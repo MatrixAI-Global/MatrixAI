@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Image, StyleSheet, ActivityIndicator } from 'react-native';
 import { useCoinsSubscription } from '../hooks/useCoinsSubscription';
 import { supabase } from '../supabaseClient';
 
@@ -8,7 +8,9 @@ const Header = ({ navigation, uid, openDrawer }) => {
     const coinCount = useCoinsSubscription(uid);
     const [userName, setUserName] = useState('');
     const [dpUrl, setDpUrl] = useState(null);
-
+    const [loading, setLoading] = useState(true);
+    const [isPro, setIsPro] = useState(false);
+    
     useEffect(() => {
         if (uid) {
             fetchUserData();
@@ -16,10 +18,11 @@ const Header = ({ navigation, uid, openDrawer }) => {
     }, [uid]);
 
     const fetchUserData = async () => {
+        setLoading(true);
         try {
             const { data, error } = await supabase
                 .from('users')
-                .select('name, dp_url')
+                .select('name, dp_url, subscription_active')
                 .eq('uid', uid)
                 .single();
 
@@ -37,9 +40,14 @@ const Header = ({ navigation, uid, openDrawer }) => {
                 if (data.dp_url) {
                     setDpUrl(data.dp_url);
                 }
+                
+                // Set pro status
+                setIsPro(data.subscription_active || false);
             }
         } catch (error) {
             console.error('Error:', error);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -63,9 +71,27 @@ const Header = ({ navigation, uid, openDrawer }) => {
                         style={styles.icon} 
                     />
                 </TouchableOpacity>
-                <Text style={styles.welcomeText}>
-                    Welcome{userName ? ` ${userName}!`: '!'}
-                </Text>
+                
+                {loading ? (
+                    <ActivityIndicator size="small" color="#333" style={{ marginLeft: 10 }} />
+                ) : (
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        {isPro ? (
+                            <View style={styles.proContainer}>
+                                <Text style={styles.welcomeText}>
+                                    {userName} 
+                                </Text>
+                                <View style={styles.proBadge}>
+                                    <Text style={styles.proText}>PRO</Text>
+                                </View>
+                            </View>
+                        ) : (
+                            <Text style={styles.welcomeText}>
+                                Welcome{userName ? ` ${userName}!`: '!'}
+                            </Text>
+                        )}
+                    </View>
+                )}
             </View>
 
             {/* Coin Display with Coin Icon */}
@@ -133,6 +159,22 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold',
         color: '#FF6600',
+    },
+    proContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    proBadge: {
+        backgroundColor: '#FF6600',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 12,
+        marginLeft: 6,
+    },
+    proText: {
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: 12,
     },
 });
 

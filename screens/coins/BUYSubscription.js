@@ -12,6 +12,7 @@ const BUYSubscription = ({ navigation, route }) => {
   const [discount, setDiscount] = useState(0);
   const [suggestedCoupons, setSuggestedCoupons] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [finalPrice, setFinalPrice] = useState(price);
   const [originalPrice, setOriginalPrice] = useState(price);
@@ -135,8 +136,8 @@ const BUYSubscription = ({ navigation, route }) => {
     setAppliedCoupon(null);
   };
 
-  const handleConfirm = () => {
-    // Implement payment processing or confirmation logic here
+  const handleConfirm = async () => {
+    // Show confirmation alert
     Alert.alert(
       'Confirm Purchase',
       `You are about to purchase the ${planDetails.title} for ${finalPrice}HKD. Would you like to proceed?`,
@@ -147,17 +148,51 @@ const BUYSubscription = ({ navigation, route }) => {
         },
         {
           text: 'Confirm',
-          onPress: () => {
-            // Here you would implement the payment processing
-            // For now, we'll just simulate success and navigate to a success screen
-            navigation.navigate('successScreen', {
-              message: `Successfully purchased ${planDetails.title}!`,
-              planDetails: planDetails,
-              finalPrice: `${finalPrice}HKD`,
-              discount: discount > 0 ? `${discount}%` : null,
-              startDate: startDate.toLocaleDateString(),
-              endDate: endDate.toLocaleDateString(),
-            });
+          onPress: async () => {
+            try {
+              // Show loading indicator
+              setProcessing(true);
+              
+              // Prepare request data
+              const requestData = {
+                uid: uid,
+                plan: plan,
+                totalPrice: parseInt(finalPrice),
+                couponId: appliedCoupon ? appliedCoupon.id : ""
+              };
+              
+              // Make API call
+              const response = await fetch('https://matrix-server.vercel.app/BuySubscription', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestData),
+              });
+              
+              const result = await response.json();
+              
+              // Handle API response
+              if (result.success) {
+                // Navigate to success screen
+                navigation.replace('SuccessScreen', {
+                  message: `Successfully purchased ${planDetails.title}!`,
+                  planDetails: planDetails,
+                  finalPrice: `${finalPrice}HKD`,
+                  discount: discount > 0 ? `${discount}%` : null,
+                  startDate: startDate.toLocaleDateString(),
+                  endDate: endDate.toLocaleDateString(),
+                });
+              } else {
+                // Show error message
+                Alert.alert('Error', result.message || 'Failed to process payment');
+              }
+            } catch (error) {
+              console.error('Payment error:', error);
+              Alert.alert('Error', 'Something went wrong while processing your payment');
+            } finally {
+              setProcessing(false);
+            }
           },
         },
       ]
@@ -301,10 +336,26 @@ const BUYSubscription = ({ navigation, route }) => {
       </View>
 
       {/* Confirm Button */}
-      <TouchableOpacity style={styles.confirmButton} onPress={handleConfirm}>
-        <Text style={styles.confirmButtonText}>Confirm Purchase</Text>
+      <TouchableOpacity 
+        style={[styles.confirmButton, processing && styles.disabledButton]} 
+        onPress={handleConfirm}
+        disabled={processing}
+      >
+        {processing ? (
+          <ActivityIndicator size="small" color="#fff" />
+        ) : (
+          <Text style={styles.confirmButtonText}>Confirm Purchase</Text>
+        )}
       </TouchableOpacity>
       </View>
+
+      {/* Processing overlay */}
+      {processing && (
+        <View style={styles.processingOverlay}>
+          <ActivityIndicator size="large" color="#fff" />
+          <Text style={styles.processingText}>Processing your purchase...</Text>
+        </View>
+      )}
     </LinearGradient>
   );
 };
@@ -316,7 +367,7 @@ const styles = StyleSheet.create({
   },
   container2: {
     flex: 1,
-  padding:20,
+    padding:20,
   },
   backButton: {
     position: 'absolute',
@@ -525,6 +576,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
+  },
+  processingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  processingText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 20,
   },
 });
 

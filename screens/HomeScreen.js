@@ -10,7 +10,9 @@ import { useAuth } from '../hooks/useAuth';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Banner2 from '../components/AIShop/Banner copy';
 import SidePanel from '../components/SidePanel';
-
+import { ProStatusProvider } from '../hooks/useProStatus';
+import FeatureCardWithDetailsPro from '../components/FeatureCardWithDetailsPro';  
+import FeatureCardWithDetailsAddon from '../components/FeatureCardWithDetailsAddon';
 const { width } = Dimensions.get('window'); // Get screen width
 
 const HomeScreen = ({ navigation }) => {
@@ -56,103 +58,107 @@ const HomeScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
+    <ProStatusProvider>
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" />
 
-      {/* Fixed Header */}
-      <View style={styles.fixedHeader}>
-        <Header navigation={navigation} uid={uid} openDrawer={toggleSidePanel} />
-      </View>
+        {/* Fixed Header */}
+        <View style={styles.fixedHeader}>
+          <Header navigation={navigation} uid={uid} openDrawer={toggleSidePanel} />
+        </View>
 
-      <ScrollView 
-        contentContainerStyle={styles.scrollViewContent}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-      >
-        {/* Rotating Animated Gradient with Fixed Content */}
-        <View style={styles.content}>
-          <View style={styles.roundedCardContainer}>
-            <Animated.View
-              style={[
-                styles.animatedGradientContainer,
-                {
-                  width: circleRadius,
-                  height: circleRadius,
-                  borderRadius: circleRadius / 2,
-                  top: -(circleRadius * 0.1), // Adjust position for centering
-                  left: '50%',
-                  marginLeft: -(circleRadius / 2), // Ensure it's centered horizontally
-                  transform: [{ rotate: rotation }],
-                },
-              ]}>
-              <LinearGradient
-                colors={['#2A76F1', '#88C2FF', '#2A76F1']}
-                start={{ x: 0.5, y: 0 }}
-                end={{ x: 0.5, y: 1 }}
-                style={styles.gradientBackground}
-              />
-            </Animated.View>
+        <ScrollView 
+          contentContainerStyle={styles.scrollViewContent}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          {/* Rotating Animated Gradient with Fixed Content */}
+          <View style={styles.content}>
+            <View style={styles.roundedCardContainer}>
+              <Animated.View
+                style={[
+                  styles.animatedGradientContainer,
+                  {
+                    width: circleRadius,
+                    height: circleRadius,
+                    borderRadius: circleRadius / 2,
+                    top: -(circleRadius * 0.1), // Adjust position for centering
+                    left: '50%',
+                    marginLeft: -(circleRadius / 2), // Ensure it's centered horizontally
+                    transform: [{ rotate: rotation }],
+                  },
+                ]}>
+                <LinearGradient
+                  colors={['#2A76F1', '#88C2FF', '#2A76F1']}
+                  start={{ x: 0.5, y: 0 }}
+                  end={{ x: 0.5, y: 1 }}
+                  style={styles.gradientBackground}
+                />
+              </Animated.View>
 
-            <View style={styles.gradientContent}>
-              <View style={styles.rowContainer}>
-                <View style={styles.micContainer}>
-                  <Image source={require('../assets/voice.png')} style={styles.micIcon} />
-                </View>
-                <View style={styles.columnContainer}>
-                  <Text style={styles.sectionTitle}>Speech to Script</Text>
-                  <Text style={styles.voiceChangeText}> Change your voice as you wish</Text>
+              <View style={styles.gradientContent}>
+                <View style={styles.rowContainer}>
+                  <View style={styles.micContainer}>
+                    <Image source={require('../assets/voice.png')} style={styles.micIcon} />
+                  </View>
+                  <View style={styles.columnContainer}>
+                    <Text style={styles.sectionTitle}>Speech to Script</Text>
+                    <Text style={styles.voiceChangeText}> Change your voice as you wish</Text>
+                  </View>
                 </View>
               </View>
+              <TouchableOpacity style={styles.createButton} onPress={handleButtonPress}>
+                <Text style={styles.createButtonText}>Create</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.createButton} onPress={handleButtonPress}>
-              <Text style={styles.createButtonText}>Create</Text>
-            </TouchableOpacity>
           </View>
-        </View>
 
-        {/* Scrollable Content */}
-        {/* Feature Cards */}
-        <View style={styles.featureRow}>
-         
-          <FeatureCard
-            title="Generate Image"
-            description="Create stunning Image with MatrixAI"
-            iconSource={require('../assets/card/image.png')}
-            navigation={navigation}
-            targetScreen="ImageTextScreen"
-          />
+          {/* Scrollable Content */}
+          {/* Feature Cards */}
+          <View style={styles.featureRow}>
+           
+            <FeatureCard
+              title="Generate Image"
+              description="Create stunning Image with MatrixAI"
+              iconSource={require('../assets/card/image.png')}
+              navigation={navigation}
+              targetScreen="ImageTextScreen"
+            />
+        
+            <FeatureCard
+              title="Generate Video"
+              description="Convert your own Video."
+              iconSource={require('../assets/card/video.png')}
+              navigation={navigation}
+              targetScreen="VideoUpload"
+            />
+            </View>
+            <View style={styles.featureRow}>
+            <FeatureCard
+              title="Remove Background"
+              description="Remove Background from you Images."
+              iconSource={require('../assets/card/image.png')}
+              navigation={navigation}
+              targetScreen="RemoveBackground"
+            />
       
-          <FeatureCard
-            title="Generate Video"
-            description="Convert your own Video."
-            iconSource={require('../assets/card/video.png')}
-            navigation={navigation}
-            targetScreen="VideoUpload"
-          />
-              </View>
-              <View style={styles.featureRow}>
-          <FeatureCard
-            title="Remove Background"
-            description="Remove Background from you Images."
-            iconSource={require('../assets/card/image.png')}
-            navigation={navigation}
-            targetScreen="RemoveBackground"
-          />
-    
-          <FeatureCard
-            title="Create Presentation"
-            description="Create your prsentation is less than a minutue"
-            iconSource={require('../assets/card/ppt.png')}
-            navigation={navigation}
-            targetScreen="PPTGenerateScreen"
-          />
+            <FeatureCard
+              title="Create Presentation"
+              description="Create your prsentation is less than a minutue"
+              iconSource={require('../assets/card/ppt.png')}
+              navigation={navigation}
+              targetScreen="PPTGenerateScreen"
+            />
          
-        </View>
-        <FeatureCardWithDetails/>
-        <Banner2 style={styles.banner}/>
-      </ScrollView>
-      <FloatingButton />
-    </SafeAreaView>
+          </View>
+          <FeatureCardWithDetails/>
+          <FeatureCardWithDetailsPro/>
+          <FeatureCardWithDetailsAddon/>
+          <Banner2 style={styles.banner}/>
+        </ScrollView>
+        <FloatingButton />
+      </SafeAreaView>
+    </ProStatusProvider>
   );
 };
 
