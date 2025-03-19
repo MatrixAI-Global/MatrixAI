@@ -60,7 +60,7 @@ const FeatureCard = ({ title, description, iconSource, navigation, targetScreen 
 
 const styles = StyleSheet.create({
   card: {
-    width: width * 0.40, // 40% of the screen width
+    width: width * 0.424, // 40% of the screen width
     backgroundColor: '#fff',
     borderRadius: 10,
     padding: 15,

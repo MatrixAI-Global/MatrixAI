@@ -15,7 +15,6 @@ import { supabase } from '../supabaseClient';
 
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import * as ImagePicker from 'react-native-image-picker';
-import { decode } from 'base-64';
 import { useAuthUser } from '../hooks/useAuthUser';
 
 const EditProfile = ({ navigation }) => {
@@ -68,12 +67,24 @@ const EditProfile = ({ navigation }) => {
       const result = await ImagePicker.launchImageLibrary(options);
       if (result.assets && result.assets[0]) {
         setUploading(true);
-        const fileContent = result.assets[0].uri;
-        const filePath = `users/${uid}/profile-${Date.now()}`;
+        const asset = result.assets[0];
+        
+        // Get file extension from uri
+        const fileExt = asset.uri.substring(asset.uri.lastIndexOf('.') + 1);
+        
+        // Create file name with correct extension
+        const filePath = `users/${uid}/profile-${Date.now()}.${fileExt}`;
+
+        // Fetch the image data
+        const response = await fetch(asset.uri);
+        const imageData = await response.blob();
 
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('user-uploads')
-          .upload(filePath, decode(fileContent));
+          .upload(filePath, imageData, {
+            contentType: asset.type || 'image/jpeg',
+            cacheControl: '3600'
+          });
 
         if (uploadError) throw uploadError;
 

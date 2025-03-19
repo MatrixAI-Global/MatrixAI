@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFFFF',
-    padding: 10,
+    padding: 20,
   },
   header: {
     flexDirection: 'row',
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
   },
   content: {
     marginTop: 20,
-    paddingHorizontal: 20,
+   
   },
   roundedCardContainer: {
     width: '100%',
