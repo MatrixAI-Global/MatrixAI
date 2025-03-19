@@ -14,13 +14,17 @@ import { ProStatusProvider } from '../hooks/useProStatus';
 import FeatureCardWithDetailsPro from '../components/FeatureCardWithDetailsPro';  
 import FeatureCardWithDetailsAddon from '../components/FeatureCardWithDetailsAddon';
 const { width } = Dimensions.get('window'); // Get screen width
-
+import { useProStatus } from '../hooks/useProStatus';
+import { useCoinsSubscription } from '../hooks/useCoinsSubscription';
 const HomeScreen = ({ navigation }) => {
   const { uid, loading } = useAuth();
   const rotateValue = useRef(new Animated.Value(0)).current;
   const [isRotatingFast, setIsRotatingFast] = useState(false);
   const [isSidePanelVisible, setIsSidePanelVisible] = useState(false);
-
+  const coinCount = useCoinsSubscription(uid);
+  
+  // Access the pro status
+  const { isPro } = useProStatus();
   // Gradient rotation animation
   useEffect(() => {
     Animated.loop(
@@ -151,10 +155,15 @@ const HomeScreen = ({ navigation }) => {
             />
          
           </View>
-          <FeatureCardWithDetails/>
-          <FeatureCardWithDetailsPro/>
-          <FeatureCardWithDetailsAddon/>
-          <Banner2 style={styles.banner}/>
+           {/* Conditional rendering based on Pro status */}
+           {!isPro ? (
+            <FeatureCardWithDetails/>
+          ) : (
+            <>
+              <FeatureCardWithDetailsPro/>
+              {(coinCount < 200) && <FeatureCardWithDetailsAddon/>}
+            </>
+          )}
         </ScrollView>
         <FloatingButton />
       </SafeAreaView>

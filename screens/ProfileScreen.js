@@ -10,13 +10,16 @@ import { supabase } from '../supabaseClient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import FeatureCardWithDetails2 from '../components/FeatureCardWithDetails copy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useProStatus } from '../hooks/useProStatus';
+import FeatureCardWithDetailsPro from '../components/FeatureCardWithDetailsPro';
+import FeatureCardWithDetailsAddon from '../components/FeatureCardWithDetailsAddon';
 
 const ProfileScreen = ({ navigation }) => {
     const { uid, loading } = useAuth();
     const coinCount = useCoinsSubscription(uid);
     const [isSeller, setIsSeller] = useState(false);
     const [isVerified, setIsVerified] = useState(false);
-
+    const { isPro } = useProStatus();
     useEffect(() => {
         if (uid) {
             checkUserStatus();
@@ -171,9 +174,17 @@ const ProfileScreen = ({ navigation }) => {
             <Header2 uid={uid} />
             
             {/* Header Section */}
-            <FeatureCardWithDetails2 />
+             {/* Conditional rendering based on Pro status */}
+             {!isPro ? (
+                <FeatureCardWithDetails2 />
+            ) : (
+                <>
+                    <FeatureCardWithDetailsPro />
+                    {(coinCount < 200) && <FeatureCardWithDetailsAddon />}
+                </>
+            )}
 
-            <View style={styles.header}>
+            {/* <View style={styles.header}>
                 <View style={styles.timeCreditsContainer}>
                     <View style={styles.timeIconContainer}>
                         <Ionicons name="time-outline" size={20} color="#fff" />
@@ -186,7 +197,7 @@ const ProfileScreen = ({ navigation }) => {
                 <TouchableOpacity style={styles.buyTimeButton} onPress={handleUpgradePress}>
                     <Text style={styles.buyTimeText}>Buy time</Text>
                 </TouchableOpacity>
-            </View>
+            </View> */}
             <Text style={styles.menuTitle}>Your Information</Text>
             {/* Updated Menu Items with navigation */}
             <View style={styles.menuContainer}>
@@ -203,7 +214,7 @@ const ProfileScreen = ({ navigation }) => {
             <MenuItem 
                 iconName="document-text-outline" 
                 label="Order History" 
-                onPress={handleVoiceNote} 
+                onPress={() => navigation.navigate('OrderHistoryScreen')} 
             />
             <MenuItem 
                 iconName="people-outline" 
@@ -248,12 +259,12 @@ const ProfileScreen = ({ navigation }) => {
          <MenuItem 
                 iconName="chatbox-outline" 
                 label="Customer Support & FAQ" 
-                onPress={() => navigation.navigate('AddProductScreen')}
+                onPress={() => navigation.navigate('CustomerSupportScreen')}
             />
             <MenuItem 
                 iconName="help-circle-outline" 
                 label="Help" 
-                onPress={() => navigation.navigate('AddProductScreen')}
+                onPress={() => navigation.navigate('CustomerSupportScreen')}
             />  
 
             <MenuItem 

@@ -16,7 +16,8 @@ import {
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import * as Animatable from 'react-native-animatable';
-import Ionicons from 'react-native-vector-icons/MaterialCommunityIcons';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
@@ -350,9 +351,7 @@ const BotScreen = ({ navigation, route }) => {
     
     const handleConfirm = async () => {
       // Ensure we have a question
-      if (!imageQuestion.trim()) {
-        setImageQuestion('What do you see in this image?');
-      }
+     
       
       setImagePreviewModalVisible(false);
       
@@ -398,6 +397,12 @@ const BotScreen = ({ navigation, route }) => {
           },
         ]);
         
+        // Save the chat history for the image
+        await saveChatHistory(publicUrl, 'user');
+        
+        // Use a fixed question to Volces API regardless of what the user typed
+        const fixedImageQuestion = "What do you see in the image define in brief";
+        
         // Send the image to Volces API
         const VOLCES_API_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
         const VOLCES_API_KEY = '95fad12c-0768-4de2-a4c2-83247337ea89';
@@ -422,7 +427,7 @@ const BotScreen = ({ navigation, route }) => {
                 content: [
                   {
                     type: 'text',
-                    text: imageQuestion
+                    text: fixedImageQuestion
                   },
                   {
                     type: 'image_url',
@@ -443,17 +448,57 @@ const BotScreen = ({ navigation, route }) => {
         );
         
         // Extract the response from Volces API
-        const botMessage = volcesResponse.data.choices[0].message.content.trim();
+        const volcesImageDescription = volcesResponse.data.choices[0].message.content.trim();
         
-        // Add the bot's response to messages
-        setMessages((prev) => [
-          ...prev,
-          { id: Date.now().toString(), text: botMessage, sender: 'bot' },
-        ]);
-        
-        // Save the chat history
-        await saveChatHistory(publicUrl, 'user');
-        await saveChatHistory(botMessage, 'bot');
+        // Now send the volcesImageDescription along with the user's question to DeepSeek
+        // Only if the user has entered a custom question
+        if (imageQuestion && imageQuestion !== 'What do you see in the image?') {
+          // Create a message combining the image description and user question
+          const combinedPrompt = `[Image Description]: ${volcesImageDescription}\n\n[User Question]: ${imageQuestion}`;
+          
+          // Send to DeepSeek
+          const deepseekResponse = await axios.post(
+            'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
+            {
+              model: 'deepseek-r1-250120',
+              messages: [
+                { role: 'system', content: systemContent },
+                ...messages.map(msg => ({
+                  role: msg.sender === 'bot' ? 'assistant' : 'user',
+                  content: msg.text || '' // Handle image messages which don't have text
+                })),
+                { role: 'user', content: combinedPrompt },
+              ]
+            },
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer 95fad12c-0768-4de2-a4c2-83247337ea89`
+              }
+            }
+          );
+          
+          // Use the DeepSeek response as the bot message
+          const botMessage = deepseekResponse.data.choices[0].message.content.trim();
+          
+          // Add the bot's response to messages
+          setMessages((prev) => [
+            ...prev,
+            { id: Date.now().toString(), text: botMessage, sender: 'bot' },
+          ]);
+          
+          // Save the chat history for the bot response
+          await saveChatHistory(botMessage, 'bot');
+        } else {
+          // If no custom question, just use the Volces response
+          setMessages((prev) => [
+            ...prev,
+            { id: Date.now().toString(), text: volcesImageDescription, sender: 'bot' },
+          ]);
+          
+          // Save the chat history for the bot response
+          await saveChatHistory(volcesImageDescription, 'bot');
+        }
         
       } catch (error) {
         console.error('Error processing image:', error);
@@ -478,78 +523,73 @@ const BotScreen = ({ navigation, route }) => {
         visible={imagePreviewModalVisible}
         onRequestClose={() => setImagePreviewModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity 
-              style={styles.closeButton}
-              onPress={() => setImagePreviewModalVisible(false)}
-            >
-              <Ionicons name="close" size={24} color="#000" />
-            </TouchableOpacity>
-            
-            <Text style={styles.modalTitle}>Image Preview</Text>
-            
-            <View style={styles.imageContainer}>
-              {selectedImage && (
-                <Image 
-                  source={{ uri: selectedImage }} 
-                  style={styles.previewImage}
-                  resizeMode="contain"
-                />
-              )}
-            </View>
-            
-            <TextInput
-              style={styles.questionInput}
-              value={imageQuestion}
-              onChangeText={setImageQuestion}
-              onFocus={() => {
-                if (imageQuestion === 'What do you see in the image?') {
-                  setImageQuestion('');
-                }
-              }}
-              onBlur={() => {
-                if (!imageQuestion.trim()) {
-                  setImageQuestion('What do you see in the image?');
-                }
-              }}
-              multiline
-              placeholder="Enter your question about the image"
-              placeholderTextColor="#999"
-            />
-            
-            <View style={styles.quickQuestionsContainer}>
-              <TouchableOpacity 
-                style={styles.quickQuestionButton}
-                onPress={() => handleQuickQuestion('What is the solution to this problem or equation shown in the image?')}
-              >
-                <Text style={styles.quickQuestionText}>What is the solution to this problem or equation shown in the image?</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.quickQuestionButton}
-                onPress={() => handleQuickQuestion('What colors are used in this image and what might they represent?')}
-              >
-                <Text style={styles.quickQuestionText}>What colors are used in this image and what might they represent?</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.quickQuestionButton}
-                onPress={() => handleQuickQuestion('Describe this image in detail and explain what it might be showing.')}
-              >
-                <Text style={styles.quickQuestionText}>Describe this image in detail and explain what it might be showing.</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <TouchableOpacity 
-              style={styles.confirmButton}
-              onPress={handleConfirm}
-            >
-              <Ionicons name="check" size={24} color="#FFF" />
-              <Text style={styles.confirmButtonText}>Send</Text>
-            </TouchableOpacity>
+        <TouchableWithoutFeedback>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.modalContent}>
+                <TouchableOpacity 
+                  style={styles.closeButton}
+                  onPress={() => setImagePreviewModalVisible(false)}
+                >
+                  <MaterialCommunityIcons name="close" size={24} color="#000" />
+                </TouchableOpacity>
+                
+                <Text style={styles.modalTitle}>Image Preview</Text>
+                
+                <View style={styles.imageContainer}>
+                  {selectedImage && (
+                    <Image 
+                      source={{ uri: selectedImage }} 
+                      style={styles.previewImage}
+                      resizeMode="contain"
+                    />
+                  )}
+                </View>
+                
+                <TextInput
+  style={styles.textInput}
+  placeholder="Ask a question about the image..."
+  value={imageQuestion}
+  onChangeText={(text) => setImageQuestion(text)} // Only update text
+  multiline
+/>
+
+
+                
+                <View style={styles.quickQuestionsContainer}>
+                  <TouchableOpacity 
+                    style={styles.quickQuestionButton}
+                    onPress={() => handleQuickQuestion('What is the solution to this problem or equation shown in the image?')}
+                  >
+                    <Text style={styles.quickQuestionText}>What is the solution to this problem or equation shown in the image?</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.quickQuestionButton}
+                    onPress={() => handleQuickQuestion('What colors are used in this image and what might they represent?')}
+                  >
+                    <Text style={styles.quickQuestionText}>What colors are used in this image and what might they represent?</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.quickQuestionButton}
+                    onPress={() => handleQuickQuestion('Describe this image in detail and explain what it might be showing.')}
+                  >
+                    <Text style={styles.quickQuestionText}>Describe this image in detail and explain what it might be showing.</Text>
+                  </TouchableOpacity>
+                </View>
+                
+                <TouchableOpacity 
+                  style={styles.confirmButton}
+                  onPress={handleConfirm}
+                >
+                  <Ionicons name="check" size={24} color="#FFF" />
+                  <Text style={styles.confirmButtonText}>Send</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
     );
   };
@@ -642,10 +682,10 @@ const BotScreen = ({ navigation, route }) => {
           <MaterialIcons name="call" size={24} color="#4C8EF7" marginHorizontal={1} />
         </TouchableOpacity>
         <TouchableOpacity onPress={() => navigation.navigate('CameraScreen')}>
-          <Ionicons name="video-outline" size={28} color="#4C8EF7" marginHorizontal={10} />
+          <MaterialCommunityIcons name="video-outline" size={28} color="#4C8EF7" marginHorizontal={10} />
         </TouchableOpacity>
         <TouchableOpacity onPress={startNewChat}>
-          <Ionicons name="chat-plus-outline" size={24} color="#4C8EF7" />
+          <MaterialCommunityIcons name="chat-plus-outline" size={24} color="#4C8EF7" />
         </TouchableOpacity>
      
        
@@ -778,7 +818,7 @@ const BotScreen = ({ navigation, route }) => {
                   {showAdditionalButtons ? (
                     <Ionicons name="close" size={24} color="#4C8EF7" />
                   ) : (
-                    <Ionicons name="plus" size={24} color="#4C8EF7" />
+                    <MaterialCommunityIcons name="plus" size={24} color="#4C8EF7" />
                   )}
                 </TouchableOpacity>
                
@@ -966,7 +1006,7 @@ const styles = StyleSheet.create({
   loadingContainer: {
     position: 'absolute',
   
-    right: 130,
+    left: -70,
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -68,7 +68,11 @@ import EmailLoginScreen from './screens/EmailLoginScreen.js';
 import TermsOfServiceScreen from './screens/TermsOfServiceScreen.js';
 import PrivacyPolicyScreen from './screens/PrivacyPolicyScreen.js';
 import BUYSubscription from './screens/coins/BUYSubscription.js';
-const Stack = createStackNavigator();
+import { ProStatusProvider } from './hooks/useProStatus.js';
+import CustomerSupportScreen from './screens/CustomerSupportScreen.js';
+import OrderHistoryScreen from './screens/OrderHistoryScreen.js';
+import HelpScreen from './screens/HelpScreen.js';
+    const Stack = createStackNavigator();
 
 interface AuthContextType {
     uid: string | null;
@@ -114,6 +118,7 @@ const App = () => {
                 {({ uid }: AuthContextType) => (
                     <>
                         <ModalProvider>
+                            <ProStatusProvider>
                             <NavigationContainer>
                                 <Stack.Navigator>
                                     {/* Onboarding Screen */}
@@ -384,9 +389,25 @@ const App = () => {
                                         component={BUYSubscription} 
                                         options={{ headerShown: false }} 
                                     />
+                                    <Stack.Screen 
+                                        name="CustomerSupportScreen" 
+                                        component={CustomerSupportScreen} 
+                                        options={{ headerShown: false }} 
+                                    />
+                                   <Stack.Screen 
+                                   name="OrderHistoryScreen" 
+                                   component={OrderHistoryScreen} 
+                                   options={{ headerShown: false }} 
+                                   />
+                                   <Stack.Screen 
+                                   name="HelpScreen" 
+                                   component={HelpScreen} 
+                                   options={{ headerShown: false }} 
+                                   />
                                 </Stack.Navigator>
                             </NavigationContainer>
-                        </ModalProvider>
+                            </ProStatusProvider>
+                            </ModalProvider>
                         <Toast />
                     </>
                 )}
