@@ -673,21 +673,23 @@ const BotScreen = ({ navigation, route }) => {
             <Text style={styles.placeholderText2}>How can I help you today?</Text>
             
             {/* New role selection UI */}
-            <Text style={styles.placeholderText3}>You can ask me any question or you can select the below role:</Text>
-            
+            <Text style={styles.placeholderText3}>You can ask me any question or you</Text>
+            <Text style={styles.placeholderText4}>can select the below role:</Text>
             <View style={styles.roleButtonsContainer}>
               <View style={styles.roleButtonRow}>
                 <TouchableOpacity 
                   style={styles.roleButton} 
-                  onPress={() => handleRoleSelection('Doctor')}
+                  onPress={() => handleRoleSelection('🩺 Doctor')}
                 >
+                   <Text style={styles.roleButtonText}>🩺</Text>
                   <Text style={styles.roleButtonText}>Doctor</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
                   style={styles.roleButton} 
-                  onPress={() => handleRoleSelection('Teacher')}
+                  onPress={() => handleRoleSelection('📚 Teacher')}
                 >
+                    <Text style={styles.roleButtonText}>📚</Text>
                   <Text style={styles.roleButtonText}>Teacher</Text>
                 </TouchableOpacity>
               </View>
@@ -695,15 +697,17 @@ const BotScreen = ({ navigation, route }) => {
               <View style={styles.roleButtonRow}>
                 <TouchableOpacity 
                   style={styles.roleButton} 
-                  onPress={() => handleRoleSelection('Lawyer')}
+                  onPress={() => handleRoleSelection('⚖️ Lawyer')}
                 >
+                    <Text style={styles.roleButtonText}>⚖️</Text>
                   <Text style={styles.roleButtonText}>Lawyer</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
                   style={styles.roleButton} 
-                  onPress={() => handleRoleSelection('Psychologist')}
+                  onPress={() => handleRoleSelection('🌱 Psychologist')}
                 >
+                    <Text style={styles.roleButtonText}>🌱</Text>
                   <Text style={styles.roleButtonText}>Psychologist</Text>
                 </TouchableOpacity>
               </View>
@@ -711,15 +715,17 @@ const BotScreen = ({ navigation, route }) => {
               <View style={styles.roleButtonRow}>
                 <TouchableOpacity 
                   style={styles.roleButton} 
-                  onPress={() => handleRoleSelection('Engineer')}
+                  onPress={() => handleRoleSelection('🔧 Engineer')}
                 >
+                    <Text style={styles.roleButtonText}>🔧</Text>
                   <Text style={styles.roleButtonText}>Engineer</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
                   style={styles.roleButton} 
-                  onPress={() => handleRoleSelection('Surveyor')}
+                  onPress={() => handleRoleSelection('📐 Surveyor')}
                 >
+                    <Text style={styles.roleButtonText}>📐</Text>
                   <Text style={styles.roleButtonText}>Surveyor</Text>
                 </TouchableOpacity>
               </View>
@@ -727,15 +733,17 @@ const BotScreen = ({ navigation, route }) => {
               <View style={styles.roleButtonRow}>
                 <TouchableOpacity 
                   style={styles.roleButton} 
-                  onPress={() => handleRoleSelection('Architect')}
+                  onPress={() => handleRoleSelection('🏤 Architect')}
                 >
+                    <Text style={styles.roleButtonText}>🏤</Text>
                   <Text style={styles.roleButtonText}>Architect</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
                   style={styles.roleButton} 
-                  onPress={() => handleRoleSelection('Financial Advisor')}
+                  onPress={() => handleRoleSelection('📈 Financial Advisor')}
                 >
+                    <Text style={styles.roleButtonText}>📈</Text>
                   <Text style={styles.roleButtonText}>Financial Advisor</Text>
                 </TouchableOpacity>
               </View>
@@ -756,7 +764,7 @@ const BotScreen = ({ navigation, route }) => {
       
        <View style={[styles.chatBoxContainer, { bottom: showAdditionalButtons ? 70 : 10}]}>
           <TextInput
-            style={[styles.textInput, { textAlignVertical: 'top' }]}
+            style={[styles.textInput, { textAlignVertical: 'center' }]}
             placeholder="Send a message..."
             placeholderTextColor="#ccc"
             value={inputText}
@@ -979,6 +987,8 @@ const styles = StyleSheet.create({
     padding: 10,
     fontSize: 16,
     marginHorizontal: 10,
+    justifyContent:'center',
+    alignSelf:'center',
   },
   inputContainer: {
     flexDirection: 'row',
@@ -1035,6 +1045,13 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     marginTop: 20,
+  
+  },
+  placeholderText4: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+   
     marginBottom: 10,
   },
   roleButtonsContainer: {
@@ -1053,8 +1070,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#4C8EF7',
+
+  
+    backgroundColor:'#C5F8FE86',
     minWidth: '48%',
     alignItems: 'center',
     shadowColor: '#000',

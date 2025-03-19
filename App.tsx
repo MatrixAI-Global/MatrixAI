@@ -67,6 +67,7 @@ import AudioRecordScreen from './screens/AudioRecordScreen.js';
 import EmailLoginScreen from './screens/EmailLoginScreen.js';
 import TermsOfServiceScreen from './screens/TermsOfServiceScreen.js';
 import PrivacyPolicyScreen from './screens/PrivacyPolicyScreen.js';
+import BUYSubscription from './screens/coins/BUYSubscription.js';
 const Stack = createStackNavigator();
 
 interface AuthContextType {
@@ -378,7 +379,11 @@ const App = () => {
                                         options={{ headerShown: false }} 
                                     />
                                   
-                                    
+                                    <Stack.Screen 
+                                        name="BUYSubscription" 
+                                        component={BUYSubscription} 
+                                        options={{ headerShown: false }} 
+                                    />
                                 </Stack.Navigator>
                             </NavigationContainer>
                         </ModalProvider>

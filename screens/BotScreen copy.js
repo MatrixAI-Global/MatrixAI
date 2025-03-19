@@ -95,12 +95,7 @@ const BotScreen2 = ({ navigation, route }) => {
       sender: 'bot',
     },
     // Add summary request message conditionally
-    ...(transcription ? [{
-      id: `summary-request-${audioid}`,
-      text: "Help me generate a summary of the given transcription",
-      sender: 'user',
-      fullText: transcription,
-    }] : []),
+  
   ]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
