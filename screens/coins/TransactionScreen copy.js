@@ -1,49 +1,95 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity } from 'react-native';
-
-const transactions = [
-  { id: '1', type: 'Image', coins: 2 },
-  { id: '2', type: 'Image', coins: 2 },
-  { id: '3', type: 'Image', coins: 2 },
-  { id: '4', type: 'Image', coins: 2 },
-  { id: '5', type: 'Image', coins: 2 },
-  { id: '6', type: 'Image', coins: 2 },
-];
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
+import axios from 'axios';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const TransactionScreen2 = ({ navigation }) => {
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
+
+  const fetchTransactions = async () => {
+    try {
+      const response = await axios.post('https://matrix-server.vercel.app/AllTransactions', {
+        uid: "31ca978d-53c8-4b61-963f-fdacc2f5e9c6"
+      });
+      
+      if (response.data.success) {
+        setTransactions(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getTransactionIcon = (transactionName) => {
+    switch (transactionName.toLowerCase()) {
+      case 'audio transcription':
+        return require('../../assets/card/music.png');
+      case 'image':
+        return require('../../assets/card/image.png');
+      default:
+        return require('../../assets/card/ppt.png');
+    }
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   const renderItem = ({ item }) => (
     <View style={styles.transactionItem}>
-      <Image source={require('../../assets/coin.png')} style={styles.image} />
+      <Image source={getTransactionIcon(item.transaction_name)} style={styles.image} />
       <View style={styles.transactionDetails}>
-        <Text style={styles.transactionType}>{item.type}</Text>
-        <Text style={styles.transactionSubText}>AI generated Image</Text>
+        <Text style={styles.transactionType}>{item.transaction_name}</Text>
+        <Text style={styles.transactionSubText}>{formatDate(item.time)}</Text>
+        <Text style={styles.balanceText}>Balance: {item.remaining_coins} coins</Text>
       </View>
-      <Text style={styles.coinsText}>{item.coins} Coins</Text>
+      <View style={styles.coinsContainer}>
+        <Text style={[styles.coinsText, item.status === 'success' ? styles.successText : styles.pendingText]}>
+          {item.coin_amount} Coins
+        </Text>
+        <Text style={[styles.statusText, item.status === 'success' ? styles.successText : styles.pendingText]}>
+          {item.status}
+        </Text>
+      </View>
     </View>
   );
 
   return (
-    <View style={styles.container}>
-      {/* Header with Back Button */}
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Image source={require('../../assets/back.png')} style={styles.backIcon} />
         </TouchableOpacity>
-       
+        <Text style={styles.headerTitle}>Transaction History</Text>
       </View>
 
-      {/* Transaction List */}
-      <View style={styles.transactionsHeader}>
-        <Text style={styles.subtitle}>Last Transaction</Text>
-      </View>
-
-      <FlatList
-        data={transactions}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        style={styles.transactionList}
-      />
-    </View>
+      {loading ? (
+        <ActivityIndicator size="large" color="#4169E1" style={styles.loader} />
+      ) : (
+        <FlatList
+          data={transactions}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id.toString()}
+          style={styles.transactionList}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
+        />
+      )}
+    </SafeAreaView>
   );
 };
 
@@ -53,48 +99,53 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fc',
     padding: 20,
   },
+  loader: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   header: {
     flexDirection: 'row',
-  marginLeft:-20,
-  
-    paddingHorizontal: 10,
-
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingTop: 10,
   },
   backButton: {
-    marginRight: 10,
+    padding: 5,
   },
   backIcon: {
-    width: 30,
-    height: 30,
+    width: 24,
+    height: 24,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    marginLeft: 15,
+    color: '#333',
   },
-  transactionsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  transactionList: {
-    marginTop: 10,
+  listContent: {
+    paddingBottom: 20,
   },
   transactionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    padding: 15,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   image: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    marginRight: 10,
+    marginRight: 15,
+    resizeMode: 'contain',
+ 
   },
   transactionDetails: {
     flex: 1,
@@ -102,15 +153,37 @@ const styles = StyleSheet.create({
   transactionType: {
     fontSize: 16,
     fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
   },
   transactionSubText: {
     fontSize: 12,
-    color: '#6b6b6b',
+    color: '#666',
+    marginBottom: 4,
+  },
+  balanceText: {
+    fontSize: 12,
+    color: '#4169E1',
+    fontWeight: '500',
+  },
+  coinsContainer: {
+    alignItems: 'flex-end',
   },
   coinsText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#000',
+    marginBottom: 4,
+  },
+  successText: {
+    color: '#4CAF50',
+  },
+  pendingText: {
+    color: '#FFA500',
+  },
+  statusText: {
+    fontSize: 12,
+    textTransform: 'capitalize',
+    fontWeight: '500',
   },
 });
 

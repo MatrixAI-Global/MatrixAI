@@ -72,6 +72,7 @@ import { ProStatusProvider } from './hooks/useProStatus.js';
 import CustomerSupportScreen from './screens/CustomerSupportScreen.js';
 import OrderHistoryScreen from './screens/OrderHistoryScreen.js';
 import HelpScreen from './screens/HelpScreen.js';
+import AddonScreen from './screens/coins/AddonScreen.js';
     const Stack = createStackNavigator();
 
 interface AuthContextType {
@@ -402,6 +403,11 @@ const App = () => {
                                    <Stack.Screen 
                                    name="HelpScreen" 
                                    component={HelpScreen} 
+                                   options={{ headerShown: false }} 
+                                   />
+                                   <Stack.Screen 
+                                   name="AddonScreen" 
+                                   component={AddonScreen} 
                                    options={{ headerShown: false }} 
                                    />
                                 </Stack.Navigator>

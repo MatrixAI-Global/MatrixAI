@@ -3,8 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, FlatList, A
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Ionicons';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
-import { useAuth } from '../../hooks/useAuth';
-import supabase from '../../supabaseClient';
+
 
 const BUYSubscription = ({ navigation, route }) => {
   const { uid, plan, price } = route.params;
@@ -66,6 +65,15 @@ const BUYSubscription = ({ navigation, route }) => {
         coins: '1380 coins/month',
         duration: '12 Months',
         expiry: 'You will receive 1380 coins each month. These coins will expire at the end of each month.',
+        price: price
+      };
+    }
+    else if (plan === 'Addon') {
+      return {
+        title: 'Addon Plan',
+        coins: '550 coins',
+        duration: 'Until subscription',
+        expiry: 'Coins will expire after your subscription expires',
         price: price
       };
     }

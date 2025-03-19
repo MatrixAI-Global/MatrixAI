@@ -32,7 +32,7 @@ const FeatureCardWithDetailsAddon = () => {
             
             <TouchableOpacity 
                 style={styles.actionButton}
-                onPress={() => navigation.navigate('TransactionScreen', { coinCount })}
+                onPress={() => navigation.navigate('AddonScreen')}
             >
                 <Text style={styles.actionButtonText}>Purchase More Coins</Text>
             </TouchableOpacity>

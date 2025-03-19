@@ -3,13 +3,14 @@ import React, { useState, useEffect } from 'react';
 import supabase from '../../supabaseClient';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ImageBackground } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient'; // Install react-native-linear-gradient for gradient backgrounds
-import { useAuth } from '../../hooks/useAuth';
+
 import { useCoinsSubscription } from '../../hooks/useCoinsSubscription';
 import Icon from 'react-native-vector-icons/Ionicons';
-import FontAwesome from 'react-native-vector-icons/FontAwesome';
+import { useAuthUser } from '../../hooks/useAuthUser';
+
 
 const SubscriptionScreen = ({ navigation }) => {
-  const { uid } = useAuth();
+  const { uid } = useAuthUser();
   const coinCount = useCoinsSubscription(uid);
   const [selectedPlan, setSelectedPlan] = useState('Tester'); // Default selected plan as Tester
   const [coins, setCoins] = useState(null);
