@@ -8,6 +8,7 @@ import { supabase } from '../supabaseClient';
 import Icon from 'react-native-vector-icons/Ionicons';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import Toast from 'react-native-toast-message';
+import { CheckBox } from '@react-native-community/checkbox';
 const { width } = Dimensions.get('window');
 
 const EmailLoginScreen = ({ navigation }) => {
@@ -15,6 +16,7 @@ const EmailLoginScreen = ({ navigation }) => {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [isChecked, setChecked] = useState(false);
 
     const handleLogin = async () => {
         // Validate email and password
@@ -202,7 +204,16 @@ const EmailLoginScreen = ({ navigation }) => {
                     />
                 </TouchableOpacity>
             </View>
-
+            <View style={styles.TermsContainer}>
+                <CheckBox
+                    value={isChecked}
+                    onValueChange={setChecked}
+                />
+                <Text style={styles.TermsText}>By logging in, you agree to our</Text>
+                <TouchableOpacity style={styles.TermsLink} onPress={() => navigation.navigate('TermsOfService')}>
+                    <Text style={styles.TermsLinkText}>Terms of Service</Text>
+                </TouchableOpacity>
+            </View>
             {/* Forgot Password Link */}
             <TouchableOpacity style={styles.forgotPasswordContainer} onPress={handleForgotPassword}>
                 <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
@@ -386,6 +397,24 @@ const styles = StyleSheet.create({
         color: '#aaa',
         fontSize: 12,
         marginHorizontal: 5,
+    },
+    TermsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        marginTop: 20,
+        width: '100%',
+    },
+    TermsText: {
+        fontSize: 12,
+        color: '#aaa',
+    },
+    TermsLink: {
+        fontSize: 12,
+        color: '#2274F0',
+    },
+    TermsLinkText: {
+        fontSize: 12,
+        color: '#2274F0',
     },
 });
 

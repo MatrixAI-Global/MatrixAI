@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, FlatList, A
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Ionicons';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
+import PlanCard from '../../components/PlanCard';
 
 
 const BUYSubscription = ({ navigation, route }) => {
@@ -255,36 +256,7 @@ const BUYSubscription = ({ navigation, route }) => {
       <Text style={styles.title}>Complete Purchase</Text>
 
       {/* Plan Details Card */}
-      <View style={styles.planCard}>
-        <Text style={styles.planCardTitle}>{planDetails.title}</Text>
-        
-        <View style={styles.planDetailsRow}>
-          <View style={styles.planDetailItem}>
-            <Image source={require('../../assets/coin.png')} style={styles.coinIcon} />
-            <Text style={styles.planDetailText}>{planDetails.coins}</Text>
-          </View>
-          
-          <View style={styles.planDetailItem}>
-            <Icon name="calendar-outline" size={20} color="#2274F0" />
-            <Text style={styles.planDetailText}>{planDetails.duration}</Text>
-          </View>
-          
-          <View style={styles.planDetailItem}>
-            <Icon name="pricetag-outline" size={20} color="#FF6600" />
-            <Text style={styles.planDetailText}>{planDetails.price}</Text>
-          </View>
-        </View>
-        
-        <View style={styles.dateContainer}>
-          <Text style={styles.dateLabel}>Start Date:</Text>
-          <Text style={styles.dateValue}>{formatDate(startDate)}</Text>
-          
-          <Text style={styles.dateLabel}>End Date:</Text>
-          <Text style={styles.dateValue}>{formatDate(endDate)}</Text>
-        </View>
-
-        <Text style={styles.planExpiryNote}>{planDetails.expiry}</Text>
-      </View>
+      <PlanCard planDetails={planDetails} />
 
       {/* Coupon Section */}
       <View style={styles.couponSection}>

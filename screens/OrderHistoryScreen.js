@@ -114,12 +114,9 @@ console.log(orders);
                 </View>
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Amount Paid:</Text>
-                  <Text style={styles.detailValue}>₹{order.total_price}</Text>
+                  <Text style={styles.detailValue}>${order.total_price} HKD</Text>
                 </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Coins Added:</Text>
-                  <Text style={styles.detailValue}>{order.coins_added} coins</Text>
-                </View>
+               
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Valid Till:</Text>
                   <Text style={styles.detailValue}>

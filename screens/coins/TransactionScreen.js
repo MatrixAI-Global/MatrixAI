@@ -4,6 +4,7 @@ import axios from 'axios';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthUser } from '../../hooks/useAuthUser';
 import { useCoinsSubscription } from '../../hooks/useCoinsSubscription';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 const TransactionScreen = ({ route, navigation }) => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -35,11 +36,11 @@ const TransactionScreen = ({ route, navigation }) => {
   const getTransactionIcon = (transactionName) => {
     switch (transactionName.toLowerCase()) {
       case 'audio transcription':
-        return require('../../assets/card/music.png');
+        return 'audio-file';
       case 'image':
-        return require('../../assets/card/image.png');
+        return 'image';
       default:
-        return require('../../assets/card/ppt.png');
+        return 'video-file';
     }
   };
 
@@ -56,7 +57,9 @@ const TransactionScreen = ({ route, navigation }) => {
 
   const renderItem = ({ item }) => (
     <View style={styles.transactionItem}>
-      <Image source={getTransactionIcon(item.transaction_name)} style={styles.image} />
+      <View style={styles.iconContainer}>
+      <Icon name={getTransactionIcon(item.transaction_name)} size={30} color="#4169E1" style={styles.image} />
+      </View>
       <View style={styles.transactionDetails}>
         <Text style={styles.transactionType}>{item.transaction_name}</Text>
         <Text style={styles.transactionSubText}>{formatDate(item.time)}</Text>
@@ -78,10 +81,10 @@ const TransactionScreen = ({ route, navigation }) => {
       </TouchableOpacity>
 
       {/* Header with full background */}
-      <View style={styles.header}>
+      <TouchableOpacity style={styles.header} onPress={() => navigation.navigate('AddonScreen')}>
         <Image source={require('../../assets/Header.png')} style={styles.headerImage} />
         <Text style={styles.coinCount}>{coinCount} Coins</Text>
-      </View>
+      </TouchableOpacity>
 
       {/* Action buttons */}
       <View style={styles.actionsRow}>
@@ -93,18 +96,11 @@ const TransactionScreen = ({ route, navigation }) => {
           </TouchableOpacity>
           <Text style={styles.actionText}>Transaction</Text>
         </View>
+       
         <View>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => navigation.navigate('WatchAdScreen')}>
-            <Image source={require('../../assets/export.png')} style={styles.actionIcon} />
-          </TouchableOpacity>
-          <Text style={styles.actionText}>Watch Ad</Text>
-        </View>
-        <View>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => navigation.navigate('BuyCoinsScreen')}>
+            onPress={() => navigation.navigate('AddonScreen')}>
             <Image source={require('../../assets/money-send.png')} style={styles.actionIcon} />
           </TouchableOpacity>
           <Text style={styles.actionText}>Buy Coins</Text>
@@ -243,13 +239,17 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-  image: {
+
+  iconContainer: {
     width: 50,
     height: 50,
     borderRadius: 25,
     marginRight: 15,
     resizeMode: 'contain',
-   
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#4169E1',
   },
   transactionDetails: {
     flex: 1,

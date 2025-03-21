@@ -62,6 +62,7 @@ const styles = StyleSheet.create({
   card: {
     width: width * 0.424, // 40% of the screen width
     backgroundColor: '#fff',
+    aspectRatio: 1,
     borderRadius: 10,
     padding: 15,
     margin: 10,

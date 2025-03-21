@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Image, StyleSheet, ActivityIndicator } from 'react-native';
 import { useCoinsSubscription } from '../hooks/useCoinsSubscription';
 import { supabase } from '../supabaseClient';
 
 const Header2 = ({ navigation, uid, openDrawer }) => {
- 
-   
+    console.log("Header rendering with UID:", uid);
+    const coinCount = useCoinsSubscription(uid);
     const [userName, setUserName] = useState('');
     const [dpUrl, setDpUrl] = useState(null);
-
+    const [loading, setLoading] = useState(true);
+    const [isPro, setIsPro] = useState(false);
+    
     useEffect(() => {
         if (uid) {
             fetchUserData();
@@ -16,10 +18,11 @@ const Header2 = ({ navigation, uid, openDrawer }) => {
     }, [uid]);
 
     const fetchUserData = async () => {
+        setLoading(true);
         try {
             const { data, error } = await supabase
                 .from('users')
-                .select('name, dp_url')
+                .select('name, dp_url, subscription_active')
                 .eq('uid', uid)
                 .single();
 
@@ -37,9 +40,14 @@ const Header2 = ({ navigation, uid, openDrawer }) => {
                 if (data.dp_url) {
                     setDpUrl(data.dp_url);
                 }
+                
+                // Set pro status
+                setIsPro(data.subscription_active || false);
             }
         } catch (error) {
             console.error('Error:', error);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -48,7 +56,7 @@ const Header2 = ({ navigation, uid, openDrawer }) => {
         return <Text>No UID found</Text>;
     }
 
- 
+    console.log("Current coin count:", coinCount);
 
     return (
         <View style={styles.header}>
@@ -57,23 +65,45 @@ const Header2 = ({ navigation, uid, openDrawer }) => {
 
             {/* Welcome Text with Profile Picture */}
             <View style={styles.rowContainer}>
-                <View>
+              <View style={styles.iconContainer}>
                     <Image 
                         source={dpUrl ? { uri: dpUrl } : require('../assets/Avatar/Cat.png')} 
                         style={styles.icon} 
                     />
                 </View>
-                <View style={{flexDirection: 'column', alignItems: 'flex-start'}}>
-                <Text style={styles.welcomeText}>
-                   {userName ? ` ${userName} Kumar Srivastava`: '!'}
-                </Text>
-                <Text style={styles.welcomeText2}>
-                  9289881135
-                </Text>
-                </View>
+                
+                {loading ? (
+                    <ActivityIndicator size="small" color="#333" style={{ marginLeft: 10 }} />
+                ) : (
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        {isPro ? (
+                            <View style={styles.proContainer}>
+                                <Text style={styles.welcomeText}>
+                                    {userName} 
+                                </Text>
+                                <View style={styles.proBadge}>
+                                    <Text style={styles.proText}>PRO</Text>
+                                </View>
+                            </View>
+                        ) : (
+                            <Text style={styles.welcomeText}>
+                                Welcome{userName ? ` ${userName}!`: '!'}
+                            </Text>
+                        )}
+                    </View>
+                )}
             </View>
 
-           
+            {/* Coin Display with Coin Icon */}
+            <TouchableOpacity
+                style={styles.coinContainer}
+                onPress={() =>
+                    navigation.navigate('TransactionScreen', { coinCount })
+                }
+            >
+                <Image source={require('../assets/coin.png')} style={styles.coinIcon} />
+                <Text style={styles.coinText}>{coinCount?.toString()}</Text>
+            </TouchableOpacity>
         </View>
     );
 };
@@ -83,8 +113,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
- 
-        padding:5,
+     marginTop:10,
+        paddingBottom:5,
       
     },
     menuButton: {
@@ -99,12 +129,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     icon: {
-        width: 50,
-        height: 50,
+        width: 40,
+        height: 40,
         marginRight: 3,
         borderWidth: 0.8,
         borderColor: '#C9C9C9',
-        borderRadius: 35, // Make the image circular
+        borderRadius: 17.5, // Make the image circular
     },
     welcomeText: {
         fontSize: 18,
@@ -130,11 +160,21 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#FF6600',
     },
-    welcomeText2: {
-        fontSize: 10,
-       marginTop: 2,
-       marginLeft: 5,
-        color: '#333',
+    proContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    proBadge: {
+        backgroundColor: '#FF6600',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 12,
+        marginLeft: 6,
+    },
+    proText: {
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: 12,
     },
 });
 

@@ -24,11 +24,11 @@ console.log(uid);
 
   const getButtonPrice = () => {
     if (selectedPlan === 'Tester') {
-      return '50HKD';
+      return '$50 HKD';
     } else if (selectedPlan === 'Monthly') {
-      return '138HKD';
+      return '$138 HKD';
     } else if (selectedPlan === 'Yearly') {
-      return '1490HKD';
+      return '$1490 HKD';
     }
   };
 
@@ -38,7 +38,7 @@ console.log(uid);
     } else if (selectedPlan === 'Monthly') {
       return '*Your coins will auto expire after 1 Month.';
     } else if (selectedPlan === 'Yearly') {
-      return '*You will receive 1138 coins per month and these coins will expire after each month.';
+      return '*You will receive 1380 coins per month and these coins will expire after each month.';
     }
   };
 
@@ -100,7 +100,7 @@ console.log(uid);
         >
           <Text style={styles.planTitle}>Tester</Text>
           <Text style={styles.planPrice2}>
-            50HKD
+            $50 HKD
           </Text>
           <View style={styles.planPriceContainer}>
             
@@ -117,7 +117,7 @@ console.log(uid);
         >
           <Text style={styles.planTitle}>Monthly</Text>
           <Text style={styles.planPrice2}>
-            138HKD
+            $138 HKD
           </Text>
           <View style={styles.planPriceContainer}>
             
@@ -135,11 +135,11 @@ console.log(uid);
         >
           <Text style={styles.planTitle}>Yearly</Text>
           <Text style={styles.planPrice2}>
-            1490HKD
+            $1490 HKD
           </Text>
           <View style={styles.planPriceContainer2}>
           <Text style={styles.planPrice3}>
-            1656HKD
+            $1656 HKD
           </Text>
           <Text style={styles.planPrice4}>
             Save 10%
@@ -148,7 +148,7 @@ console.log(uid);
           <View style={styles.planPriceContainer}>
             
           <Text style={styles.planPrice}>
-           1138
+           1380
           </Text>
          <Image source={require('../../assets/coin.png')} style={styles.planIcon} />
          <Text style={styles.planPrice}>/Month</Text>

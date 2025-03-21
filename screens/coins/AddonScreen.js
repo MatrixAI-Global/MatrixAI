@@ -13,7 +13,7 @@ const AddonScreen = ({ navigation }) => {
     navigation.navigate('BUYSubscription', {
       uid: uid,
       plan: 'Addon',
-      price: '50HKD'
+      price: '$50 HKD'
     });
   };
 
@@ -61,7 +61,7 @@ const AddonScreen = ({ navigation }) => {
         <View style={[styles.plan, styles.activePlan]}>
           <Text style={styles.planTitle}>Addon Pack</Text>
           <Text style={styles.planPrice2}>
-            50HKD
+            $50 HKD
           </Text>
           <View style={styles.planPriceContainer}>
             <Text style={styles.planPrice}>
@@ -83,7 +83,7 @@ const AddonScreen = ({ navigation }) => {
 
       {/* Buy Now Button */}
       <TouchableOpacity style={styles.buyButton} onPress={handleBuyNow}>
-        <Text style={styles.buyButtonText}>Buy Now <Text style={{fontSize:18}}>50HKD</Text></Text>
+        <Text style={styles.buyButtonText}>Buy Now <Text style={{fontSize:18}}>$50 HKD</Text></Text>
       </TouchableOpacity>
     </LinearGradient>
   );

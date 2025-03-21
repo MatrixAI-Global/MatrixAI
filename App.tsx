@@ -73,6 +73,7 @@ import CustomerSupportScreen from './screens/CustomerSupportScreen.js';
 import OrderHistoryScreen from './screens/OrderHistoryScreen.js';
 import HelpScreen from './screens/HelpScreen.js';
 import AddonScreen from './screens/coins/AddonScreen.js';
+import FeedbackScreen from './screens/FeedbackScreen.js';
     const Stack = createStackNavigator();
 
 interface AuthContextType {
@@ -410,6 +411,11 @@ const App = () => {
                                    component={AddonScreen} 
                                    options={{ headerShown: false }} 
                                    />
+                                    <Stack.Screen 
+                                        name="FeedbackScreen" 
+                                        component={FeedbackScreen} 
+                                        options={{ headerShown: false }} 
+                                    />
                                 </Stack.Navigator>
                             </NavigationContainer>
                             </ProStatusProvider>

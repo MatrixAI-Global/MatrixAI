@@ -12,16 +12,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
-const HelpScreen = ({ route, navigation }) => {
-  const { orderId } = route.params;
+const FeedbackScreen = ({ route, navigation }) => {
   const [issue, setIssue] = useState('');
   const [description, setDescription] = useState('');
 
   const commonIssues = [
-    'Payment not reflected',
-    'Coins not credited',
-    'Plan activation failed',
-    'Need refund assistance',
+    'Great experience and helpful',
+    'Good experience but could be improved',
+    'Could be better',
+    'Not helpful at all',
     'Other issues',
   ];
 
@@ -56,12 +55,9 @@ const HelpScreen = ({ route, navigation }) => {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.orderInfoCard}>
-          <Ionicons name="receipt-outline" size={24} color="#007AFF" />
-          <Text style={styles.orderInfoText}>Order #{orderId}</Text>
-        </View>
+       
 
-        <Text style={styles.sectionTitle}>What issue are you facing?</Text>
+        <Text style={styles.sectionTitle}>What do you think about our app?</Text>
         <View style={styles.issuesContainer}>
           {commonIssues.map((item, index) => (
             <TouchableOpacity
@@ -253,4 +249,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default HelpScreen; 
+export default FeedbackScreen; 

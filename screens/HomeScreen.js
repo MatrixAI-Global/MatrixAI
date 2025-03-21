@@ -16,6 +16,7 @@ import FeatureCardWithDetailsAddon from '../components/FeatureCardWithDetailsAdd
 const { width } = Dimensions.get('window'); // Get screen width
 import { useProStatus } from '../hooks/useProStatus';
 import { useCoinsSubscription } from '../hooks/useCoinsSubscription';
+import FeatureCardWithDetails2 from '../components/FeatureCardWithDetails copy';
 const HomeScreen = ({ navigation }) => {
   const { uid, loading } = useAuth();
   const rotateValue = useRef(new Animated.Value(0)).current;
@@ -106,8 +107,8 @@ const HomeScreen = ({ navigation }) => {
                     <Image source={require('../assets/voice.png')} style={styles.micIcon} />
                   </View>
                   <View style={styles.columnContainer}>
-                    <Text style={styles.sectionTitle}>Speech to Script</Text>
-                    <Text style={styles.voiceChangeText}> Change your voice as you wish</Text>
+                    <Text style={styles.sectionTitle}>Speech to Text</Text>
+                    <Text style={styles.voiceChangeText}> Convert any audio to text</Text>
                   </View>
                 </View>
               </View>
@@ -147,7 +148,7 @@ const HomeScreen = ({ navigation }) => {
             />
       
             <FeatureCard
-              title="Create Presentation"
+              title="Create PPT"
               description="Create your prsentation is less than a minutue"
               iconSource={require('../assets/card/ppt.png')}
               navigation={navigation}
@@ -157,13 +158,19 @@ const HomeScreen = ({ navigation }) => {
           </View>
            {/* Conditional rendering based on Pro status */}
            {!isPro ? (
-            <FeatureCardWithDetails/>
+            <FeatureCardWithDetails2/>
           ) : (
             <>
               <FeatureCardWithDetailsPro/>
               {(coinCount < 200) && <FeatureCardWithDetailsAddon/>}
             </>
           )}
+           <View style={styles.endTextContainer}>
+          <Text style={styles.crossBee}>MatrixAI❤️</Text>
+          <Text style={styles.AppYard3}>World's best AI tools</Text>
+          <Text style={styles.AppYard4}>@All rights reserved to MatrixAI</Text>
+        </View>
+
         </ScrollView>
         <FloatingButton />
       </SafeAreaView>
@@ -266,6 +273,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center', // Ensures the text is centered inside the button
   },
+  endTextContainer: {
+    flexDirection: 'column',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  crossBee: {
+    fontSize: 28,
+    color: '#95959527',
+    fontWeight: 'bold',
+  },
+  AppYard3: { 
+    fontSize: 20,
+    color: '#95959527',
+    fontWeight: 'bold',
+  },
+  AppYard4: { 
+    fontSize: 12,
+    color: '#9595957D',
+    fontWeight: 'bold',
+    marginTop: 20,
+    alignSelf: 'center',
+  },
+  
   featureRow: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -273,7 +303,7 @@ const styles = StyleSheet.create({
   },
   scrollViewContent: {
   
-    paddingBottom: 100,
+    paddingBottom: 20,
   },
   fixedHeader: {
   

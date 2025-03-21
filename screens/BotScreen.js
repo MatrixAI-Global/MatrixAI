@@ -227,6 +227,56 @@ const BotScreen = ({ navigation, route }) => {
       [messageId]: !prev[messageId]
     }));
   };
+  const isMathExpression = (text) => {
+    // Skip if text is too long (likely not a math expression)
+    if (text.length > 100) return false;
+    
+    // Skip if it's just a simple number
+    if (/^\d+$/.test(text)) return false;
+    
+    // Skip if it's a date
+    if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(text) || /^\d{1,2}\-\d{1,2}\-\d{2,4}$/.test(text)) return false;
+    
+    // Skip if it's likely a list item with a number (e.g., "1. Item")
+    if (/^\d+\.\s+.+/.test(text)) return false;
+    
+    // Skip if it's likely a normal sentence with numbers
+    if (text.split(' ').length > 8 && !/\=/.test(text)) return false;
+    
+    // Check for equation patterns (must have equals sign)
+    const hasEquation = /\=/.test(text);
+    
+    // Check for mathematical operators
+    const hasOperators = /[\+\-\*\/\(\)\[\]\{\}\^×÷]/.test(text);
+    
+    // Check for number patterns with operators (this is the strongest indicator)
+    const hasNumberWithOperator = /\d+\s*[\+\-\*\/\=\(\)\[\]\{\}\^×÷]\s*\d+/.test(text);
+    
+    // Check for common math expressions at the start of the text
+    const isCommonMathExpression = /^(solve|calculate|find|evaluate|simplify|compute)/.test(text.toLowerCase());
+    
+    // Check for fractions
+    const hasFraction = /\d+\s*\/\s*\d+/.test(text) && !/https?:\/\//.test(text); // Exclude URLs
+    
+    // Check for square roots or exponents or other math functions
+    const hasAdvancedMath = /sqrt|square root|\^|x\^2|x\^3|sin\(|cos\(|tan\(|log\(/.test(text.toLowerCase());
+    
+    // Check for multiple numbers and operators (likely a calculation)
+    const hasMultipleOperations = /\d+\s*[\+\-\*\/]\s*\d+\s*[\+\-\*\/]\s*\d+/.test(text);
+    
+    // Check for specific equation patterns
+    const isEquation = /^\s*\d+\s*[\+\-\*\/]\s*\d+\s*\=/.test(text) || // 2 + 2 =
+                      /^\s*\d+\s*[\+\-\*\/\=]\s*\d+/.test(text) && text.length < 20; // Short expressions like 2+2
+    
+    // Return true if it looks like a math expression
+    return (isEquation ||
+            hasNumberWithOperator || 
+            (hasEquation && hasOperators) || 
+            (isCommonMathExpression && (hasOperators || hasEquation)) ||
+            hasFraction || 
+            hasAdvancedMath ||
+            hasMultipleOperations);
+  };
 
   const renderMessage = ({ item }) => {
     // Log the messages state for debugging
@@ -234,14 +284,92 @@ const BotScreen = ({ navigation, route }) => {
     
     // Ensure messages is an array and data is loaded
     if (!dataLoaded || !Array.isArray(messages) || messages.length === 0) return null; 
-
+  
     const isBot = item.sender === 'bot';
     const isExpanded = expandedMessages[item.id];
     const shouldTruncate = item.text && item.text.length > 100; // Check if text exists
     const displayText = shouldTruncate && !isExpanded 
       ? `${item.text.substring(0, 100)}...`
       : item.text;
+  
+    // Function to detect if the text contains a URL
+    const containsUrl = (text) => {
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      return text && urlRegex.test(text);
+    };
+  
+    // Function to process and format the message text
+    const formatMessageText = (text) => {
+      if (!text) return [];
+      
+      // Remove "###", "***", "**", and "---" from the text
+      text = text.replace(/###/g, '')
+                 .replace(/\*\*\*/g, '')
+                 .replace(/\*\*/g, '')
+                 .replace(/---/g, ''); // Remove "---"
 
+      const lines = text.split('\n');
+      return lines.map(line => {
+        // Check for heading (starts with number and dot, or has : at the end)
+        const isHeading = /^\d+\.\s+.+/.test(line) || /.*:$/.test(line);
+        // Check for subheading (starts with - or • or *)
+        const isSubheading = /^[-•*]\s+.+/.test(line);
+        // Check for mathematical expressions
+        const hasMathExpression = isMathExpression(line);
+        
+        return {
+          text: line,
+          isHeading,
+          isSubheading,
+          hasMathExpression
+        };
+      });
+    };
+  
+    // Function to render a single line of text with math expressions highlighted
+    const renderTextWithMath = (line, index) => {
+      // Use regex to find math expressions in the text
+      const mathRegex = /(\d+\s*[\+\-\*\/\=\(\)\[\]\{\}\^×÷]\s*\d+)|(\b\d+\s*[×÷=]\s*\d+\b)/g;
+      const matches = line.text.match(mathRegex) || [];
+      
+      // If we found math expressions, split and format them
+      if (matches.length > 0) {
+        const parts = line.text.split(mathRegex);
+        const elements = [];
+        
+        parts.forEach((part, i) => {
+          if (part) {
+            elements.push(
+              <Text key={`text-part-${index}-${i}`} style={styles.botText}>
+                {part}
+              </Text>
+            );
+          }
+          
+          if (matches[i]) {
+            elements.push(
+              <View key={`math-part-${index}-${i}`} style={styles.inlineMathContainer}>
+                <Text style={styles.mathText}>{matches[i]}</Text>
+              </View>
+            );
+          }
+        });
+        
+        return (
+          <View key={`line-${index}`} style={styles.textLine}>
+            {elements}
+          </View>
+        );
+      }
+      
+      // If no math expressions found, return regular text
+      return (
+        <Text key={`line-${index}`} style={styles.botText}>
+          {line.text}
+        </Text>
+      );
+    };
+  
     return (
       <Animatable.View
         animation="fadeInUp"
@@ -257,9 +385,82 @@ const BotScreen = ({ navigation, route }) => {
             style={{ width: 200, height: 200, borderRadius: 10 }} // Adjust size as needed
           />
         ) : (
-          <Text style={isBot ? styles.botText : styles.userText}>
-            {displayText}
-          </Text>
+          <View style={isBot ? styles.botTextContainer : styles.userTextContainer}>
+            {formatMessageText(displayText).map((line, index) => {
+              // Handle links in the text
+              if (containsUrl(line.text)) {
+                const urlRegex = /(https?:\/\/[^\s]+)/g;
+                const parts = line.text.split(urlRegex);
+                const elements = [];
+                
+                parts.forEach((part, i) => {
+                  if (urlRegex.test(part)) {
+                    elements.push(
+                      <TouchableOpacity 
+                        key={`link-${index}-${i}`}
+                        onPress={() => Linking.openURL(part)}
+                        style={styles.linkContainer}
+                      >
+                        <Ionicons name="link" size={16} color="#007bff" style={styles.linkIcon} />
+                        <Text style={styles.linkText}>{part}</Text>
+                      </TouchableOpacity>
+                    );
+                  } else if (part) {
+                    elements.push(<Text key={`text-${index}-${i}`} style={isBot ? styles.botText : styles.userText}>{part}</Text>);
+                  }
+                });
+                
+                return (
+                  <View key={`line-${index}`} style={styles.textLine}>
+                    {elements}
+                  </View>
+                );
+              }
+              
+              // Handle math expressions
+              else if (line.hasMathExpression) {
+                return (
+                  <View key={`line-${index}`} style={styles.mathContainer}>
+                    <Text style={isBot ? styles.botText : styles.userText}>{line.text}</Text>
+                  </View>
+                );
+              }
+              
+              // Handle headings
+              else if (line.isHeading) {
+                return (
+                  <View key={`line-${index}`} style={styles.headingContainer}>
+                    <Text style={styles.headingPointer}>➤</Text>
+                    <Text style={isBot ? styles.botText : styles.userText}>{line.text}</Text>
+                  </View>
+                );
+              }
+              
+              // Handle subheadings
+              else if (line.isSubheading) {
+                return (
+                  <View key={`line-${index}`} style={styles.subheadingContainer}>
+                    <Text style={styles.subheadingPointer}>•</Text>
+                    <Text style={isBot ? styles.botText : styles.userText}>{line.text}</Text>
+                  </View>
+                );
+              }
+              
+              // Regular text - check for inline math expressions
+              else if (isMathExpression(line.text)) {
+                return renderTextWithMath(line, index);
+              }
+              
+              // Plain text with no special formatting
+              else {
+                return (
+                  <Text key={`line-${index}`} style={isBot ? styles.botText : styles.userText}>
+                    {line.text}
+                  </Text>
+                );
+              }
+            })}
+          </View>
         )}
         {shouldTruncate && (
           <TouchableOpacity
@@ -271,6 +472,8 @@ const BotScreen = ({ navigation, route }) => {
             </Text>
           </TouchableOpacity>
         )}
+        {/* Add Tail */}
+        <View style={isBot ? styles.botTail : styles.userTail} />
       </Animatable.View>
     );
   };
@@ -674,9 +877,9 @@ const BotScreen = ({ navigation, route }) => {
         </TouchableOpacity>
         <Image source={require('../assets/Avatar/Cat.png')} style={styles.botIcon} />
         <View style={styles.headerTextContainer}>
-          <Text style={styles.botName}>{currentChat ? currentChat.name : chatName}</Text>
-          {currentRole && <Text style={styles.botRole}>Role: {currentRole}</Text>}
-          <Text style={styles.botDescription}>{currentChat ? currentChat.description : chatDescription}</Text>
+        
+          {currentRole && <Text style={styles.botRole}>{currentRole}</Text>|| <Text style={styles.botRole}>MatrixAI Bot</Text>}
+        
         </View>
         <TouchableOpacity onPress={() => navigation.navigate('CallScreen')}>
           <MaterialIcons name="call" size={24} color="#4C8EF7" marginHorizontal={1} />
@@ -792,7 +995,7 @@ const BotScreen = ({ navigation, route }) => {
         )}
       </Animatable.View>
       {isLoading && (
-        <View style={[styles.loadingContainer, { bottom: showAdditionalButtons ? -20 : -80 }]}>
+        <View style={[styles.loadingContainer, { bottom: showAdditionalButtons ? -10 : -70 }]}>
           <LottieView
             source={require('../assets/dot.json')}
             autoPlay
@@ -802,7 +1005,7 @@ const BotScreen = ({ navigation, route }) => {
         </View>
       )}
       
-       <View style={[styles.chatBoxContainer, { bottom: showAdditionalButtons ? 70 : 10}]}>
+       <View style={[styles.chatBoxContainer, { bottom: showAdditionalButtons ? 80 : 20}]}>
           <TextInput
             style={[styles.textInput, { textAlignVertical: 'center' }]}
             placeholder="Send a message..."
@@ -829,30 +1032,30 @@ const BotScreen = ({ navigation, route }) => {
 
         {showAdditionalButtons && (
              <View style={styles.additionalButtonsContainer}>
-
-
-          <TouchableOpacity style={styles.additionalButton2} onPress={() => handleImageOCR('camera')}>
-            <View style={styles.additionalButton}>
-            <Ionicons name="camera" size={24} color="#4C8EF7" />
+                <View style={styles.buttonRow}>
+                    <TouchableOpacity style={styles.additionalButton2} onPress={() => handleImageOCR('camera')}>
+                        <View style={styles.additionalButton}>
+                            <Ionicons name="camera" size={24} color="#4C8EF7" />
+                        </View>
+                        <Text>Photo</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity style={styles.additionalButton2} onPress={() => handleImageOCR('gallery')}>
+                        <View style={styles.additionalButton}>
+                            <Ionicons name="image" size={24} color="#4C8EF7" />
+                        </View>
+                        <Text>Image</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity style={styles.additionalButton2}>
+                        <View style={styles.additionalButton}>
+                            <Ionicons name="attach" size={24} color="#4C8EF7" />
+                        </View>
+                        <Text>Document</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
-            <Text>Photo</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.additionalButton2} onPress={() => handleImageOCR('gallery')}>
-            <View style={styles.additionalButton3}>
-            <Ionicons name="image" size={24} color="#4C8EF7" />
-            </View>
-            <Text>Image</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.additionalButton2}>
-            <View style={styles.additionalButton}>
-            <Ionicons name="attach" size={24} color="#4C8EF7" />
-            </View>
-            <Text>Document</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+        )}
   
 
      
@@ -882,7 +1085,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
     width:20,
     height:70,
-    backgroundColor:'#D2D2D257',
+    backgroundColor:'#EDEDEDC8',
     justifyContent:'center',
     alignItems:'center',
     borderRadius:15,
@@ -948,10 +1151,20 @@ const styles = StyleSheet.create({
 
   additionalButtonsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     position: 'absolute',
-    bottom: 2, // Adjust based on your layout
+    bottom: 15, // Adjust based on your layout
     width: '100%',
+    paddingHorizontal: 20, // Add padding for spacing
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  additionalButton2: {
+    flex: 1, // Allow buttons to take equal space
+    alignItems: 'center', // Center the content
   },
  
   chatBoxContainer: {
@@ -989,20 +1202,57 @@ const styles = StyleSheet.create({
   chat: {
     paddingVertical: 10,
   },
+ 
+
   messageContainer: {
-    maxWidth: '70%',
-    marginVertical: 5,
+    maxWidth: '80%',
     padding: 10,
     borderRadius: 10,
+    marginVertical: 5,
+    position: 'relative', // Required for positioning the tail
   },
   botMessageContainer: {
     alignSelf: 'flex-start',
     backgroundColor: '#E0E0E0',
+    marginLeft: 15, // Add margin to accommodate the tail
   },
   userMessageContainer: {
     alignSelf: 'flex-end',
     backgroundColor: '#4C8EF7',
+    marginRight: 15, // Add margin to accommodate the tail
   },
+  botTail: {
+    position: 'absolute',
+    left: -10,
+    bottom: 0,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 10,
+    borderRightWidth: 10,
+    borderBottomWidth: 10,
+    borderStyle: 'solid',
+    backgroundColor: 'transparent',
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: '#E0E0E0',
+  },
+  userTail: {
+    position: 'absolute',
+    right: -10,
+    bottom: 0,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 10,
+    borderRightWidth: 10,
+    borderBottomWidth: 10,
+    borderStyle: 'solid',
+    backgroundColor: 'transparent',
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: '#4C8EF7',
+  },
+
+
   loadingContainer: {
     position: 'absolute',
   
@@ -1112,7 +1362,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
 
   
-    backgroundColor:'#C5F8FE86',
+    backgroundColor:'#F0F8FF',
     minWidth: '48%',
     alignItems: 'center',
     shadowColor: '#000',
@@ -1221,7 +1471,7 @@ const styles = StyleSheet.create({
   },
   additionalButton: {
     alignItems: 'center',
-    backgroundColor:'#76767651',
+    backgroundColor:'#D1D1D151',
     borderRadius:15,
   padding:8,
   },
@@ -1232,10 +1482,6 @@ const styles = StyleSheet.create({
     borderRadius:15,
   padding:8,
   zIndex:30,
-  },
-  additionalButton2: {
-    alignItems: 'center',
-    flexDirection:'column',
   },
   additionalIcon: {
     width: 24,
@@ -1341,7 +1587,7 @@ const styles = StyleSheet.create({
   },
   headingText: {
     fontWeight: 'bold',
-    fontSize: 17,
+    fontSize: 18,
     color: '#333',
     flex: 1,
   },
@@ -1358,6 +1604,7 @@ const styles = StyleSheet.create({
     color: '#4C8EF7',
   },
   subheadingText: {
+    fontWeight: 'bold',
     fontSize: 16,
     color: '#333',
     flex: 1,

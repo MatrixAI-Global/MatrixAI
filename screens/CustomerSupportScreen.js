@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
-const FAQItem = ({ question, answer }) => {
+const FAQItem = ({ question, answer,navigation }) => {
   const [expanded, setExpanded] = useState(false);
   const animation = new Animated.Value(expanded ? 1 : 0);
 
@@ -79,9 +79,9 @@ const CustomerSupportScreen = ({ navigation }) => {
   const supportOptions = [
     {
       icon: 'chatbubbles-outline',
-      title: 'Live Chat',
-      description: 'Chat with our support team',
-      action: () => {/* Implement live chat */},
+      title: 'Give Feedback',
+      description: 'Give feedback to our support team',
+        action: () => navigation.navigate('FeedbackScreen'),
     },
     {
       icon: 'mail-outline',
@@ -89,12 +89,12 @@ const CustomerSupportScreen = ({ navigation }) => {
       description: 'Get help via email',
       action: () => Linking.openURL('mailto:support@matrixai.com'),
     },
-    {
-      icon: 'call-outline',
-      title: 'Phone Support',
-      description: 'Talk to our team',
-      action: () => Linking.openURL('tel:+1234567890'),
-    },
+    // {
+    //   icon: 'call-outline',
+    //   title: 'Phone Support',
+    //   description: 'Talk to our team',
+    //   action: () => Linking.openURL('tel:+1234567890'),
+    // },
   ];
 
   return (
@@ -138,7 +138,7 @@ const CustomerSupportScreen = ({ navigation }) => {
           ))}
         </View>
 
-        <View style={styles.communityCard}>
+        {/* <View style={styles.communityCard}>
           <View style={styles.communityIcon}>
             <Ionicons name="people-outline" size={24} color="#007AFF" />
           </View>
@@ -151,7 +151,7 @@ const CustomerSupportScreen = ({ navigation }) => {
           <TouchableOpacity style={styles.joinButton}>
             <Text style={styles.joinButtonText}>Join Now</Text>
           </TouchableOpacity>
-        </View>
+        </View> */}
       </ScrollView>
     </SafeAreaView>
   );

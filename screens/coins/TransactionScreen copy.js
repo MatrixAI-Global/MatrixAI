@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
 import axios from 'axios';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
+import Icon from 'react-native-vector-icons/MaterialIcons';
 const TransactionScreen2 = ({ navigation }) => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -30,11 +30,11 @@ const TransactionScreen2 = ({ navigation }) => {
   const getTransactionIcon = (transactionName) => {
     switch (transactionName.toLowerCase()) {
       case 'audio transcription':
-        return require('../../assets/card/music.png');
+        return 'audio-file';
       case 'image':
-        return require('../../assets/card/image.png');
+        return 'image';
       default:
-        return require('../../assets/card/ppt.png');
+        return 'video-file';
     }
   };
 
@@ -51,8 +51,10 @@ const TransactionScreen2 = ({ navigation }) => {
 
   const renderItem = ({ item }) => (
     <View style={styles.transactionItem}>
-      <Image source={getTransactionIcon(item.transaction_name)} style={styles.image} />
-      <View style={styles.transactionDetails}>
+      <View style={styles.iconContainer}>
+        <Icon name={getTransactionIcon(item.transaction_name)} size={30} color="#4169E1" style={styles.image} />
+      </View>
+      <View style={styles.transactionDetails}>      
         <Text style={styles.transactionType}>{item.transaction_name}</Text>
         <Text style={styles.transactionSubText}>{formatDate(item.time)}</Text>
         <Text style={styles.balanceText}>Balance: {item.remaining_coins} coins</Text>
@@ -123,6 +125,17 @@ const styles = StyleSheet.create({
     marginLeft: 15,
     color: '#333',
   },
+  iconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 15,
+    resizeMode: 'contain',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#4169E1',
+  },
   listContent: {
     paddingBottom: 20,
   },
@@ -140,13 +153,10 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   image: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 15,
-    resizeMode: 'contain',
+
  
   },
+
   transactionDetails: {
     flex: 1,
   },

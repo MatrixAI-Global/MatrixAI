@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Alert } from 'react-native';
 
-const ReferralScreen = () => {
+const ReferralScreen = ({ navigation }) => {
   const referralCode = '03AERET78';
 
   const copyToClipboard = () => {
@@ -11,9 +11,9 @@ const ReferralScreen = () => {
   return (
     <View style={styles.container}>
       {/* Back Button */}
-      <TouchableOpacity style={styles.backButton}>
-        <Image source={require('../../assets/back.png')} style={styles.backIcon} />
-      </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+              <Image source={require('../../assets/back.png')} style={styles.backIcon} />
+            </TouchableOpacity>
 
       {/* Blue Area */}
       <View style={styles.blueArea}>
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    top: 10,
+    top: 70,
     left: 10,
     zIndex: 10,
   },
@@ -96,7 +96,7 @@ paddingBottom:60,
   },
   header: {
     fontSize: 18,
-    marginTop:30,
+    marginTop:90,
     fontWeight: 'bold',
     color: '#fff',
     textAlign: 'left',
@@ -109,7 +109,7 @@ paddingBottom:60,
   },
   coinBoxContainer: {
     position: 'absolute',
-    top: 120,
+    top: 180,
     left: '3%',
     right: '3%',
     alignItems: 'center',

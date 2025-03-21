@@ -390,7 +390,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         width: '100%',
         padding: 10,
-        backgroundColor: '#ffff',
+        backgroundColor: '#007AFF',
+ 
       },
       headerIcon3: {
      
@@ -406,7 +407,7 @@ const styles = StyleSheet.create({
       headerTitle2: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#333',
+        color: '#fff',
       },
       menuTitle: {
         fontSize: 16,

@@ -1,13 +1,23 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-const FeatureCardWithDetailsPro = () => {
-    const navigation = useNavigation();
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
-    return (
-        <View style={styles.container}>
-            <View style={styles.headerRow}>
+const { width } = Dimensions.get('window'); // Get the screen width
+
+const FeatureCardWithDetailsPro = () => {
+  const navigation = useNavigation(); // Initialize navigation
+
+  const handleUpgradePress = () => {
+    navigation.navigate('SubscriptionScreen'); // Replace 'UpgradeScreen' with your target screen's name
+  };
+
+  return (
+    <View style={styles.container}>
+      <TouchableOpacity style={styles.card}>
+        {/* Top section with "Matrix AI" text and "PRO" container */}
+        <View style={styles.headerRow}>
                 <View style={styles.titleContainer}>
                     <Text style={styles.title}>Pro Features</Text>
                     <View style={styles.proBadge}>
@@ -15,115 +25,147 @@ const FeatureCardWithDetailsPro = () => {
                     </View>
                 </View>
             </View>
-            
-            <View style={styles.featuresContainer}>
-                <TouchableOpacity 
-                    style={styles.featureItem}
-                    onPress={() => navigation.navigate('AdvancedFeatureScreen')}
-                >
-                   <Icon name="star" size={24} color="#4CAF50" /> 
-                    <View style={styles.featureTextContainer}>
-                        <Text style={styles.featureTitle}>Advanced Voice Customization</Text>
-                        <Text style={styles.featureDescription}>Customize your voice with advanced settings</Text>
-                    </View>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                    style={styles.featureItem}
-                    onPress={() => navigation.navigate('LongerTranscriptionsScreen')}
-                >
-                    <Icon name="access-time" size={24} color="#4CAF50" />
-                    <View style={styles.featureTextContainer}>
-                        <Text style={styles.featureTitle}>Longer Transcriptions</Text>
-                        <Text style={styles.featureDescription}>Generate longer audio-to-text conversions</Text>
-                    </View>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                    style={styles.featureItem}
-                    onPress={() => navigation.navigate('PriorityProcessingScreen')}
-                >
-                    <Icon name="speed" size={24} color="#4CAF50" />
-                    <View style={styles.featureTextContainer}>
-                        <Text style={styles.featureTitle}>Priority Processing</Text>
-                        <Text style={styles.featureDescription}>Get faster processing for all your AI requests</Text>
-                    </View>
-                </TouchableOpacity>
+
+       <View style={styles.featureList}>
+          <View style={styles.featureItem}>
+            <MaterialCommunityIcons name="text-recognition" size={30} color="#FF6600" style={styles.featureIcon} />
+            <Text style={styles.featureText}>High-Accuracy Speech-to-Text</Text>
+          </View>
+          <View style={styles.featureItem}>
+            <MaterialCommunityIcons name="microphone" size={30} color="#FF6600" style={styles.featureIcon} />
+            <Text style={styles.featureText}>Live Speech-to-Text</Text>
+          </View>
+          <View style={styles.featureItem}>
+            <MaterialIcons name="translate" size={30} color="#FF6600" style={styles.featureIcon} />
+            <Text style={styles.featureText}>Multilingual Text Translation</Text>
+          </View>
+          <View style={styles.featureItem}>
+            <MaterialCommunityIcons name="robot" size={30} color="#FF6600" style={styles.featureIcon} />
+            <Text style={styles.featureText}>AI Chatbot</Text>
+          </View>
+          <View style={styles.featureItem}>
+            <MaterialCommunityIcons name="file-powerpoint" size={30} color="#FF6600" style={styles.featureIcon} />
+            <Text style={styles.featureText}>One-Click PPT Generation</Text>
+          </View>
+          <View style={styles.featureItem}>
+            <MaterialCommunityIcons name="image" size={30} color="#FF6600" style={styles.featureIcon} />
+            <Text style={styles.featureText}>AI Chatbot with Picture Understanding</Text>
+          </View>
+          <View style={styles.featureItem}>
+            <MaterialCommunityIcons name="video" size={30} color="#FF6600" style={styles.featureIcon} />
+            <Text style={styles.featureText}>Voice and Video Calls with AI</Text>
+          </View>
             </View>
-        </View>
-    );
+       
+      </TouchableOpacity>
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 15,
-       
-        marginVertical: 10,
-        padding: 15,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 5,
-        elevation: 3,
-        borderWidth: 1,
-        borderColor: '#EAEAEA',
-    },
-    headerRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 15,
-    },
-    titleContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    title: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    proBadge: {
-        backgroundColor: '#4CAF50',
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 12,
-        marginLeft: 10,
-    },
-    proText: {
-        color: 'white',
-        fontWeight: 'bold',
-        fontSize: 10,
-    },
-    featuresContainer: {
-        marginTop: 5,
-    },
-    featureItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
-    },
-    featureIcon: {
-        width: 24,
-        height: 24,
-        marginRight: 15,
-    },
-    featureTextContainer: {
-        flex: 1,
-    },
-    featureTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
-    },
-    featureDescription: {
-        fontSize: 12,
-        color: '#777',
-        marginTop: 3,
-    },
+  container: {
+    flex: 1,
+    justifyContent: 'center', // Center the card vertically
+    alignItems: 'center', // Center the card horizontally
+    backgroundColor: '#F8F9FD',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+   
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  proBadge: {
+    backgroundColor: '#FF6600', // Blue background
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 15,
+  
+  },
+  
+  
+  
+  
+  card: {
+    width: '100%', // 80% of the screen width
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    margin: 10,
+    borderWidth: 1, // Gray border for the card
+    borderColor: '#ccc',
+   
+    justifyContent: 'center', // Center content inside card
+    alignItems: 'center', // Center content horizontally in card
+  },
+  topSection: {
+    flexDirection: 'row',
+    justifyContent: 'center', // Center the text and PRO label horizontally
+    alignItems: 'center',
+    marginBottom: 5, // Add space below top section
+  },
+  matrixAIText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  proContainer: {
+    backgroundColor: '#007BFF', // Blue background
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 15,
+    marginLeft: 10, // Space between "Matrix AI" and "PRO"
+  },
+  proText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  featureList: {
+    marginTop: 5,
+    width: '100%', // Make sure feature items fill the width of the card
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  featureIcon: {
+    width: 30,
+    height: 30,
+    marginRight: 10,
+    resizeMode: 'contain',
+  },
+  featureText: {
+    fontSize: 14,
+    color: '#666',
+    flex: 1, // Ensures text takes up remaining space
+  },
+  upgradeButton: {
+    backgroundColor: '#007BFF', // Blue background for button
+    paddingVertical: 10,
+    width: width * 0.7,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  upgradeButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
 });
 
 export default FeatureCardWithDetailsPro;

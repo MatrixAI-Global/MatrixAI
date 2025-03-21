@@ -578,13 +578,13 @@ const BotScreen2 = ({ navigation, route }) => {
     const isBot = item.sender === 'bot';
     const isUser = item.sender === 'user';
     const isExpanded = expandedMessages[item.id];
-
+  
     // Function to detect if the text contains a URL
     const containsUrl = (text) => {
       const urlRegex = /(https?:\/\/[^\s]+)/g;
       return text && urlRegex.test(text);
     };
-
+  
     // Function to process and format the message text
     const formatMessageText = (text) => {
       if (!text) return [];
@@ -626,6 +626,7 @@ const BotScreen2 = ({ navigation, route }) => {
       );
     };
 
+  
     // Function to render a single line of text with math expressions highlighted
     const renderTextWithMath = (line, index) => {
       // Use regex to find math expressions in the text
@@ -669,40 +670,40 @@ const BotScreen2 = ({ navigation, route }) => {
         </Text>
       );
     };
-
+  
     return (
       <GestureHandlerRootView>
-        <Swipeable
-          ref={(ref) => {
-            if (ref) {
-              swipeableRefs.current[item.id] = ref;
-            }
-          }}
-          renderLeftActions={isBot ? renderLeftActions : null}
-          leftThreshold={40}
-          rightThreshold={40}
-          overshootLeft={false}
-          overshootRight={false}
-          enabled={isBot}
-        >
-          <View style={{ flexDirection: isBot ? 'row' : 'row-reverse', alignItems: 'center' }}>
-            <Animatable.View
-              animation={isBot ? "fadeInUp" : undefined}
-              duration={100}
-              style={[
-                styles.messageContainer,
-                isBot ? styles.botMessageContainer : styles.userMessageContainer,
-              ]}
-            >
-              {/* Show image if the user sends an image */}
-              {isUser && item.image && (
-                <Image source={{ uri: item.image }} style={styles.messageImage} />
-              )}
+      <Swipeable
+        ref={(ref) => {
+          if (ref) {
+            swipeableRefs.current[item.id] = ref;
+          }
+        }}
+        renderLeftActions={isBot ? renderLeftActions : null}
+        leftThreshold={40}
+        rightThreshold={40}
+        overshootLeft={false}
+        overshootRight={false}
+        enabled={isBot}
+      >
+        <View style={{ flexDirection: isBot ? 'row' : 'row-reverse', alignItems: 'center' }}>
+          <Animatable.View
+            animation={isBot ? "fadeInUp" : undefined}
+            duration={100}
+            style={[
+              styles.messageContainer,
+              isBot ? styles.botMessageContainer : styles.userMessageContainer,
+            ]}
+          >
+            {/* Show image if the user sends an image */}
+            {isUser && item.image && (
+              <Image source={{ uri: item.image }} style={styles.messageImage} />
+            )}
 
-              {/* Show text if the user sends a text message */}
-              {isUser && item.text && !containsUrl(item.text) && (
-                <Text style={styles.userText}>{item.text}</Text>
-              )}
+            {/* Show text if the user sends a text message */}
+            {isUser && item.text && !containsUrl(item.text) && (
+              <Text style={styles.userText}>{item.text}</Text>
+            )}
 
               {/* Bot's message can have both text and images */}
               {isBot && item.image && (
@@ -786,7 +787,11 @@ const BotScreen2 = ({ navigation, route }) => {
                   })}
                 </View>
               )}
+  
+              {/* Add Tail */}
+              <View style={isBot ? styles.botTail : styles.userTail} />
             </Animatable.View>
+  
             <TouchableOpacity
               onPress={() => {
                 if (isBot && swipeableRefs.current[item.id]) {
@@ -846,7 +851,7 @@ const BotScreen2 = ({ navigation, route }) => {
 
       {/* Loading Animation */}
       {isLoading && (
-        <View style={[styles.loadingContainer, { bottom: showAdditionalButtons ? -50 : -90 }]}>
+        <View style={[styles.loadingContainer, { bottom: showAdditionalButtons ? -70 : -130 }]}>
           <LottieView
             source={require('../assets/dot.json')}
             autoPlay
@@ -857,7 +862,7 @@ const BotScreen2 = ({ navigation, route }) => {
       )}
 
       {/* Quick Action Buttons */}
-      <View style={[styles.quickActionContainer, { bottom: showAdditionalButtons ? 15 : -40 }]}>
+      <View style={[styles.quickActionContainer, { bottom: showAdditionalButtons ? 30 : -30 }]}>
         <TouchableOpacity 
           style={styles.quickActionButton}
           onPress={() => transcription && fetchDeepSeekResponse(`Please provide a summary of this text in very structured format in the original language of the transcription: ${transcription}`)}
@@ -879,7 +884,7 @@ const BotScreen2 = ({ navigation, route }) => {
       </View>
 
       {/* Chat Input Box */}
-      <View style={[styles.chatBoxContainer, { bottom: showAdditionalButtons ? -35 : -90 }]}>
+      <View style={[styles.chatBoxContainer, { bottom: showAdditionalButtons ? -20 : -80 }]}>
         <TextInput
           style={styles.textInput}
           placeholder="Type a message..."
@@ -904,30 +909,30 @@ const BotScreen2 = ({ navigation, route }) => {
 
       {showAdditionalButtons && (
              <View style={styles.additionalButtonsContainer}>
-
-
-          <TouchableOpacity style={styles.additionalButton2} onPress={() => handleImageOCR('camera')}>
-            <View style={styles.additionalButton}>
-            <Ionicons name="camera" size={24} color="#4C8EF7" />
+                <View style={styles.buttonRow}>
+                    <TouchableOpacity style={styles.additionalButton2} onPress={() => handleImageOCR('camera')}>
+                        <View style={styles.additionalButton}>
+                            <Ionicons name="camera" size={24} color="#4C8EF7" />
+                        </View>
+                        <Text>Photo</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity style={styles.additionalButton2} onPress={() => handleImageOCR('gallery')}>
+                        <View style={styles.additionalButton}>
+                            <Ionicons name="image" size={24} color="#4C8EF7" />
+                        </View>
+                        <Text>Image</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity style={styles.additionalButton2}>
+                        <View style={styles.additionalButton}>
+                            <Ionicons name="attach" size={24} color="#4C8EF7" />
+                        </View>
+                        <Text>Document</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
-            <Text>Photo</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.additionalButton2} onPress={() => handleImageOCR('gallery')}>
-            <View style={styles.additionalButton3}>
-            <Ionicons name="image" size={24} color="#4C8EF7" />
-            </View>
-            <Text>Image</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.additionalButton2}>
-            <View style={styles.additionalButton}>
-            <Ionicons name="attach" size={24} color="#4C8EF7" />
-            </View>
-            <Text>Document</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+        )}
 
       <Modal
         visible={isFullScreen}
@@ -1022,35 +1027,61 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  mindmapButton: {
-    backgroundColor: '#007bff',
-  },
-  pptButton: {
-    backgroundColor: '#4CAF50',
-  },
+
   buttonText: {
     color: '#FFF',
     fontSize: 16,
     fontWeight: 'bold',
   },
   messageContainer: {
-    maxWidth: '70%',
+    maxWidth: '80%',
     marginVertical: 5,
     padding: 10,
     borderRadius: 10,
   },
+
   botMessageContainer: {
     alignSelf: 'flex-start',
     backgroundColor: '#E0E0E0',
-    marginLeft: 0,
-    marginRight: 10,
+    marginLeft: 15, // Add margin to accommodate the tail
   },
   userMessageContainer: {
     alignSelf: 'flex-end',
     backgroundColor: '#4C8EF7',
-    marginRight: 0,
-    marginLeft: 10,
+    marginRight: 15, // Add margin to accommodate the tail
   },
+  botTail: {
+    position: 'absolute',
+    left: -10, // Adjust based on the tail image size
+    bottom: 0,
+    width: 15, // Adjust based on the tail image size
+    height: 15, // Adjust based on the tail image size
+    borderLeftWidth: 10,
+    borderRightWidth: 10,
+    borderBottomWidth: 10,
+    borderStyle: 'solid',
+    backgroundColor: 'transparent',
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: '#E0E0E0', // Match bot message background color
+  },
+  userTail: {
+    position: 'absolute',
+    right: -10, // Adjust based on the tail image size
+    bottom: 0,
+    width: 15, // Adjust based on the tail image size
+    height: 15, // Adjust based on the tail image size
+    borderLeftWidth: 10,
+    borderRightWidth: 10,
+    borderBottomWidth: 10,
+    borderStyle: 'solid',
+    backgroundColor: 'transparent',
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: '#4C8EF7', // Match user message background color
+  },
+
+
   botText: {
     color: '#333',
     fontSize: 16,
@@ -1199,19 +1230,28 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  additionalButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    position: 'absolute',
-    bottom: -100, // Adjust based on your layout
-    width: '100%',
- 
-  },
   additionalButton: {
     alignItems: 'center',
-    backgroundColor:'#76767651',
+    backgroundColor:'#D1D1D151',
     borderRadius:15,
   padding:8,
+  },
+  additionalButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    position: 'absolute',
+    bottom: -85, // Adjust based on your layout
+    width: '100%',
+    paddingHorizontal: 10, // Add padding for spacing
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  additionalButton2: {
+    flex: 1, // Allow buttons to take equal space
+    alignItems: 'center', // Center the content
   },
   additionalButton3: {
     alignItems: 'center',
@@ -1221,10 +1261,7 @@ const styles = StyleSheet.create({
   padding:8,
   zIndex:30,
   },
-  additionalButton2: {
-    alignItems: 'center',
-    flexDirection:'column',
-  },
+
   additionalIcon: {
     width: 24,
     height: 24,
