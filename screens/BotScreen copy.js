@@ -42,20 +42,25 @@ const BotScreen2 = ({ navigation, route }) => {
   const [showSummaryPrompt, setShowSummaryPrompt] = useState(true); // New state for summary prompt
   const isMounted = useRef(true);
   
+  // Initialize messages state first
+  const [messages, setMessages] = useState([
+    {
+      id: '1',
+      text: "Hello.👋 I'm your new friend, MatrixAI Bot. You can ask me any questions.",
+      sender: 'bot',
+    },
+  ]);
+
   // New state variables for image preview modal
-  const [imagePreviewModalVisible, setImagePreviewModalVisible] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
-  const [imageQuestion, setImageQuestion] = useState('');
   const [imageType, setImageType] = useState('');
   const [imageFileName, setImageFileName] = useState('');
-  const [isQuestionRequired, setIsQuestionRequired] = useState(true);
 
   useEffect(() => {
     return () => {
       isMounted.current = false;
     };
   }, []);
-
 
   useEffect(() => {
     const checkSummaryPreference = async () => {
@@ -76,8 +81,10 @@ const BotScreen2 = ({ navigation, route }) => {
         const chatHistoryIsEmpty = messages.length === 1 && 
           (messages[0]?.text === "Hello.👋 I'm your new friend, MatrixAI Bot. You can ask me any questions.");
 
-        // If a preference exists ('yes' or 'no') or chat history has data, do not show the prompt
-       
+        // If chat is empty and we have transcription, show the prompt
+        if (chatHistoryIsEmpty && transcription) {
+          setShowSummaryPrompt(true);
+        }
       } catch (error) {
         console.error('Error fetching summary preference:', error);
       }
@@ -86,17 +93,8 @@ const BotScreen2 = ({ navigation, route }) => {
     if (transcription && audioid) {
       checkSummaryPreference();
     }
-  }, [transcription, dataLoaded, audioid]);
+  }, [transcription, dataLoaded, audioid, messages.length]);
 
-  const [messages, setMessages] = useState([
-    {
-      id: '1',
-      text: "Hello.👋 I'm your new friend, MatrixAI Bot. You can ask me any questions.",
-      sender: 'bot',
-    },
-    // Add summary request message conditionally
-  
-  ]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isApiLoading, setIsApiLoading] = useState(false);
@@ -144,18 +142,132 @@ const BotScreen2 = ({ navigation, route }) => {
     }
   };
 
-  const handleSendMessage = () => {
-    if (inputText.trim()) {
-      const newMessage = {
-        id: Date.now().toString(),
-        text: inputText,
-        sender: 'user',
-      };
-      setMessages((prev) => [...prev, newMessage]);
-      saveChatHistory(inputText, 'user'); // Save user message
-      fetchDeepSeekResponse(inputText);
-      setInputText('');
-      setIsTyping(false);
+  const handleSendMessage = async () => {
+    if (inputText.trim() || selectedImage) {
+      // If there's an image, process it
+      if (selectedImage) {
+        try {
+          setIsLoading(true);
+         
+          // Generate a unique image ID
+          const imageID = Date.now().toString(36) + Math.random().toString(36).substring(2, 15);
+          const fileExtension = imageFileName ? imageFileName.split('.').pop() : 'jpg';
+          
+          // Read the file as base64
+          const fileContent = await RNFS.readFile(selectedImage, 'base64');
+          
+          // Create file path for Supabase storage
+          const filePath = `users/${uid}/Image/${imageID}.${fileExtension}`;
+          
+          // Upload to Supabase storage
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('user-uploads')
+            .upload(filePath, decode(fileContent), {
+              contentType: imageType || 'image/jpeg',
+              upsert: false
+            });
+            
+          if (uploadError) {
+            throw new Error(`Upload error: ${uploadError.message}`);
+          }
+          
+          // Get the public URL for the uploaded image
+          const { data: { publicUrl } } = supabase.storage
+            .from('user-uploads')
+            .getPublicUrl(filePath);
+          
+          // Add the image to messages
+          const newMessage = {
+            id: Date.now().toString(),
+            image: publicUrl,
+            text: inputText.trim() ? inputText : "",
+            sender: 'user'
+          };
+          
+          setMessages((prev) => [...prev, newMessage]);
+          setSelectedImage(null);
+          setInputText('');
+
+          // Save the chat history for the image
+          await saveChatHistory(publicUrl, 'user');
+          
+          // If there's text, use it as the question, otherwise use a default
+          const question = inputText.trim() ? inputText : "What do you see in this image?";
+          
+          // Send request to Volces API
+          const volcesResponse = await axios.post(
+            'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
+            {
+              model: 'doubao-vision-pro-32k-241028',
+              messages: [
+                {
+                  role: 'system',
+                  content: 'You are MatrixAI Bot, a helpful AI assistant.'
+                },
+                {
+                  role: 'user',
+                  content: [
+                    {
+                      type: 'text',
+                      text: question
+                    },
+                    {
+                      type: 'image_url',
+                      image_url: {
+                        url: publicUrl
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              headers: {
+                'Authorization': 'Bearer 95fad12c-0768-4de2-a4c2-83247337ea89',
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+          
+          // Extract the response from Volces API
+          const botMessage = volcesResponse.data.choices[0].message.content.trim();
+          
+          // Add the bot's response to messages
+          setMessages((prev) => [
+            ...prev,
+            { id: Date.now().toString(), text: botMessage, sender: 'bot' },
+          ]);
+          
+          // Save the chat history for the bot response
+          await saveChatHistory(botMessage, 'bot');
+          
+          // Clear the image and text
+          setSelectedImage(null);
+          setInputText('');
+          
+        } catch (error) {
+          console.error('Error processing image:', error);
+          Alert.alert('Error', 'Failed to process image');
+          
+          setMessages((prev) => [
+            ...prev,
+            { id: Date.now().toString(), text: 'Error processing image. Please try again.', sender: 'bot' },
+          ]);
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        // Regular text message handling
+        const newMessage = {
+          id: Date.now().toString(),
+          text: inputText,
+          sender: 'user',
+        };
+        setMessages((prev) => [...prev, newMessage]);
+        saveChatHistory(inputText, 'user');
+        fetchDeepSeekResponse(inputText);
+        setInputText('');
+      }
     }
   };
 
@@ -214,230 +326,6 @@ const BotScreen2 = ({ navigation, route }) => {
     });
   };
 
-  // Debounce function
-  const debounce = (func, delay) => {
-    let timeoutId;
-    return (...args) => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      timeoutId = setTimeout(() => {
-        func(...args);
-      }, delay);
-    };
-  };
-
-  // Debounced input change handler
-  const handleInputChange = debounce((text) => {
-    setImageQuestion(text);
-  }, 300);
-
-  // Image Preview Modal Component
-  const ImagePreviewModal = () => {
-    const screenWidth = Dimensions.get('window').width;
-    const screenHeight = Dimensions.get('window').height;
-    const imageWidth = screenWidth * 0.7;
-    const imageHeight = screenHeight * 0.3;
-    
-    const handleQuickQuestion = (question) => {
-      setImageQuestion(question);
-      setIsQuestionRequired(false);
-    };
-    
-    const handleConfirm = async () => {
-      // Check if question is required and empty
-      if (isQuestionRequired && !imageQuestion.trim()) {
-        Alert.alert('Question Required', 'Please enter a question about the image before sending.');
-        return;
-      }
-      
-      // If we have a valid question or it's not required, proceed
-      setImagePreviewModalVisible(false);
-      
-      if (!selectedImage) return;
-      
-      try {
-        setIsLoading(true);
-        
-        // Generate a unique image ID
-        const imageID = Date.now().toString(36) + Math.random().toString(36).substring(2, 15);
-        const fileExtension = imageFileName ? imageFileName.split('.').pop() : 'jpg';
-        
-        // Read the file as base64
-        const fileContent = await RNFS.readFile(selectedImage, 'base64');
-        
-        // Create file path for Supabase storage
-        const filePath = `users/${uid}/Image/${imageID}.${fileExtension}`;
-        
-        // Upload to Supabase storage
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('user-uploads')
-          .upload(filePath, decode(fileContent), {
-            contentType: imageType || 'image/jpeg',
-            upsert: false
-          });
-          
-        if (uploadError) {
-          throw new Error(`Upload error: ${uploadError.message}`);
-        }
-        
-        // Get the public URL for the uploaded image
-        const { data: { publicUrl } } = supabase.storage
-          .from('user-uploads')
-          .getPublicUrl(filePath);
-        
-        // Add the image to messages
-        setMessages((prev) => [
-          ...prev,
-          { 
-            id: Date.now().toString(), 
-            image: publicUrl,
-            sender: 'user' 
-          },
-        ]);
-        
-        // Save the image URL to chat history
-        await saveChatHistory(publicUrl, 'user');
-        
-        // Send the image to Volces API
-        const VOLCES_API_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
-        const VOLCES_API_KEY = '95fad12c-0768-4de2-a4c2-83247337ea89';
-        
-        const volcesResponse = await axios.post(
-          VOLCES_API_URL,
-          {
-            model: 'doubao-vision-pro-32k-241028',
-            messages: [
-              {
-                role: 'user',
-                content: [
-                  {
-                    type: 'text',
-                    text: imageQuestion || 'What do you see in this image?'
-                  },
-                  {
-                    type: 'image_url',
-                    image_url: {
-                      url: publicUrl
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            headers: {
-              'Authorization': `Bearer ${VOLCES_API_KEY}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-        
-        // Extract the response from Volces API
-        const botMessage = volcesResponse.data.choices[0].message.content.trim();
-        
-        // Add the bot's response to messages
-        setMessages((prev) => [
-          ...prev,
-          { id: Date.now().toString(), text: botMessage, sender: 'bot' },
-        ]);
-        
-        // Save the bot response to chat history
-        await saveChatHistory(botMessage, 'bot');
-        
-      } catch (error) {
-        console.error('Error processing image:', error);
-        Alert.alert('Error', 'Failed to process image');
-        
-        setMessages((prev) => [
-          ...prev,
-          { id: Date.now().toString(), text: 'Error processing image. Please try again.', sender: 'bot' },
-        ]);
-      } finally {
-        setIsLoading(false);
-        // Reset state
-        setSelectedImage(null);
-        setImageQuestion('');
-      }
-    };
-    
-    return (
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={imagePreviewModalVisible}
-        onRequestClose={() => setImagePreviewModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity 
-              style={styles.closeButton}
-              onPress={() => setImagePreviewModalVisible(false)}
-            >
-              <Ionicons name="close" size={24} color="#000" />
-            </TouchableOpacity>
-            
-            <Text style={styles.modalTitle}>Image Preview</Text>
-            
-            <View style={styles.imageContainer}>
-              {selectedImage && (
-                <Image 
-                  source={{ uri: selectedImage }} 
-                  style={styles.previewImage}
-                  resizeMode="contain"
-                />
-              )}
-            </View>
-            
-            <TextInput
-              style={styles.questionInput}
-              value={imageQuestion}
-              onChangeText={handleInputChange}
-              placeholder="Ask question about your image eg:'What you see in the image'"
-              placeholderTextColor="#999"
-              multiline
-            />
-            
-            <View style={styles.quickQuestionsContainer}>
-              <TouchableOpacity 
-                style={styles.quickQuestionButton}
-                onPress={() => handleQuickQuestion('What is the solution to this problem or equation shown in the image?')}
-              >
-                <Text style={styles.quickQuestionText}>What is the solution to this problem or equation shown in the image?</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.quickQuestionButton}
-                onPress={() => handleQuickQuestion('What colors are used in this image and what might they represent?')}
-              >
-                <Text style={styles.quickQuestionText}>What colors are used in this image and what might they represent?</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.quickQuestionButton}
-                onPress={() => handleQuickQuestion('Describe this image in detail and explain what it might be showing.')}
-              >
-                <Text style={styles.quickQuestionText}>Describe this image in detail and explain what it might be showing.</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <TouchableOpacity 
-              style={[
-                styles.confirmButton,
-                isQuestionRequired && !imageQuestion.trim() ? styles.disabledButton : {}
-              ]}
-              onPress={handleConfirm}
-              disabled={isQuestionRequired && !imageQuestion.trim()}
-            >
-              <Ionicons name="checkmark" size={24} color="#FFF" />
-              <Text style={styles.confirmButtonText}>Send</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    );
-  };
-
   const handleImageOCR = async (source = 'gallery') => {
     const options = {
       mediaType: 'photo',
@@ -457,15 +345,10 @@ const BotScreen2 = ({ navigation, route }) => {
       if (response.assets && response.assets.length > 0) {
         const { uri, type, fileName } = response.assets[0];
         
-        // Reset question state
-        setImageQuestion('');
-        setIsQuestionRequired(true);
-        
-        // Set the selected image and show the modal
+        // Set the selected image
         setSelectedImage(uri);
         setImageType(type || 'image/jpeg');
         setImageFileName(fileName || `image_${Date.now()}.jpg`);
-        setImagePreviewModalVisible(true);
       }
     } catch (error) {
       console.error('Error selecting image:', error);
@@ -607,6 +490,273 @@ const BotScreen2 = ({ navigation, route }) => {
       });
     };
 
+    // Function to detect if text has math subscripts
+    const hasMathSubscripts = (text) => {
+      return /([a-zA-Z])_(\d)|([a-zA-Z])_n|([a-zA-Z])_i|([a-zA-Z])_j|([a-zA-Z])_k|([a-zA-Z])_a|([a-zA-Z])_x|([a-zA-Z])_\{([^}]+)\}/.test(text);
+    };
+
+    // Function to render text with math expressions
+    const renderTextWithMath = (line, index) => {
+      // Add support for subscript notation
+      if (hasMathSubscripts(line.text)) {
+        // Process subscripts
+        const formattedText = line.text
+          .replace(/([a-zA-Z])_(\d)/g, (match, p1, p2) => {
+            const subscripts = {
+              '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄',
+              '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉'
+            };
+            return p1 + subscripts[p2];
+          })
+          .replace(/([a-zA-Z])_n/g, '$1ₙ')
+          .replace(/([a-zA-Z])_i/g, '$1ᵢ')
+          .replace(/([a-zA-Z])_j/g, '$1ⱼ')
+          .replace(/([a-zA-Z])_k/g, '$1ₖ')
+          .replace(/([a-zA-Z])_a/g, '$1ₐ')
+          .replace(/([a-zA-Z])_x/g, '$1ₓ')
+          .replace(/([a-zA-Z])_\{([^}]+)\}/g, '$1ₙ');
+        
+        return (
+          <View key={`math-line-${index}`} style={styles.mathContainer}>
+            <Text style={styles.mathText}>{formattedText}</Text>
+          </View>
+        );
+      }
+      
+      // Use regex to find math expressions in the text
+      const mathRegex = /(\d+\s*[\+\-\*\/\=\(\)\[\]\{\}\^×÷]\s*\d+)|(\b\d+\s*[×÷=]\s*\d+\b)|(sqrt\([^)]+\))|(sin\([^)]+\))|(cos\([^)]+\))|(tan\([^)]+\))|(log\([^)]+\))/g;
+      const matches = line.text.match(mathRegex) || [];
+      
+      // If we found math expressions, split and format them
+      if (matches.length > 0) {
+        const parts = line.text.split(mathRegex);
+        const elements = [];
+        
+        parts.forEach((part, i) => {
+          if (part) {
+            elements.push(
+              <Text key={`text-part-${index}-${i}`} style={styles.botText}>
+                {part}
+              </Text>
+            );
+          }
+          
+          if (matches[i]) {
+            // Format the math expression for better readability
+            const { formattedMath, hasFraction, hasSquareRoot } = formatMathExpression(matches[i]);
+            
+            if (hasFraction) {
+              // Split the formula to find fractions
+              const fractionParts = parseFractionFormula(formattedMath);
+              
+              elements.push(
+                <View key={`math-part-${index}-${i}`} style={styles.mathContainer}>
+                  {renderFractionFormula(fractionParts)}
+                </View>
+              );
+            } else if (hasSquareRoot) {
+              // Handle square root specially
+              elements.push(
+                <View key={`math-part-${index}-${i}`} style={styles.mathContainer}>
+                  {renderSquareRoot(formattedMath)}
+                </View>
+              );
+            } else {
+              elements.push(
+                <View key={`math-part-${index}-${i}`} style={styles.mathContainer}>
+                  <Text style={styles.mathText}>{formattedMath}</Text>
+                </View>
+              );
+            }
+          }
+        });
+        
+        return (
+          <View key={`line-${index}`} style={styles.textLine}>
+            {elements}
+          </View>
+        );
+      }
+      
+      // If no math expressions found, return regular text
+      return (
+        <Text key={`line-${index}`} style={styles.botText}>
+          {line.text}
+        </Text>
+      );
+    };
+
+    // Parse a math formula to identify fractions
+    const parseFractionFormula = (formula) => {
+      // Split the formula into parts - operators, numbers, and fractions
+      const fractionRegex = /(\d+)\s*\/\s*(\d+)/g;
+      const parts = [];
+      let lastIndex = 0;
+      let match;
+      
+      while ((match = fractionRegex.exec(formula)) !== null) {
+        // Add the text before the fraction
+        if (match.index > lastIndex) {
+          parts.push({
+            type: 'text',
+            content: formula.substring(lastIndex, match.index).trim()
+          });
+        }
+        
+        // Add the fraction
+        parts.push({
+          type: 'fraction',
+          numerator: match[1].trim(),
+          denominator: match[2].trim()
+        });
+        
+        lastIndex = match.index + match[0].length;
+      }
+      
+      // Add any remaining text
+      if (lastIndex < formula.length) {
+        parts.push({
+          type: 'text',
+          content: formula.substring(lastIndex).trim()
+        });
+      }
+      
+      return parts.length > 0 ? parts : [{ type: 'text', content: formula }];
+    };
+    
+    // Render a formula with proper fractions
+    const renderFractionFormula = (parts) => {
+      return (
+        <View style={styles.formulaContainer}>
+          {parts.map((part, i) => {
+            if (part.type === 'text') {
+              return (
+                <Text key={`formula-part-${i}`} style={styles.mathText}>
+                  {part.content}
+                </Text>
+              );
+            } else if (part.type === 'fraction') {
+              return (
+                <View key={`fraction-${i}`} style={styles.fractionContainer}>
+                  <Text style={styles.numerator}>{part.numerator}</Text>
+                  <View style={styles.fractionLine} />
+                  <Text style={styles.denominator}>{part.denominator}</Text>
+                </View>
+              );
+            }
+            return null;
+          })}
+        </View>
+      );
+    };
+    
+    // Render square root notation
+    const renderSquareRoot = (formula) => {
+      // Extract the content inside the square root
+      const rootMatch = formula.match(/√\(([^)]+)\)/);
+      const rootContent = rootMatch ? rootMatch[1] : formula.replace(/√/g, '').trim();
+      
+      return (
+        <View style={styles.sqrtContainer}>
+          <Text style={styles.sqrtSymbol}>√</Text>
+          <View style={styles.sqrtOverline}>
+            <View style={styles.sqrtBar} />
+            <Text style={styles.mathText}>{rootContent}</Text>
+          </View>
+        </View>
+      );
+    };
+    
+    // Function to format math expressions to be more readable
+    const formatMathExpression = (expression) => {
+      // Replace * with × for multiplication and add line break
+      let formatted = expression.replace(/\*/g, ' ×\n');
+      
+      // Add line breaks for complex expressions
+      formatted = formatted.replace(/([+\-=×])\s*/g, '$1\n');
+      
+      // Check if the expression has fractions
+      const hasFraction = /\d+\s*\/\s*\d+/.test(formatted);
+      
+      // Check if the expression has square roots
+      const hasSquareRoot = /√\(([^)]+)\)/.test(formatted) || /√\d+/.test(formatted);
+      
+      // Format common mathematical functions
+      formatted = formatted.replace(/sqrt\(([^)]+)\)/g, '√($1)');
+      formatted = formatted.replace(/square root of (\d+)/gi, '√$1');
+      formatted = formatted.replace(/square root/gi, '√');
+      
+      // Format pi
+      formatted = formatted.replace(/\bpi\b/gi, 'π');
+      
+      // Format trigonometric functions
+      formatted = formatted.replace(/\b(sin|cos|tan)\(/g, '$1(');
+      
+      // Format logarithmic functions
+      formatted = formatted.replace(/\blog\(/g, 'log(');
+      
+      // Handle subscripts like a_{n}
+      formatted = formatted.replace(/([a-zA-Z])_\{([^}]+)\}/g, '$1ₙ');
+      
+      // Handle specific subscripts
+      formatted = formatted.replace(/_0/g, '₀');
+      formatted = formatted.replace(/_1/g, '₁');
+      formatted = formatted.replace(/_2/g, '₂');
+      formatted = formatted.replace(/_3/g, '₃');
+      formatted = formatted.replace(/_4/g, '₄');
+      formatted = formatted.replace(/_5/g, '₅');
+      formatted = formatted.replace(/_6/g, '₆');
+      formatted = formatted.replace(/_7/g, '₇');
+      formatted = formatted.replace(/_8/g, '₈');
+      formatted = formatted.replace(/_9/g, '₉');
+      formatted = formatted.replace(/_n/g, 'ₙ');
+      formatted = formatted.replace(/_i/g, 'ᵢ');
+      formatted = formatted.replace(/_j/g, 'ⱼ');
+      formatted = formatted.replace(/_k/g, 'ₖ');
+      formatted = formatted.replace(/_a/g, 'ₐ');
+      formatted = formatted.replace(/_x/g, 'ₓ');
+      
+      // Handle exponents
+      formatted = formatted.replace(/\^2/g, '²');
+      formatted = formatted.replace(/\^3/g, '³');
+      formatted = formatted.replace(/\^4/g, '⁴');
+      formatted = formatted.replace(/\^5/g, '⁵');
+      formatted = formatted.replace(/\^6/g, '⁶');
+      formatted = formatted.replace(/\^7/g, '⁷');
+      formatted = formatted.replace(/\^8/g, '⁸');
+      formatted = formatted.replace(/\^9/g, '⁹');
+      formatted = formatted.replace(/\^0/g, '⁰');
+      
+      // Handle variables with exponents
+      formatted = formatted.replace(/([a-z])\^2/gi, '$1²');
+      formatted = formatted.replace(/([a-z])\^3/gi, '$1³');
+      formatted = formatted.replace(/([a-z])\^4/gi, '$1⁴');
+      formatted = formatted.replace(/([a-z])\^5/gi, '$1⁵');
+      formatted = formatted.replace(/([a-z])\^6/gi, '$1⁶');
+      formatted = formatted.replace(/([a-z])\^7/gi, '$1⁷');
+      formatted = formatted.replace(/([a-z])\^8/gi, '$1⁸');
+      formatted = formatted.replace(/([a-z])\^9/gi, '$1⁹');
+      
+      // Format common formulas
+      formatted = formatted.replace(/a\^2\s*\+\s*b\^2\s*=\s*c\^2/g, 'a² + b² = c²');
+      formatted = formatted.replace(/E\s*=\s*mc\^2/g, 'E = mc²');
+      formatted = formatted.replace(/F\s*=\s*ma/g, 'F = ma');
+      
+      // Format area formulas
+      formatted = formatted.replace(/area\s*=\s*πr\^2/gi, 'Area = πr²');
+      formatted = formatted.replace(/area\s*=\s*π\s*×\s*r\^2/gi, 'Area = π × r²');
+      formatted = formatted.replace(/area\s*=\s*l\s*×\s*w/gi, 'Area = L × W');
+      
+      // Format perimeter formulas
+      formatted = formatted.replace(/perimeter\s*=\s*2\s*×\s*\(l\s*\+\s*w\)/gi, 'Perimeter = 2 × (L + W)');
+      formatted = formatted.replace(/circumference\s*=\s*2\s*×\s*π\s*×\s*r/gi, 'Circumference = 2 × π × r');
+      
+      // Clean up excess spaces and line breaks
+      formatted = formatted.replace(/\s+/g, ' ').trim();
+      
+      return { formattedMath: formatted, hasFraction, hasSquareRoot };
+    };
+
     const renderLeftActions = () => {
       return (
         <View style={styles.swipeableButtons}>
@@ -626,50 +776,6 @@ const BotScreen2 = ({ navigation, route }) => {
       );
     };
 
-  
-    // Function to render a single line of text with math expressions highlighted
-    const renderTextWithMath = (line, index) => {
-      // Use regex to find math expressions in the text
-      const mathRegex = /(\d+\s*[\+\-\*\/\=\(\)\[\]\{\}\^×÷]\s*\d+)|(\b\d+\s*[×÷=]\s*\d+\b)/g;
-      const matches = line.text.match(mathRegex) || [];
-      
-      // If we found math expressions, split and format them
-      if (matches.length > 0) {
-        const parts = line.text.split(mathRegex);
-        const elements = [];
-        
-        parts.forEach((part, i) => {
-          if (part) {
-            elements.push(
-              <Text key={`text-part-${index}-${i}`} style={styles.botText}>
-                {part}
-              </Text>
-            );
-          }
-          
-          if (matches[i]) {
-            elements.push(
-              <View key={`math-part-${index}-${i}`} style={styles.inlineMathContainer}>
-                <Text style={styles.mathText}>{matches[i]}</Text>
-              </View>
-            );
-          }
-        });
-        
-        return (
-          <View key={`line-${index}`} style={styles.textLine}>
-            {elements}
-          </View>
-        );
-      }
-      
-      // If no math expressions found, return regular text
-      return (
-        <Text key={`line-${index}`} style={styles.botText}>
-          {line.text}
-        </Text>
-      );
-    };
   
     return (
       <GestureHandlerRootView>
@@ -695,119 +801,50 @@ const BotScreen2 = ({ navigation, route }) => {
               isBot ? styles.botMessageContainer : styles.userMessageContainer,
             ]}
           >
-            {/* Show image if the user sends an image */}
-            {isUser && item.image && (
-              <Image source={{ uri: item.image }} style={styles.messageImage} />
-            )}
-
-            {/* Show text if the user sends a text message */}
-            {isUser && item.text && !containsUrl(item.text) && (
-              <Text style={styles.userText}>{item.text}</Text>
-            )}
-
-              {/* Bot's message can have both text and images */}
-              {isBot && item.image && (
-                <Image source={{ uri: item.image }} style={styles.messageImage} />
-              )}
-              {isBot && item.text && (
-                <View style={styles.botTextContainer}>
-                  {formatMessageText(item.text).map((line, index) => {
-                    // Handle links in the text
-                    if (containsUrl(line.text)) {
-                      const urlRegex = /(https?:\/\/[^\s]+)/g;
-                      const parts = line.text.split(urlRegex);
-                      const elements = [];
-                      
-                      parts.forEach((part, i) => {
-                        if (urlRegex.test(part)) {
-                          elements.push(
-                            <TouchableOpacity 
-                              key={`link-${index}-${i}`}
-                              onPress={() => Linking.openURL(part)}
-                              style={styles.linkContainer}
-                            >
-                              <Ionicons name="link" size={16} color="#007bff" style={styles.linkIcon} />
-                              <Text style={styles.linkText}>{part}</Text>
-                            </TouchableOpacity>
-                          );
-                        } else if (part) {
-                          elements.push(<Text key={`text-${index}-${i}`} style={styles.botText}>{part}</Text>);
-                        }
-                      });
-                      
+            {item.image ? (
+              <Image
+                source={{ uri: item.image }}
+                style={{ width: 200, height: 200, borderRadius: 10 }}
+              />
+            ) : (
+              <View style={isBot ? styles.botTextContainer : styles.userTextContainer}>
+                {formatMessageText(item.text).map((line, index) => {
+                  if (line.isLatexFormula) {
+                    return renderLatexFormula(line.text, index);
+                  }
+                  
+                  if (line.isChineseMath) {
+                    if (line.isChineseHeading) {
                       return (
-                        <View key={`line-${index}`} style={styles.textLine}>
-                          {elements}
-                        </View>
-                      );
-                    }
-                    
-                    // Handle math expressions
-                    else if (line.hasMathExpression) {
-                      return (
-                        <View key={`line-${index}`} style={styles.mathContainer}>
-                          <Text style={styles.mathText}>{line.text}</Text>
-                        </View>
-                      );
-                    }
-                    
-                    // Handle headings
-                    else if (line.isHeading) {
-                      return (
-                        <View key={`line-${index}`} style={styles.headingContainer}>
-                          <Text style={styles.headingPointer}>➤</Text>
-                          <Text style={styles.headingText}>{line.text}</Text>
-                        </View>
-                      );
-                    }
-                    
-                    // Handle subheadings
-                    else if (line.isSubheading) {
-                      return (
-                        <View key={`line-${index}`} style={styles.subheadingContainer}>
-                          <Text style={styles.subheadingPointer}>•</Text>
-                          <Text style={styles.subheadingText}>{line.text}</Text>
-                        </View>
-                      );
-                    }
-                    
-                    // Regular text - check for inline math expressions
-                    else if (isMathExpression(line.text)) {
-                      return renderTextWithMath(line, index);
-                    }
-                    
-                    // Plain text with no special formatting
-                    else {
-                      return (
-                        <Text key={`line-${index}`} style={styles.botText}>
+                        <Text key={`chinese-heading-${index}`} style={styles.chineseMathHeading}>
                           {line.text}
                         </Text>
                       );
                     }
-                  })}
-                </View>
-              )}
-  
-              {/* Add Tail */}
-              <View style={isBot ? styles.botTail : styles.userTail} />
-            </Animatable.View>
-  
-            <TouchableOpacity
-              onPress={() => {
-                if (isBot && swipeableRefs.current[item.id]) {
-                  swipeableRefs.current[item.id].openLeft();
-                }
-              }}
-            >
-              <Ionicons
-                name={isBot ? 'arrow-redo-sharp' : ''}
-                size={24}
-                color="#4588F5FF"
-                style={{ marginHorizontal: 5 }}
-              />
-            </TouchableOpacity>
-          </View>
-        </Swipeable>
+                    
+                    if (line.isChineseSubheading) {
+                      return (
+                        <Text key={`chinese-subheading-${index}`} style={styles.chineseMathSubheading}>
+                          {line.text}
+                        </Text>
+                      );
+                    }
+                    
+                    return (
+                      <Text key={`chinese-math-text-${index}`} style={styles.chineseMathText}>
+                        {line.text}
+                      </Text>
+                    );
+                  }
+                  
+                  return renderTextWithMath(line, index);
+                })}
+              </View>
+            )}
+            <View style={isBot ? styles.botTail : styles.userTail} />
+          </Animatable.View>
+        </View>
+      </Swipeable>
       </GestureHandlerRootView>
     );
   };
@@ -958,7 +995,22 @@ const BotScreen2 = ({ navigation, route }) => {
 
      
 
-      <ImagePreviewModal />
+      {selectedImage && (
+        <View style={[styles.imagePreviewContainer, { bottom: showAdditionalButtons ? 68 : 8 }]}>
+          <View style={styles.imageIconContainer}>
+            <Ionicons name="image-outline" size={24} color="#fff" />
+          </View>
+          <Text style={styles.imageNameText} numberOfLines={1} ellipsizeMode="middle">
+            {imageFileName || "Selected Image"}
+          </Text>
+          <TouchableOpacity 
+            style={styles.removeImageButton}
+            onPress={() => setSelectedImage(null)}
+          >
+            <Ionicons name="close-circle" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -1325,101 +1377,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    padding: 20,
-    borderRadius: 20,
-    width: '90%',
-    maxHeight: '80%',
-    justifyContent: 'space-between',
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    zIndex: 10,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 15,
-    textAlign: 'center',
-    marginTop: 5,
-  },
-  imageContainer: {
-    height: 200,
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 15,
-    borderRadius: 10,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  previewImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 10,
-  },
-  questionInput: {
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 10,
-    padding: 10,
-    fontSize: 16,
-    marginBottom: 15,
-    maxHeight: 80,
-    textAlignVertical: 'top',
-    width: '100%',
-  },
-  quickQuestionsContainer: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    marginBottom: 15,
-    maxHeight: 200,
-    width: '100%',
-  },
-  quickQuestionButton: {
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#4C8EF7',
-    borderRadius: 10,
-    marginBottom: 8,
-    width: '100%',
-  },
-  quickQuestionText: {
-    fontSize: 14,
-    color: '#4C8EF7',
-  },
-  confirmButton: {
-    backgroundColor: '#4C8EF7',
-    padding: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 5,
-    width: '100%',
-  },
-  confirmButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginLeft: 5,
-  },
-  disabledButton: {
-    backgroundColor: '#ccc',
-  },
+
   botTextContainer: {
     flexDirection: 'column',
+    flexShrink: 1,
+    width: '100%',
+    overflow: 'hidden',
+  },
+  userTextContainer: {
+    flexDirection: 'column',
+    flexShrink: 1,
+    width: '100%',
+    overflow: 'hidden',
   },
   textLine: {
     flexDirection: 'row',
@@ -1427,57 +1396,63 @@ const styles = StyleSheet.create({
     marginVertical: 2,
   },
   mathContainer: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#F8F9FA',
     borderRadius: 8,
-    padding: 8,
+    padding: 2,
     marginVertical: 4,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#E0E0E0',
     alignSelf: 'flex-start',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1,
-    elevation: 2,
+    maxWidth: '100%',
+    flexWrap: 'wrap',
+    flexShrink: 1,
   },
   mathText: {
     fontFamily: 'monospace',
     fontWeight: 'bold',
-    fontSize: 16,
-    color: '#333',
+    fontSize: 12,
+    color: '#1B5E20',
+    letterSpacing: 1,
+    flexShrink: 1,
   },
   headingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 6,
+    marginVertical: 8,
+ width:'80%',
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  
   },
   headingPointer: {
     fontWeight: 'bold',
     fontSize: 18,
-    marginRight: 5,
-    color: '#4C8EF7',
+    marginRight: 8,
+    color: '#1976D2',
   },
   headingText: {
     fontWeight: 'bold',
-    fontSize: 17,
-    color: '#333',
+    fontSize: 18,
+    color: '#1976D2',
     flex: 1,
   },
   subheadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 4,
-    paddingLeft: 10,
+   
+  width:'80%',
   },
   subheadingPointer: {
     fontWeight: 'bold',
-    fontSize: 16,
-    marginRight: 5,
-    color: '#4C8EF7',
+    fontSize: 12,
+    marginRight: 8,
+    color: '#2196F3',
   },
   subheadingText: {
-    fontSize: 16,
-    color: '#333',
+    fontWeight: 'bold',
+    fontSize: 12,
+    color: '#2196F3',
     flex: 1,
   },
   linkText: {
@@ -1493,18 +1468,167 @@ const styles = StyleSheet.create({
     marginRight: 5,
   },
   inlineMathContainer: {
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
+    backgroundColor: '#EAF5FF',
+    borderRadius: 12,
     padding: 8,
     marginVertical: 4,
-    borderWidth: 1,
-    borderColor: '#ddd',
+    borderWidth: 2,
+    borderColor: '#4C8EF7',
     alignSelf: 'flex-start',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 4,
+  },
+  formulaContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    paddingVertical: 4,
+  },
+  fractionContainer: {
+    alignItems: 'center',
+    marginHorizontal: 4,
+    minWidth: 30,
+    paddingHorizontal: 2,
+  },
+  fractionLine: {
+    height: 2,
+    backgroundColor: '#1B5E20',
+    width: '80%',
+    marginVertical: 3,
+  },
+  numerator: {
+    fontFamily: 'monospace',
+    fontWeight: 'bold',
+    fontSize: 12,
+    color: '#1B5E20',
+    textAlign: 'center',
+    paddingBottom: 2,
+  },
+  denominator: {
+    fontFamily: 'monospace',
+    fontWeight: 'bold',
+    fontSize: 12,
+    color: '#1B5E20',
+    textAlign: 'center',
+    paddingTop: 2,
+  },
+  sqrtContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sqrtSymbol: {
+    fontFamily: 'monospace',
+    fontWeight: 'bold',
+    fontSize: 16,
+    color: '#1B5E20',
+    marginRight: 2,
+  },
+  sqrtOverline: {
+    position: 'relative',
+    paddingTop: 4,
+  },
+  sqrtBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#1B5E20',
+  },
+  complexMathContainer: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    padding: 1,
+    marginVertical: 4,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    alignSelf: 'flex-start',
+    width: '100%',
+    maxWidth: '100%',
+    flexWrap: 'wrap',
+    flexShrink: 1,
+    overflow: 'hidden',
+  },
+  complexMathText: {
+    fontFamily: 'monospace',
+    fontWeight: 'bold',
+    fontSize: 16,
+    color: '#1B5E20',
+    letterSpacing: 1,
+    lineHeight: 26,
+    flexShrink: 1,
+  },
+  chineseMathHeading: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1976D2',
+    marginBottom: 8,
+    marginTop: 12,
+    backgroundColor: '#E3F2FD',
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#BBDEFB',
+  },
+  chineseMathSubheading: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2196F3',
+    marginBottom: 6,
+    marginTop: 8,
+    paddingLeft: 12,
+    backgroundColor: '#F5F5F5',
+    padding: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  chineseMathText: {
+    fontSize: 16,
+    color: '#333',
+    lineHeight: 24,
+    marginBottom: 6,
+  },
+  imagePreviewContainer: {
+    position: 'absolute',
+    left: 10,
+    right: 10,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 10,
+    padding: 10,
+    flexDirection: 'row',
+    width: '70%',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#4C8EF7',
+    zIndex: 5,
+  },
+  imageIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#4C8EF7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageNameText: {
+    color: '#333',
+    fontSize: 14,
+    flex: 1,
+    marginHorizontal: 10,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    backgroundColor: '#4C8EF7',
+    borderRadius: 15,
+    padding: 2,
+    zIndex: 10,
   },
 });
 

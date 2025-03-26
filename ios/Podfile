@@ -50,5 +50,13 @@ target 'MatrixAI' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+    
+    # Force-enable build-for-debugging for all pods, which ensures dSYM files are generated
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf-with-dsym'
+        config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
+      end
+    end
   end
 end
