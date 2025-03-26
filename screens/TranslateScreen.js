@@ -67,6 +67,8 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
       const [transcription, setTranscription] = useState([]);
       // Add a ref for the speed timer
       const speedTimerRef = useRef(null);
+      const [playbackSpeed, setPlaybackSpeed] = useState(1.0); // State for tracking current playback speed
+      const [isSpeedDropdownVisible, setIsSpeedDropdownVisible] = useState(false); // State for dropdown visibility
    
       const [sliderWidth, setSliderWidth] = useState(Dimensions.get('window').width);
       const [isLoading, setIsLoading] = useState(true);
@@ -200,12 +202,16 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
         fetchData();
     }, [uid, audioid]);
 
-    const togglePlaybackSpeed = () => {
+    const togglePlaybackSpeed = (selectedSpeed) => {
         if (!sound) return;
         
-        // Toggle the speed state
-        const newSpeedState = !is2xSpeed;
-        setIs2xSpeed(newSpeedState);
+        // Set the new playback speed state
+        setPlaybackSpeed(selectedSpeed);
+        setIsSpeedDropdownVisible(false);
+        
+        // Determine if it's 2x speed (for backward compatibility with existing code)
+        const isSpeedFast = selectedSpeed > 1.0;
+        setIs2xSpeed(isSpeedFast);
         
         // Clear any existing speed timer
         if (speedTimerRef.current) {
@@ -219,9 +225,8 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                 // This is a hack to access the underlying AVAudioPlayer
                 const player = sound._player;
                 if (player && typeof player.setRate === 'function') {
-                    // Use 1.75 instead of 2.0 for better audio clarity while still being faster
-                    player.setRate(newSpeedState ? 1.75 : 1.0);
-                    console.log(`Set iOS playback rate to ${newSpeedState ? 1.75 : 1.0}`);
+                    player.setRate(selectedSpeed);
+                    console.log(`Set iOS playback rate to ${selectedSpeed}`);
                     return;
                 }
             } catch (e) {
@@ -233,10 +238,9 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                 const player = sound._player;
                 if (player && typeof player.setPlaybackParams === 'function') {
                     const params = player.getPlaybackParams();
-                    // Use 1.75 instead of 2.0 for better audio clarity while still being faster
-                    params.setSpeed(newSpeedState ? 1.75 : 1.0);
+                    params.setSpeed(selectedSpeed);
                     player.setPlaybackParams(params);
-                    console.log(`Set Android playback rate to ${newSpeedState ? 1.75 : 1.0}`);
+                    console.log(`Set Android playback rate to ${selectedSpeed}`);
                     return;
                 }
             } catch (e) {
@@ -244,19 +248,19 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
             }
         }
         
-        // Improved fallback approach for 2x speed
+        // Improved fallback approach for custom speed
         console.log('Using improved timer-based speed control fallback');
         
-        // If switching to 2x speed and audio is playing, start the speed timer
-        if (newSpeedState && isAudioPlaying) {
-            // For 2x speed, we need to seek forward by smaller increments
-            // to make the audio clearer while still achieving faster speed
+        // If switching to a faster speed and audio is playing, start the speed timer
+        if (isSpeedFast && isAudioPlaying) {
+            // For faster speed, we need to seek forward by smaller increments
             speedTimerRef.current = setInterval(() => {
                 if (sound && isAudioPlaying) {
                     sound.getCurrentTime((seconds) => {
-                        // Calculate new position: add a smaller increment (0.075s) more frequently (every 50ms)
-                        // This makes it play at ~1.5x speed but with better audio quality
-                        const newPosition = Math.min(seconds + 0.075, audioDuration);
+                        // Calculate new position based on selected speed
+                        // Use a smaller increment more frequently for smoother playback
+                        const incrementFactor = selectedSpeed - 1.0;
+                        const newPosition = Math.min(seconds + (0.05 * incrementFactor * 1.5), audioDuration);
                         
                         // Only update if we're not at the end
                         if (newPosition < audioDuration) {
@@ -284,8 +288,6 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                     speedTimerRef.current = null;
                 }
             }, 50);
-            
-            console.log('Playback speed set to faster (improved simulation)');
         }
     };
     
@@ -856,17 +858,15 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                             // On iOS, we can try to use AVAudioPlayer's rate property
                             const player = newSound._player;
                             if (player && player.rate !== undefined) {
-                                // Use 1.75 instead of 2.0 for better audio clarity
-                                player.rate = 1.75;
-                                console.log('Set iOS playback rate to 1.75');
+                                player.rate = playbackSpeed;
+                                console.log(`Set iOS playback rate to ${playbackSpeed}`);
                             }
                         } else if (Platform.OS === 'android') {
                             // On Android, we can try to use MediaPlayer's setPlaybackParams
                             const player = newSound._player;
                             if (player && player.setPlaybackParams) {
-                                // Use 1.75 instead of 2.0 for better audio clarity
-                                player.setPlaybackParams(player.getPlaybackParams().setSpeed(1.75));
-                                console.log('Set Android playback rate to 1.75');
+                                player.setPlaybackParams(player.getPlaybackParams().setSpeed(playbackSpeed));
+                                console.log(`Set Android playback rate to ${playbackSpeed}`);
                             }
                         }
                     } catch (e) {
@@ -973,14 +973,16 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
             setIsAudioPlaying(true);
             
             // Start speed timer if in 2x mode
-            if (is2xSpeed) {
-                // Create a timer that seeks forward every 50ms to simulate 2x speed
+            if (playbackSpeed > 1.0) {
+                // Create a timer that seeks forward every 50ms to simulate faster speed
                 speedTimerRef.current = setInterval(() => {
                     if (sound && isAudioPlaying) {
                         sound.getCurrentTime((currentTime) => {
-                            // Calculate new position: add a smaller increment (0.075s) more frequently (every 50ms)
-                            // This makes it play at ~1.5x speed but with better audio quality
-                            const newPos = Math.min(currentTime + 0.075, audioDuration);
+                            // Calculate new position based on selected speed
+                            // Use a smaller increment more frequently for smoother playback
+                            const incrementFactor = playbackSpeed - 1.0;
+                            const newPos = Math.min(currentTime + (0.05 * incrementFactor * 1.5), audioDuration);
+                            
                             if (newPos < audioDuration) {
                                 sound.setCurrentTime(newPos);
                                 setAudioPosition(newPos);
@@ -1029,7 +1031,7 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
         });
         
         // If we're in 2x mode and seeking, we need to restart the timer
-        if (is2xSpeed && isAudioPlaying) {
+        if (playbackSpeed > 1.0 && isAudioPlaying) {
             // Clear existing timer
             if (speedTimerRef.current) {
                 clearInterval(speedTimerRef.current);
@@ -1040,9 +1042,11 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
             speedTimerRef.current = setInterval(() => {
                 if (sound && isAudioPlaying) {
                     sound.getCurrentTime((currentTime) => {
-                        // Calculate new position: add a smaller increment (0.1s) more frequently (every 50ms)
-                        // This makes it play at 2x speed but with better audio quality
-                        const newPos = Math.min(currentTime + 0.1, audioDuration);
+                        // Calculate new position based on selected speed
+                        // Use a smaller increment more frequently for smoother playback
+                        const incrementFactor = playbackSpeed - 1.0;
+                        const newPos = Math.min(currentTime + (0.05 * incrementFactor * 1.5), audioDuration);
+                        
                         if (newPos < audioDuration) {
                             sound.setCurrentTime(newPos);
                             setAudioPosition(newPos);
@@ -1678,7 +1682,9 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
     };
 
     return (
+        
         <SafeAreaView style={styles.container}>
+            
             <View style={styles.headerContainer2}>
                 <Image source={require('../assets/logo10.png')} style={styles.headerTitle} />
             </View>
@@ -1708,13 +1714,7 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                 </View>
             </View>
             {/* Header Section */}
-            {isLoading ? (
-                <ActivityIndicator size="large" color="#007BFF" style={styles.loader} />
-            ) : (
-                <>
-       
-                </>
-            )}
+          
 
 {audioUrl && (
     <Animated.View style={[
@@ -1938,16 +1938,46 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                 style={styles.navIcon}
               />
             </TouchableOpacity>
-            <TouchableOpacity onPress={togglePlaybackSpeed}>
-                    <Image
-                     source={require('../assets/movie.png')}
-                     style={[
-                  styles.navIcon2,
-                  { tintColor: is2xSpeed ? 'orange' : 'gray' } // Orange when 2x is active, gray when 1x
-                ]} />
-             
-             
+            <TouchableOpacity onPress={() => setIsSpeedDropdownVisible(!isSpeedDropdownVisible)}>
+                <View style={styles.speedButton}>
+                    <Text style={[styles.speedButtonText, { color: playbackSpeed > 1 ? 'orange' : 'gray' }]}>
+                        {playbackSpeed}x
+                    </Text>
+                </View>
             </TouchableOpacity>
+
+            {isSpeedDropdownVisible && (
+                <Modal
+                    transparent={true}
+                    animationType="fade"
+                    visible={isSpeedDropdownVisible}
+                    onRequestClose={() => setIsSpeedDropdownVisible(false)}
+                >
+                    <TouchableWithoutFeedback onPress={() => setIsSpeedDropdownVisible(false)}>
+                        <View style={styles.modalOverlay}>
+                            <View style={styles.speedPickerContainer}>
+                                {[0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].map((speed) => (
+                                    <TouchableOpacity
+                                        key={speed}
+                                        style={[
+                                            styles.speedOption,
+                                            playbackSpeed === speed && styles.selectedSpeedOption
+                                        ]}
+                                        onPress={() => togglePlaybackSpeed(speed)}
+                                    >
+                                        <Text style={[
+                                            styles.speedOptionText,
+                                            playbackSpeed === speed && styles.selectedSpeedOptionText
+                                        ]}>
+                                            {speed}x
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </View>
+                    </TouchableWithoutFeedback>
+                </Modal>
+            )}
           </Animated.View>
         </Animated.View>
       </Animated.View>
@@ -2278,9 +2308,18 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
 )}
 
             {/* Display the Mind Map if it's toggled on */}
-         
+            {isLoading ? (
+                <View style={styles.loaderContainer}>
+                    <ActivityIndicator size="large" color="#007BFF" style={styles.loader} />
+                </View>
+            ) : (
+                <>
+       
+                </>
+            )}
         </SafeAreaView>
     );
+    
 };
 
 const styles = StyleSheet.create({
@@ -2768,6 +2807,18 @@ flexDirection:'row',
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        zIndex:1000,
+    },
+    loaderContainer: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        zIndex: 1000,
     },
 
     mindMapText: {
@@ -3094,6 +3145,56 @@ flexDirection:'row',
         borderRadius: 10,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    speedButton: {
+        borderRadius: 15,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        marginHorizontal: -10,
+        backgroundColor: '#f0f0f0',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    speedButtonText: {
+        fontSize: 14,
+        fontWeight: 'bold',
+    },
+    speedOption: {
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        width: '100%',
+        alignItems: 'center',
+    },
+    selectedSpeedOption: {
+        backgroundColor: '#f0f0f0',
+        borderRadius: 5,
+    },
+    speedOptionText: {
+        fontSize: 16,
+        color: '#333',
+    },
+    selectedSpeedOptionText: {
+        color: 'orange',
+        fontWeight: 'bold',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    speedPickerContainer: {
+        backgroundColor: 'white',
+        borderRadius: 10,
+        padding: 10,
+        width: '40%',
+        alignItems: 'center',
+    },
+    loaderContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1000,
     },
 });
 

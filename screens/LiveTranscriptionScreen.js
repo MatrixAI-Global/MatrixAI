@@ -18,7 +18,6 @@ import {
   Clipboard,
 } from 'react-native';
 import { Buffer } from 'buffer';
-import { PERMISSIONS, request, check, RESULTS } from 'react-native-permissions';
 import AudioRecord from 'react-native-audio-record';
 import Sound from 'react-native-sound';
 import LottieView from 'lottie-react-native';
@@ -27,6 +26,7 @@ import pako from 'pako';
 import RNFS from 'react-native-fs';
 import 'react-native-get-random-values';
 import axios from 'axios';
+import { PERMISSIONS, request, check, RESULTS, openSettings } from 'react-native-permissions';
 
 // Global refs
 let dataSubscription = null;
@@ -262,6 +262,8 @@ const LiveTranscriptionScreen = ({ navigation }) => {
       const hasPermission = await checkPermission();
       if (hasPermission) {
         await initializeAudioRecorder();
+      } else {
+        console.log('Permission not granted in initial setup');
       }
       setLoadingPermission(false);
     };
@@ -299,30 +301,69 @@ const LiveTranscriptionScreen = ({ navigation }) => {
 
   const checkPermission = async () => {
     try {
+      console.log('Checking microphone permission');
       if (Platform.OS === 'android') {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-          {
-            title: "Microphone Permission",
-            message: "This app needs access to your microphone to record audio.",
-            buttonNeutral: "Ask Me Later",
-            buttonNegative: "Cancel",
-            buttonPositive: "OK"
-          }
-        );
-        const isGranted = granted === PermissionsAndroid.RESULTS.GRANTED;
-        setPermissionGranted(isGranted);
-        return isGranted;
-      } else {
-        const micPermission = PERMISSIONS.IOS.MICROPHONE;
-        const result = await check(micPermission);
+        const result = await check(PERMISSIONS.ANDROID.RECORD_AUDIO);
+        console.log('Android permission check result:', result);
         
         if (result === RESULTS.GRANTED) {
           setPermissionGranted(true);
           return true;
+        } else if (result === RESULTS.DENIED) {
+          const requestResult = await request(PERMISSIONS.ANDROID.RECORD_AUDIO);
+          console.log('Android permission request result:', requestResult);
+          const isGranted = requestResult === RESULTS.GRANTED;
+          setPermissionGranted(isGranted);
+          return isGranted;
+        } else {
+          // BLOCKED or UNAVAILABLE
+          setPermissionGranted(false);
+          Alert.alert(
+            'Microphone Permission Required',
+            'This app needs access to your microphone. Please enable microphone permission in your device settings.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => openSettings() }
+            ]
+          );
+          return false;
         }
+      } else {
+        // iOS
+        const result = await check(PERMISSIONS.IOS.MICROPHONE);
+        console.log('iOS permission check result:', result);
         
-        return requestPermission();
+        if (result === RESULTS.GRANTED) {
+          setPermissionGranted(true);
+          return true;
+        } else if (result === RESULTS.DENIED) {
+          const requestResult = await request(PERMISSIONS.IOS.MICROPHONE);
+          console.log('iOS permission request result:', requestResult);
+          const isGranted = requestResult === RESULTS.GRANTED;
+          setPermissionGranted(isGranted);
+          return isGranted;
+        } else if (result === RESULTS.BLOCKED) {
+          // Permission is blocked, prompt to open settings
+          Alert.alert(
+            'Microphone Permission Required',
+            'This app needs access to your microphone. Please enable microphone permission in your device settings.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => openSettings() }
+            ]
+          );
+          setPermissionGranted(false);
+          return false;
+        } else {
+          // UNAVAILABLE - very rare case
+          Alert.alert(
+            'Microphone Unavailable',
+            'The microphone is not available on this device.',
+            [{ text: 'OK' }]
+          );
+          setPermissionGranted(false);
+          return false;
+        }
       }
     } catch (error) {
       console.error('Error checking permissions:', error);
@@ -331,32 +372,54 @@ const LiveTranscriptionScreen = ({ navigation }) => {
     }
   };
 
-  const requestPermission = async () => {
-    try {
-      const micPermission = PERMISSIONS.IOS.MICROPHONE;
-      const result = await request(micPermission);
-      const isGranted = result === RESULTS.GRANTED;
-      setPermissionGranted(isGranted);
-      return isGranted;
-    } catch (error) {
-      console.error('Error requesting permissions:', error);
-      setError(`Permission request error: ${error.message}`);
-      return false;
-    }
-  };
-
   const initializeAudioRecorder = async () => {
     try {
-      // We'll use PCM format and manually create WAV files
+      // Clean up any existing listeners first to avoid "Invalid event" error
+      if (dataSubscription) {
+        dataSubscription.remove();
+        dataSubscription = null;
+      }
+      
+      // Stop any existing recording
+      try {
+        AudioRecord.stop();
+      } catch (e) {
+        console.log('No active recording to stop');
+      }
+      
+      // iOS requires specific configurations to work properly
       const options = {
         sampleRate: 16000,  // 16kHz as required by API
         channels: 1,        // Mono
         bitsPerSample: 16,  // 16-bit
-        audioSource: 6,     // MIC source type for Android
-        // No wavFile option - we'll get PCM data and convert manually
+        audioSource: Platform.OS === 'android' ? 6 : 0,  // MIC source type
+        // For iOS, we explicitly set a wav file path to ensure audio is captured
+        wavFile: Platform.OS === 'ios' 
+          ? `${RNFS.DocumentDirectoryPath}/recording.wav` 
+          : '',
       };
       
-      AudioRecord.init(options);
+      console.log('Initializing AudioRecord with options:', JSON.stringify(options));
+      
+      // Initialize with a promise wrapper to handle exceptions better
+      await new Promise((resolve, reject) => {
+        try {
+          AudioRecord.init(options);
+          resolve();
+        } catch (error) {
+          console.error('Error in AudioRecord.init():', error);
+          reject(error);
+        }
+      });
+      
+      // For iOS, we'll use a file-based approach
+      if (Platform.OS === 'ios') {
+        console.log('Using file-based audio capture approach for iOS');
+        // No need to setup listener for iOS
+        return true;
+      }
+      
+      // Setup the listener after initialization (Android only)
       setupAudioListener();
       return true;
     } catch (error) {
@@ -367,96 +430,125 @@ const LiveTranscriptionScreen = ({ navigation }) => {
   };
 
   const setupAudioListener = () => {
-    // Clean up existing subscription
-    if (dataSubscription) {
-      dataSubscription.remove();
-      dataSubscription = null;
-    }
-
-    // Reset chunk collection
-    currentChunkBuffers = [];
-    chunkStartTime = Date.now();
-    chunkCounter = 0;
-
-    // Set up new listener
-    dataSubscription = AudioRecord.on('data', async (data) => {
-      try {
-        // Convert base64 data to raw binary buffer
-        const chunk = Buffer.from(data, 'base64');
-        console.log('Raw chunk size', chunk.byteLength);
-        
-        if (chunk.byteLength > 0) {
-          // Add to the current audio chunks array (for reference)
-          audioChunksRef.current.push(data);
-          
-          // Add raw buffer to our current 1-second chunk collection
-          currentChunkBuffers.push(chunk);
-          
-          // Generate simple waveform data
-          const amplitude = Math.min(100, chunk.byteLength / 50);
-          setWaveformData(prevData => {
-            const newData = [...prevData, amplitude];
-            if (newData.length > 30) {
-              return newData.slice(newData.length - 30);
-            }
-            return newData;
-          });
-          
-          // Check if we've collected 1 second worth of audio
-          const currentTime = Date.now();
-          if (currentTime - chunkStartTime >= 1000) {
-            try {
-              // Combine all buffers into one larger buffer
-              const totalLength = currentChunkBuffers.reduce((sum, buffer) => sum + buffer.length, 0);
-              const combinedPCMBuffer = Buffer.concat(currentChunkBuffers, totalLength);
-              
-              // Convert PCM to WAV
-              const wavBuffer = createWavFile(combinedPCMBuffer);
-              
-              // Generate unique filename
-              chunkCounter++;
-              const wavFileName = `chunk_${Date.now()}_${chunkCounter}.wav`;
-              const chunkFilePath = `${RNFS.DocumentDirectoryPath}/${wavFileName}`;
-              
-              // Save the WAV file
-              const wavBase64 = wavBuffer.toString('base64');
-              await RNFS.writeFile(chunkFilePath, wavBase64, 'base64');
-              console.log(`WAV chunk saved to ${chunkFilePath}, size: ${wavBuffer.length} bytes`);
-              
-              // Check WebSocket status with more detail
-              const wsStatus = websocketConnection ? websocketConnection.readyState : 'null';
-              console.log(`WebSocket status: ${wsStatus}, Ready flag: ${websocketReady}`);
-              
-              // Send the chunk to the WebSocket if it's fully ready
-              if (websocketReady && websocketConnection && websocketConnection.readyState === WebSocket.OPEN) {
-                console.log(`Sending WAV chunk ${chunkCounter}, size: ${wavBuffer.length} bytes`);
-                const result = sendAudioChunkToWebSocket(wavBuffer, false);
-                console.log(`Chunk ${chunkCounter} sent: ${result}`);
-              } else {
-                console.log(`WebSocket not ready to send chunk ${chunkCounter}. Status: ${wsStatus}, Ready: ${websocketReady}`);
-                
-                // Store the chunk for delayed sending if needed
-                // We could implement a queue here to send chunks once the WebSocket is ready
-              }
-              
-              // Reset for the next 1-second chunk
-              currentChunkBuffers = [];
-              chunkStartTime = currentTime;
-            } catch (error) {
-              console.error('Error processing 1-second chunk:', error);
-              setError(`Chunk processing error: ${error.message}`);
-              
-              // Just reset the buffers and continue recording
-              currentChunkBuffers = [];
-              chunkStartTime = Date.now();
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error processing audio data:', error);
-        setError(`Audio data error: ${error.message}`);
+    console.log('Setting up audio listener...');
+    
+    try {
+      // Clean up existing subscription
+      if (dataSubscription) {
+        dataSubscription.remove();
+        dataSubscription = null;
       }
-    });
+
+      // Reset chunk collection
+      currentChunkBuffers = [];
+      chunkStartTime = Date.now();
+      chunkCounter = 0;
+
+      // Set up new listener - use a single string parameter for the event name
+      dataSubscription = AudioRecord.on('data', data => {
+        try {
+          // Log data receipt for debugging
+          console.log('Audio data received, length:', data.length);
+          
+          // Convert base64 data to raw binary buffer
+          const chunk = Buffer.from(data, 'base64');
+          console.log('Raw chunk size', chunk.byteLength);
+          
+          if (chunk.byteLength > 0) {
+            // Add to the current audio chunks array (for reference)
+            audioChunksRef.current.push(data);
+            
+            // Add raw buffer to our current 1-second chunk collection
+            currentChunkBuffers.push(chunk);
+            
+            // Generate simple waveform data
+            const amplitude = Math.min(100, chunk.byteLength / 50);
+            setWaveformData(prevData => {
+              const newData = [...prevData, amplitude];
+              if (newData.length > 30) {
+                return newData.slice(newData.length - 30);
+              }
+              return newData;
+            });
+            
+            // Check if we've collected 1 second worth of audio
+            const currentTime = Date.now();
+            if (currentTime - chunkStartTime >= 1000) {
+              processAudioChunk(currentTime);
+            }
+          } else {
+            console.warn('Warning: Received empty audio chunk');
+          }
+        } catch (error) {
+          console.error('Error in data listener:', error);
+          setError(`Audio data error: ${error.message}`);
+        }
+      });
+      
+      console.log('Audio listener setup complete');
+    } catch (error) {
+      console.error('Error setting up audio listener:', error);
+      setError(`Error setting up audio: ${error.message}`);
+    }
+  };
+  
+  // Move the audio chunk processing to a separate function
+  const processAudioChunk = async (currentTime) => {
+    try {
+      // Combine all buffers into one larger buffer
+      const totalLength = currentChunkBuffers.reduce((sum, buffer) => sum + buffer.length, 0);
+      console.log(`Combined chunk length: ${totalLength} bytes from ${currentChunkBuffers.length} chunks`);
+      
+      if (totalLength === 0) {
+        console.warn('Warning: Empty audio buffer - no audio data received');
+        // Reset and continue
+        currentChunkBuffers = [];
+        chunkStartTime = currentTime;
+        return;
+      }
+      
+      const combinedPCMBuffer = Buffer.concat(currentChunkBuffers, totalLength);
+      
+      // Convert PCM to WAV
+      const wavBuffer = createWavFile(combinedPCMBuffer);
+      
+      // Generate unique filename
+      chunkCounter++;
+      const wavFileName = `chunk_${Date.now()}_${chunkCounter}.wav`;
+      const chunkFilePath = `${RNFS.DocumentDirectoryPath}/${wavFileName}`;
+      
+      // Save the WAV file
+      const wavBase64 = wavBuffer.toString('base64');
+      await RNFS.writeFile(chunkFilePath, wavBase64, 'base64');
+      console.log(`WAV chunk saved to ${chunkFilePath}, size: ${wavBuffer.length} bytes`);
+      
+      // Check WebSocket status with more detail
+      const wsStatus = websocketConnection ? websocketConnection.readyState : 'null';
+      console.log(`WebSocket status: ${wsStatus}, Ready flag: ${websocketReady}`);
+      
+      // Send the chunk to the WebSocket if it's fully ready
+      if (websocketReady && websocketConnection && websocketConnection.readyState === WebSocket.OPEN) {
+        console.log(`Sending WAV chunk ${chunkCounter}, size: ${wavBuffer.length} bytes`);
+        const result = sendAudioChunkToWebSocket(wavBuffer, false);
+        console.log(`Chunk ${chunkCounter} sent: ${result}`);
+      } else {
+        console.log(`WebSocket not ready to send chunk ${chunkCounter}. Status: ${wsStatus}, Ready: ${websocketReady}`);
+        
+        // Store the chunk for delayed sending if needed
+        // We could implement a queue here to send chunks once the WebSocket is ready
+      }
+      
+      // Reset for the next 1-second chunk
+      currentChunkBuffers = [];
+      chunkStartTime = currentTime;
+    } catch (error) {
+      console.error('Error processing 1-second chunk:', error);
+      setError(`Chunk processing error: ${error.message}`);
+      
+      // Just reset the buffers and continue recording
+      currentChunkBuffers = [];
+      chunkStartTime = Date.now();
+    }
   };
 
   const startTimer = () => {
@@ -482,12 +574,11 @@ const LiveTranscriptionScreen = ({ navigation }) => {
 
   const startRecording = async () => {
     try {
-      if (!permissionGranted) {
-        const hasPermission = await checkPermission();
-        if (!hasPermission) {
-          Alert.alert('Permission Required', 'Microphone permission is required to record audio');
-          return;
-        }
+      // Check permission first
+      const hasPermission = await checkPermission();
+      if (!hasPermission) {
+        console.log('No permission to record');
+        return;
       }
       
       // Reset for new recording
@@ -500,22 +591,204 @@ const LiveTranscriptionScreen = ({ navigation }) => {
       chunkCounter = 0;
       websocketReady = false; // Reset websocket ready flag
       
+      // Ensure proper cleanup before starting
+      if (dataSubscription) {
+        dataSubscription.remove();
+        dataSubscription = null;
+      }
+      
+      // Clear any existing timers
+      if (timerIdsRef.current && timerIdsRef.current.length > 0) {
+        timerIdsRef.current.forEach(timerId => clearInterval(timerId));
+        timerIdsRef.current = [];
+      }
+      
       // Connect to WebSocket
       connectToWebSocket();
       
-      // Start recording
-      AudioRecord.start();
-      setRecording(true);
-      startTimer();
+      // Reinitialize audio recorder with fresh settings
+      const initialized = await initializeAudioRecorder();
+      if (!initialized) {
+        console.error('Failed to initialize audio recorder');
+        Alert.alert(
+          'Recording Error',
+          'Could not initialize audio recorder. Please try again.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      
+      // Start recording - add a slight delay to ensure initialization is complete
+      setTimeout(() => {
+        try {
+          console.log('Starting audio recording...');
+          AudioRecord.start();
+          setRecording(true);
+          startTimer();
+          
+          // For iOS, since we don't use the event listener, we'll periodically check 
+          // for audio data using a timer
+          if (Platform.OS === 'ios') {
+            startIOSAudioTimer();
+          }
+        } catch (err) {
+          console.error('Error starting recording:', err);
+          setError(`Could not start recording: ${err.message}`);
+          Alert.alert(
+            'Recording Error',
+            'Could not start recording. Please try again.',
+            [{ text: 'OK' }]
+          );
+        }
+      }, 500);
     } catch (error) {
-      console.error('Error starting recording:', error);
+      console.error('Error in startRecording:', error);
       setError(`Start recording error: ${error.message}`);
     }
   };
 
+  // For iOS, use a timer-based approach to check for audio data
+  const startIOSAudioTimer = () => {
+    let tempFilePath = `${RNFS.DocumentDirectoryPath}/recording.wav`;
+    let isProcessing = false;
+    let lastProcessTime = Date.now();
+    let processingAttempts = 0;
+    
+    console.log('[iOS Audio] Starting iOS audio timer with file path:', tempFilePath);
+    
+    const audioCheckInterval = setInterval(async () => {
+      if (!recording) {
+        console.log('[iOS Audio] Recording stopped, clearing interval');
+        clearInterval(audioCheckInterval);
+        return;
+      }
+      
+      if (isProcessing) {
+        console.log('[iOS Audio] Still processing previous chunk, skipping');
+        return;
+      }
+      
+      // Only process audio every 2 seconds
+      const currentTime = Date.now();
+      if (currentTime - lastProcessTime < 2000) {
+        return;
+      }
+      
+      processingAttempts++;
+      console.log(`[iOS Audio] Processing attempt #${processingAttempts}`);
+      lastProcessTime = currentTime;
+      
+      try {
+        // Mark as processing to prevent overlapping operations
+        isProcessing = true;
+        
+        // Temporarily stop recording to capture the chunk
+        console.log('[iOS Audio] Pausing recording to capture audio chunk...');
+        const audioFilePath = await AudioRecord.stop();
+        console.log('[iOS Audio] Recording paused, checking file at:', audioFilePath || tempFilePath);
+        
+        // Check if the file exists
+        const fileExists = await RNFS.exists(audioFilePath || tempFilePath);
+        console.log('[iOS Audio] File exists:', fileExists);
+        
+        if (fileExists) {
+          // Get stats to check file size
+          const fileStats = await RNFS.stat(audioFilePath || tempFilePath);
+          console.log('[iOS Audio] Audio file stats:', JSON.stringify(fileStats));
+          
+          if (fileStats.size > 44) { // WAV header is 44 bytes, so anything larger has audio data
+            console.log('[iOS Audio] Found audio data, file size:', fileStats.size);
+            
+            try {
+              // Read the file
+              const audioBase64 = await RNFS.readFile(audioFilePath || tempFilePath, 'base64');
+              console.log('[iOS Audio] Read audio file, base64 length:', audioBase64.length);
+              
+              if (audioBase64 && audioBase64.length > 0) {
+                // Convert to buffer
+                const audioBuffer = Buffer.from(audioBase64, 'base64');
+                
+                // Add some basic verification
+                if (audioBuffer.length > 44) {
+                  // Verify it's a valid WAV file
+                  const isWavFile = audioBuffer.toString('ascii', 0, 4) === 'RIFF' && 
+                                    audioBuffer.toString('ascii', 8, 12) === 'WAVE';
+                  
+                  console.log('[iOS Audio] WAV verification:', isWavFile ? 'Valid WAV file' : 'NOT a valid WAV file');
+                  
+                  if (isWavFile) {
+                    // Send to WebSocket directly
+                    if (websocketReady && websocketConnection && websocketConnection.readyState === WebSocket.OPEN) {
+                      console.log('[iOS Audio] Sending WAV chunk to WebSocket, size:', audioBuffer.length);
+                      const result = sendAudioChunkToWebSocket(audioBuffer, false);
+                      console.log('[iOS Audio] Send result:', result);
+                    } else {
+                      console.log('[iOS Audio] WebSocket not ready to receive audio. Ready:', websocketReady, 
+                                  'Connection:', websocketConnection ? 'exists' : 'null', 
+                                  'State:', websocketConnection ? websocketConnection.readyState : 'N/A');
+                    }
+                  } else {
+                    console.warn('[iOS Audio] Audio buffer is not a valid WAV file');
+                  }
+                } else {
+                  console.log('[iOS Audio] Audio buffer too small (only header):', audioBuffer.length);
+                }
+              }
+            } catch (readError) {
+              console.error('[iOS Audio] Error reading audio file:', readError);
+            }
+          } else {
+            console.log('[iOS Audio] Audio file exists but contains no audio data (size:', fileStats.size, ')');
+          }
+        } else {
+          console.log('[iOS Audio] Audio file not found:', audioFilePath || tempFilePath);
+        }
+        
+        // Restart recording with a clean file
+        try {
+          // Delete the old file to ensure we get fresh data
+          if (fileExists) {
+            await RNFS.unlink(audioFilePath || tempFilePath)
+              .then(() => console.log('[iOS Audio] File deleted'))
+              .catch(err => console.log('[iOS Audio] Error deleting file:', err));
+          }
+        } catch (e) {
+          console.log('[iOS Audio] Error handling file:', e);
+        }
+        
+        // Restart recording
+        console.log('[iOS Audio] Restarting audio recording...');
+        AudioRecord.start();
+        isProcessing = false;
+      } catch (error) {
+        console.error('[iOS Audio] Error in iOS audio timer:', error);
+        // Make sure to restart recording even if there's an error
+        try {
+          AudioRecord.start();
+        } catch (e) {
+          console.error('[iOS Audio] Failed to restart recording after error:', e);
+        }
+        isProcessing = false;
+      }
+    }, 500); // Check frequently, but we'll only process every 2 seconds
+    
+    // Store the interval ID for cleanup
+    timerIdsRef.current = [...(timerIdsRef.current || []), audioCheckInterval];
+  };
+  
+  // Add this at the top with other refs
+  const timerIdsRef = useRef([]);
+  
+  // Update stopRecording to clean up iOS timers
   const stopRecording = async () => {
     try {
       if (!recording) return;
+      
+      // Clear any iOS audio check timers
+      if (timerIdsRef.current && timerIdsRef.current.length > 0) {
+        timerIdsRef.current.forEach(timerId => clearInterval(timerId));
+        timerIdsRef.current = [];
+      }
       
       // Stop recording
       const audioFile = await AudioRecord.stop();
@@ -694,53 +967,80 @@ const LiveTranscriptionScreen = ({ navigation }) => {
 
   const sendAudioChunkToWebSocket = (chunk, isLastChunk = false) => {
     if (!websocketConnection || websocketConnection.readyState !== WebSocket.OPEN) {
-      console.error('Cannot send audio chunk, WebSocket not open');
+      console.error('[WebSocket] Cannot send audio chunk, WebSocket not open');
       return false;
     }
     
     try {
-      console.log(`Compressing ${chunk.length} bytes audio chunk, isLastChunk: ${isLastChunk}`);
+      console.log(`[WebSocket] Processing ${chunk.length} bytes audio chunk, isLastChunk: ${isLastChunk}`);
       
-      // Compress the audio chunk using GZIP
-      const compressedChunk = pako.gzip(chunk);
-      console.log(`Compressed to ${compressedChunk.length} bytes`);
+      // Check if it's a valid WAV file (should have RIFF header)
+      const isWavFile = chunk.length > 12 && 
+                        chunk.toString('ascii', 0, 4) === 'RIFF' && 
+                        chunk.toString('ascii', 8, 12) === 'WAVE';
       
-      // Create the header - 4 bytes
-      const headerBuffer = new ArrayBuffer(4);
-      const headerView = new DataView(headerBuffer);
+      console.log(`[WebSocket] Audio format check: ${isWavFile ? 'WAV file' : 'PCM data'}`);
       
-      // Set header values
-      // Format: 4 bits version (0001), 4 bits header size (0001), 
-      // 4 bits message type (0010 for audio), 4 bits message flags (0000 or 0010 for last chunk),
-      // 4 bits serialization (0000), 4 bits compression (0001), 8 bits reserved (00000000)
-      headerView.setUint8(0, (1 << 4) | 1); // Version & Header size
-      // For last chunk, set the second bit in message flags (0010)
-      headerView.setUint8(1, (2 << 4) | (isLastChunk ? 2 : 0)); // Message type & Message flags
-      headerView.setUint8(2, (0 << 4) | 1); // Serialization & Compression
-      headerView.setUint8(3, 0); // Reserved
+      // For iOS, we are directly reading WAV files, so we don't need to convert
+      let dataToSend = chunk;
       
-      // Create payload size (4 bytes)
-      const payloadSizeBuffer = new ArrayBuffer(4);
-      const payloadSizeView = new DataView(payloadSizeBuffer);
-      payloadSizeView.setUint32(0, compressedChunk.length, false); // Set as big-endian
-      
-      // Combine all parts into a single buffer
-      const finalBuffer = new Uint8Array(headerBuffer.byteLength + payloadSizeBuffer.byteLength + compressedChunk.length);
-      finalBuffer.set(new Uint8Array(headerBuffer), 0);
-      finalBuffer.set(new Uint8Array(payloadSizeBuffer), headerBuffer.byteLength);
-      finalBuffer.set(compressedChunk, headerBuffer.byteLength + payloadSizeBuffer.byteLength);
-      
-      // Send the binary message
-      websocketConnection.send(finalBuffer);
-      console.log(`WebSocket sent ${finalBuffer.length} bytes ${isLastChunk ? 'FINAL' : 'chunk'}`);
-      
-      if (isLastChunk) {
-        console.log('Sent last audio chunk');
+      if (!isWavFile && Platform.OS === 'android') {
+        // Convert PCM to WAV for Android 
+        console.log('[WebSocket] Converting PCM to WAV for Android');
+        dataToSend = createWavFile(chunk);
       }
       
-      return true;
+      // Ensure we have valid data to send
+      if (!dataToSend || dataToSend.length <= 44) { // WAV header is 44 bytes
+        console.warn('[WebSocket] No valid audio data to send');
+        return false;
+      }
+      
+      try {
+        // Compress the audio chunk using GZIP
+        const compressedChunk = pako.gzip(dataToSend);
+        console.log(`[WebSocket] Compressed to ${compressedChunk.length} bytes from ${dataToSend.length}`);
+        
+        // Create the header - 4 bytes
+        const headerBuffer = new ArrayBuffer(4);
+        const headerView = new DataView(headerBuffer);
+        
+        // Set header values
+        // Format: 4 bits version (0001), 4 bits header size (0001), 
+        // 4 bits message type (0010 for audio), 4 bits message flags (0000 or 0010 for last chunk),
+        // 4 bits serialization (0000), 4 bits compression (0001), 8 bits reserved (00000000)
+        headerView.setUint8(0, (1 << 4) | 1); // Version & Header size
+        // For last chunk, set the second bit in message flags (0010)
+        headerView.setUint8(1, (2 << 4) | (isLastChunk ? 2 : 0)); // Message type & Message flags
+        headerView.setUint8(2, (0 << 4) | 1); // Serialization & Compression
+        headerView.setUint8(3, 0); // Reserved
+        
+        // Create payload size (4 bytes)
+        const payloadSizeBuffer = new ArrayBuffer(4);
+        const payloadSizeView = new DataView(payloadSizeBuffer);
+        payloadSizeView.setUint32(0, compressedChunk.length, false); // Set as big-endian
+        
+        // Combine all parts into a single buffer
+        const finalBuffer = new Uint8Array(headerBuffer.byteLength + payloadSizeBuffer.byteLength + compressedChunk.length);
+        finalBuffer.set(new Uint8Array(headerBuffer), 0);
+        finalBuffer.set(new Uint8Array(payloadSizeBuffer), headerBuffer.byteLength);
+        finalBuffer.set(compressedChunk, headerBuffer.byteLength + payloadSizeBuffer.byteLength);
+        
+        // Send the binary message
+        websocketConnection.send(finalBuffer);
+        console.log(`[WebSocket] Sent ${finalBuffer.length} bytes ${isLastChunk ? 'FINAL' : 'chunk'}`);
+        
+        if (isLastChunk) {
+          console.log('[WebSocket] Sent last audio chunk');
+        }
+        
+        return true;
+      } catch (compressionError) {
+        console.error('[WebSocket] Error compressing/sending audio chunk:', compressionError);
+        return false;
+      }
     } catch (error) {
-      console.error('Error sending audio chunk:', error);
+      console.error('[WebSocket] Error processing audio chunk:', error);
       setError(`Error sending audio chunk: ${error.message}`);
       return false;
     }
@@ -761,6 +1061,8 @@ const LiveTranscriptionScreen = ({ navigation }) => {
       const messageFlags = header2 & 0x0F;
       const compression = header3 & 0x0F;
       
+      console.log(`[WebSocket] Received message: type=${messageType}, flags=${messageFlags}, compression=${compression}`);
+      
       // Check for error message (messageType === 15)
       if (messageType === 15) {
         const errorCode = dataView.getUint32(4, false); // Big-endian
@@ -770,7 +1072,7 @@ const LiveTranscriptionScreen = ({ navigation }) => {
         const errorMessageBytes = new Uint8Array(data, 12, errorMessageSize);
         const errorMessage = decodeUTF8(errorMessageBytes);
         
-        console.error('WebSocket error from server:', errorCode, errorMessage);
+        console.error('[WebSocket] Error from server:', errorCode, errorMessage);
         setError(`Server error: ${errorMessage} (Code: ${errorCode})`);
         return;
       }
@@ -782,6 +1084,8 @@ const LiveTranscriptionScreen = ({ navigation }) => {
         
         // Extract payload size (4 bytes)
         const payloadSize = dataView.getUint32(8, false); // Big-endian
+        
+        console.log(`[WebSocket] Response: seq=${sequenceNumber}, payloadSize=${payloadSize}`);
         
         // Extract compressed payload
         const compressedPayload = new Uint8Array(data, 12, payloadSize);
@@ -795,7 +1099,7 @@ const LiveTranscriptionScreen = ({ navigation }) => {
             // Use Buffer instead of TextDecoder
             jsonText = decodeUTF8(decompressedPayload);
           } catch (error) {
-            console.error('Error decompressing payload:', error);
+            console.error('[WebSocket] Error decompressing payload:', error);
             setError(`Decompression error: ${error.message}`);
             return;
           }
@@ -806,11 +1110,12 @@ const LiveTranscriptionScreen = ({ navigation }) => {
         
         // Parse the JSON payload
         const responseData = JSON.parse(jsonText);
-        console.log('Received response:', responseData);
+        console.log('[WebSocket] Received response:', JSON.stringify(responseData));
         
         // Update the transcription
         if (responseData.result && responseData.result.text) {
           setTranscription(prev => prev + ' ' + responseData.result.text);
+          console.log('[WebSocket] Updated transcription with text:', responseData.result.text);
         }
 
         // Also check for utterances if show_utterances was enabled
@@ -820,7 +1125,7 @@ const LiveTranscriptionScreen = ({ navigation }) => {
           
           // Log all utterances for debugging
           responseData.result.utterances.forEach(utterance => {
-            console.log(`Utterance: ${utterance.text} (${utterance.definite ? 'definite' : 'interim'})`);
+            console.log(`[WebSocket] Utterance: ${utterance.text} (${utterance.definite ? 'definite' : 'interim'})`);
           });
           
           // Display the transcription based on all utterances
@@ -830,11 +1135,12 @@ const LiveTranscriptionScreen = ({ navigation }) => {
           
           if (allText.trim()) {
             setTranscription(allText);
+            console.log('[WebSocket] Set transcription from utterances:', allText);
           }
         }
       }
     } catch (error) {
-      console.error('Error handling WebSocket message:', error);
+      console.error('[WebSocket] Error handling message:', error);
       setError(`Error handling message: ${error.message}`);
     }
   };

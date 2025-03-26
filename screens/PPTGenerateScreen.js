@@ -54,7 +54,7 @@ const PPTGenerateScreen = () => {
   };
 
   const handleGenerate = () => {
-    navigation.navigate('CreatePPTScreen', { message: transcription, number: selectedNumber });
+    navigation.navigate('CreatePPTScreen', { message: transcription, number: selectedNumber ,template: 2});
   };
   
   const backgrounds = {

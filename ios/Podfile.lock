@@ -5,6 +5,7 @@ PODS:
   - AppAuth/Core (1.7.6)
   - AppAuth/ExternalUserAgent (1.7.6):
     - AppAuth/Core
+  - BEMCheckBox (1.4.1)
   - boost (1.84.0)
   - BVLinearGradient (2.8.3):
     - React-Core
@@ -1939,6 +1940,9 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
+  - RNCCheckbox (0.5.17):
+    - BEMCheckBox (~> 1.4)
+    - React-Core
   - RNCPicker (2.11.0):
     - DoubleConversion
     - glog
@@ -2260,6 +2264,7 @@ DEPENDENCIES:
   - RNAudioRecord (from `../node_modules/react-native-audio-record`)
   - RNAudioRecorderPlayer (from `../node_modules/react-native-audio-recorder-player`)
   - "RNCAsyncStorage (from `../node_modules/@react-native-async-storage/async-storage`)"
+  - "RNCCheckbox (from `../node_modules/@react-native-community/checkbox`)"
   - "RNCPicker (from `../node_modules/@react-native-picker/picker`)"
   - RNFS (from `../node_modules/react-native-fs`)
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
@@ -2277,6 +2282,7 @@ DEPENDENCIES:
 SPEC REPOS:
   trunk:
     - AppAuth
+    - BEMCheckBox
     - GoogleSignIn
     - GTMAppAuth
     - GTMSessionFetcher
@@ -2455,6 +2461,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-audio-recorder-player"
   RNCAsyncStorage:
     :path: "../node_modules/@react-native-async-storage/async-storage"
+  RNCCheckbox:
+    :path: "../node_modules/@react-native-community/checkbox"
   RNCPicker:
     :path: "../node_modules/@react-native-picker/picker"
   RNFS:
@@ -2484,6 +2492,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   AppAuth: d4f13a8fe0baf391b2108511793e4b479691fb73
+  BEMCheckBox: 5ba6e37ade3d3657b36caecc35c8b75c6c2b1a4e
   boost: 7e761d76ca2ce687f7cc98e698152abd03a18f90
   BVLinearGradient: cb006ba232a1f3e4f341bb62c42d1098c284da70
   DoubleConversion: cb417026b2400c8f53ae97020b2be961b59470cb
@@ -2573,11 +2582,12 @@ SPEC CHECKSUMS:
   RNAudioRecord: b253d15d8141c5ef6bc614fc9d9f06577870bfc3
   RNAudioRecorderPlayer: 11df0c7b614e9767ef24d896465c3a758c592de7
   RNCAsyncStorage: 62fdbd7e63312228d4868779026248c2677911e1
+  RNCCheckbox: 450ce156f3e29e25efa0315c96cfbabe5a39ded1
   RNCPicker: cfb51a08c6e10357d9a65832e791825b0747b483
   RNFS: 89de7d7f4c0f6bafa05343c578f61118c8282ed8
   RNGestureHandler: 8b1080a6db0be82dbca18550d6212b885bfab6b2
   RNGoogleSignin: 5e115ab981ba1a9f5fae37000f49cd996c394df0
-  RNPermissions: cf51205c51bce646267388602fb49c6a2ea5f1dd
+  RNPermissions: 6ec445d97d6707163c69067a6b96bf839ca6f286
   RNScreens: b32d0d59b53acb574fa795a9343591ef4e7ab7c2
   RNShare: 56b5431c60e1e9ee167191f4f327471af1c2941a
   RNSound: 314cc5226453ef4a3314a196c65e8a65e5106a7b
@@ -2588,6 +2598,6 @@ SPEC CHECKSUMS:
   VisionCamera: f56eaedde0d3fa095143b78374d29e89e71735f9
   Yoga: b94ff2d7559cb66837c97a3f394ddb817faad4d6
 
-PODFILE CHECKSUM: 6ab4bc4c6219a58a75e1b030be7b0d6f3956a088
+PODFILE CHECKSUM: cdd7c97c9c2d8e0ca8527ada1dc2a15626fde993
 
 COCOAPODS: 1.15.2

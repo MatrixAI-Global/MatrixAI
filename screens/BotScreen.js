@@ -68,10 +68,8 @@ const BotScreen = ({ navigation, route }) => {
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [currentRole, setCurrentRole] = useState('');
   
-  // New state variables for image preview modal
-  const [imagePreviewModalVisible, setImagePreviewModalVisible] = useState(false);
+  // Modified image handling
   const [selectedImage, setSelectedImage] = useState(null);
-  const [imageQuestion, setImageQuestion] = useState('What do you see in the image?');
   const [imageType, setImageType] = useState('');
   const [imageFileName, setImageFileName] = useState('');
 
@@ -180,24 +178,143 @@ const BotScreen = ({ navigation, route }) => {
   };
 
   const handleSendMessage = async () => {
-    if (inputText.trim()) {
-      const newMessage = {
-        id: Date.now().toString(),
-        text: inputText,
-        sender: 'user',
-      };
-      const updatedMessages = [...messages, newMessage];
-      setMessages(updatedMessages);
-      // Update the current chat's messages
-      setChats(prevChats => prevChats.map(chat => 
-        chat.id === currentChatId ? { ...chat, messages: updatedMessages } : chat
-      ));
+    if (inputText.trim() || selectedImage) {
+      // If there's an image, process it
+      if (selectedImage) {
+        try {
+          setIsLoading(true);
+          
+          // Generate a unique image ID
+          const imageID = Date.now().toString(36) + Math.random().toString(36).substring(2, 15);
+          const fileExtension = imageFileName ? imageFileName.split('.').pop() : 'jpg';
+          
+          // Read the file as base64
+          const fileContent = await RNFS.readFile(selectedImage, 'base64');
+          
+          // Create file path for Supabase storage
+          const filePath = `users/${uid}/Image/${imageID}.${fileExtension}`;
+          
+          // Upload to Supabase storage
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('user-uploads')
+            .upload(filePath, decode(fileContent), {
+              contentType: imageType || 'image/jpeg',
+              upsert: false
+            });
+            
+          if (uploadError) {
+            throw new Error(`Upload error: ${uploadError.message}`);
+          }
+          
+          // Get the public URL for the uploaded image
+          const { data: { publicUrl } } = supabase.storage
+            .from('user-uploads')
+            .getPublicUrl(filePath);
+          
+          // Add the image to messages
+          const newMessage = {
+            id: Date.now().toString(),
+            image: publicUrl,
+            text: inputText.trim() ? inputText : "",
+            sender: 'user'
+          };
+          
+          setMessages((prev) => [...prev, newMessage]);
+          
+          // Save the chat history for the image
+          await saveChatHistory(publicUrl, 'user');
+          
+          // If there's text, use it as the question, otherwise use a default
+          const question = inputText.trim() ? inputText : "What do you see in this image?";
+          
+          // Create system message with role information if available
+          let systemContent = 'You are MatrixAI Bot, a helpful AI assistant.';
+          if (currentRole) {
+            systemContent = `You are MatrixAI Bot, acting as a ${currentRole}. Please provide responses with the expertise and perspective of a ${currentRole} while being helpful and informative.`;
+          }
+          
+          // Send request to Volces API
+          const volcesResponse = await axios.post(
+            'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
+            {
+              model: 'doubao-vision-pro-32k-241028',
+              messages: [
+                {
+                  role: 'system',
+                  content: systemContent
+                },
+                {
+                  role: 'user',
+                  content: [
+                    {
+                      type: 'text',
+                      text: question
+                    },
+                    {
+                      type: 'image_url',
+                      image_url: {
+                        url: publicUrl
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              headers: {
+                'Authorization': 'Bearer 95fad12c-0768-4de2-a4c2-83247337ea89',
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+          
+          // Extract the response from Volces API
+          const botMessage = volcesResponse.data.choices[0].message.content.trim();
+          
+          // Add the bot's response to messages
+          setMessages((prev) => [
+            ...prev,
+            { id: Date.now().toString(), text: botMessage, sender: 'bot' },
+          ]);
+          
+          // Save the chat history for the bot response
+          await saveChatHistory(botMessage, 'bot');
+          
+          // Clear the image and text
+          setSelectedImage(null);
+          setInputText('');
+          
+        } catch (error) {
+          console.error('Error processing image:', error);
+          Alert.alert('Error', 'Failed to process image');
+          
+          setMessages((prev) => [
+            ...prev,
+            { id: Date.now().toString(), text: 'Error processing image. Please try again.', sender: 'bot' },
+          ]);
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        // Regular text message handling (existing code)
+        const newMessage = {
+          id: Date.now().toString(),
+          text: inputText,
+          sender: 'user',
+        };
+        const updatedMessages = [...messages, newMessage];
+        setMessages(updatedMessages);
+        // Update the current chat's messages
+        setChats(prevChats => prevChats.map(chat => 
+          chat.id === currentChatId ? { ...chat, messages: updatedMessages } : chat
+        ));
 
-      // Save the user's message to the server
-      await saveChatHistory(inputText, 'user');
-      
-      fetchDeepSeekResponse(inputText);  // Fetch response from DeepSeek
-      setInputText('');
+        // Save the user's message to the server
+        await saveChatHistory(inputText, 'user');
+        
+        fetchDeepSeekResponse(inputText);  // Fetch response from DeepSeek
+        setInputText('');
+      }
       setIsTyping(false);
     }
   };
@@ -541,262 +658,6 @@ const BotScreen = ({ navigation, route }) => {
     setIsSidebarOpen(false);
   };
 
-  // Image Preview Modal Component
-  const ImagePreviewModal = () => {
-    const screenWidth = Dimensions.get('window').width;
-    const screenHeight = Dimensions.get('window').height;
-    const imageWidth = screenWidth * 0.7;
-    const imageHeight = screenHeight * 0.3;
-    
-    const handleQuickQuestion = (question) => {
-      setImageQuestion(question);
-    };
-    
-    const handleConfirm = async () => {
-      // Ensure we have a question
-     
-      
-      setImagePreviewModalVisible(false);
-      
-      if (!selectedImage) return;
-      
-      try {
-        setIsLoading(true);
-        
-        // Generate a unique image ID
-        const imageID = Date.now().toString(36) + Math.random().toString(36).substring(2, 15);
-        const fileExtension = imageFileName ? imageFileName.split('.').pop() : 'jpg';
-        
-        // Read the file as base64
-        const fileContent = await RNFS.readFile(selectedImage, 'base64');
-        
-        // Create file path for Supabase storage
-        const filePath = `users/${uid}/Image/${imageID}.${fileExtension}`;
-        
-        // Upload to Supabase storage
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('user-uploads')
-          .upload(filePath, decode(fileContent), {
-            contentType: imageType || 'image/jpeg',
-            upsert: false
-          });
-          
-        if (uploadError) {
-          throw new Error(`Upload error: ${uploadError.message}`);
-        }
-        
-        // Get the public URL for the uploaded image
-        const { data: { publicUrl } } = supabase.storage
-          .from('user-uploads')
-          .getPublicUrl(filePath);
-        
-        // Add the image to messages
-        setMessages((prev) => [
-          ...prev,
-          { 
-            id: Date.now().toString(), 
-            image: publicUrl,
-            sender: 'user' 
-          },
-        ]);
-        
-        // Save the chat history for the image
-        await saveChatHistory(publicUrl, 'user');
-        
-        // Use a fixed question to Volces API regardless of what the user typed
-        const fixedImageQuestion = "What do you see in the image define in brief";
-        
-        // Send the image to Volces API
-        const VOLCES_API_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
-        const VOLCES_API_KEY = '95fad12c-0768-4de2-a4c2-83247337ea89';
-        
-        // Create system message with role information if available
-        let systemContent = 'You are MatrixAI Bot, a helpful AI assistant.';
-        if (currentRole) {
-          systemContent = `You are MatrixAI Bot, acting as a ${currentRole}. Please provide responses with the expertise and perspective of a ${currentRole} while being helpful and informative.`;
-        }
-        
-        const volcesResponse = await axios.post(
-          VOLCES_API_URL,
-          {
-            model: 'doubao-vision-pro-32k-241028',
-            messages: [
-              {
-                role: 'system',
-                content: systemContent
-              },
-              {
-                role: 'user',
-                content: [
-                  {
-                    type: 'text',
-                    text: fixedImageQuestion
-                  },
-                  {
-                    type: 'image_url',
-                    image_url: {
-                      url: publicUrl
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            headers: {
-              'Authorization': `Bearer ${VOLCES_API_KEY}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-        
-        // Extract the response from Volces API
-        const volcesImageDescription = volcesResponse.data.choices[0].message.content.trim();
-        
-        // Now send the volcesImageDescription along with the user's question to DeepSeek
-        // Only if the user has entered a custom question
-        if (imageQuestion && imageQuestion !== 'What do you see in the image?') {
-          // Create a message combining the image description and user question
-          const combinedPrompt = `[Image Description]: ${volcesImageDescription}\n\n[User Question]: ${imageQuestion}`;
-          
-          // Send to DeepSeek
-          const deepseekResponse = await axios.post(
-            'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
-            {
-              model: 'deepseek-r1-250120',
-              messages: [
-                { role: 'system', content: systemContent },
-                ...messages.map(msg => ({
-                  role: msg.sender === 'bot' ? 'assistant' : 'user',
-                  content: msg.text || '' // Handle image messages which don't have text
-                })),
-                { role: 'user', content: combinedPrompt },
-              ]
-            },
-            {
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer 95fad12c-0768-4de2-a4c2-83247337ea89`
-              }
-            }
-          );
-          
-          // Use the DeepSeek response as the bot message
-          const botMessage = deepseekResponse.data.choices[0].message.content.trim();
-          
-          // Add the bot's response to messages
-          setMessages((prev) => [
-            ...prev,
-            { id: Date.now().toString(), text: botMessage, sender: 'bot' },
-          ]);
-          
-          // Save the chat history for the bot response
-          await saveChatHistory(botMessage, 'bot');
-        } else {
-          // If no custom question, just use the Volces response
-          setMessages((prev) => [
-            ...prev,
-            { id: Date.now().toString(), text: volcesImageDescription, sender: 'bot' },
-          ]);
-          
-          // Save the chat history for the bot response
-          await saveChatHistory(volcesImageDescription, 'bot');
-        }
-        
-      } catch (error) {
-        console.error('Error processing image:', error);
-        Alert.alert('Error', 'Failed to process image');
-        
-        setMessages((prev) => [
-          ...prev,
-          { id: Date.now().toString(), text: 'Error processing image. Please try again.', sender: 'bot' },
-        ]);
-      } finally {
-        setIsLoading(false);
-        // Reset state
-        setSelectedImage(null);
-        setImageQuestion('What do you see in the image?');
-      }
-    };
-    
-    return (
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={imagePreviewModalVisible}
-        onRequestClose={() => setImagePreviewModalVisible(false)}
-      >
-        <TouchableWithoutFeedback>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback>
-              <View style={styles.modalContent}>
-                <TouchableOpacity 
-                  style={styles.closeButton}
-                  onPress={() => setImagePreviewModalVisible(false)}
-                >
-                  <MaterialCommunityIcons name="close" size={24} color="#000" />
-                </TouchableOpacity>
-                
-                <Text style={styles.modalTitle}>Image Preview</Text>
-                
-                <View style={styles.imageContainer}>
-                  {selectedImage && (
-                    <Image 
-                      source={{ uri: selectedImage }} 
-                      style={styles.previewImage}
-                      resizeMode="contain"
-                    />
-                  )}
-                </View>
-                
-                <TextInput
-  style={styles.textInput}
-  placeholder="Ask a question about the image..."
-  value={imageQuestion}
-  onChangeText={(text) => setImageQuestion(text)} // Only update text
-  multiline
-/>
-
-
-                
-                <View style={styles.quickQuestionsContainer}>
-                  <TouchableOpacity 
-                    style={styles.quickQuestionButton}
-                    onPress={() => handleQuickQuestion('What is the solution to this problem or equation shown in the image?')}
-                  >
-                    <Text style={styles.quickQuestionText}>What is the solution to this problem or equation shown in the image?</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    style={styles.quickQuestionButton}
-                    onPress={() => handleQuickQuestion('What colors are used in this image and what might they represent?')}
-                  >
-                    <Text style={styles.quickQuestionText}>What colors are used in this image and what might they represent?</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    style={styles.quickQuestionButton}
-                    onPress={() => handleQuickQuestion('Describe this image in detail and explain what it might be showing.')}
-                  >
-                    <Text style={styles.quickQuestionText}>Describe this image in detail and explain what it might be showing.</Text>
-                  </TouchableOpacity>
-                </View>
-                
-                <TouchableOpacity 
-                  style={styles.confirmButton}
-                  onPress={handleConfirm}
-                >
-                  <Ionicons name="check" size={24} color="#FFF" />
-                  <Text style={styles.confirmButtonText}>Send</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-    );
-  };
-
   const handleImageOCR = async (source = 'gallery') => {
     const options = {
       mediaType: 'photo',
@@ -816,11 +677,10 @@ const BotScreen = ({ navigation, route }) => {
       if (response.assets && response.assets.length > 0) {
         const { uri, type, fileName } = response.assets[0];
         
-        // Set the selected image and show the modal
+        // Set the selected image
         setSelectedImage(uri);
         setImageType(type || 'image/jpeg');
         setImageFileName(fileName || `image_${Date.now()}.jpg`);
-        setImagePreviewModalVisible(true);
       }
     } catch (error) {
       console.error('Error selecting image:', error);
@@ -905,7 +765,7 @@ const BotScreen = ({ navigation, route }) => {
           onContentSizeChange={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
           onLayout={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
         
-          style={{ marginBottom: showAdditionalButtons ? 125 : 70 }}
+          style={{ marginBottom: showAdditionalButtons ? 125 : selectedImage ? 140 : 70 }}
         />
 
         {/* Placeholder for New Chat */}
@@ -1005,10 +865,23 @@ const BotScreen = ({ navigation, route }) => {
         </View>
       )}
       
+      {/* Image Preview (WhatsApp Style) */}
+      {selectedImage && (
+        <View style={styles.imagePreviewContainer}>
+          <Image source={{ uri: selectedImage }} style={styles.imagePreviewThumbnail} />
+          <TouchableOpacity 
+            style={styles.removeImageButton}
+            onPress={() => setSelectedImage(null)}
+          >
+            <Ionicons name="close-circle" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      )}
+      
        <View style={[styles.chatBoxContainer, { bottom: showAdditionalButtons ? 80 : 20}]}>
           <TextInput
             style={[styles.textInput, { textAlignVertical: 'center' }]}
-            placeholder="Send a message..."
+            placeholder={selectedImage ? "Add a caption..." : "Send a message..."}
             placeholderTextColor="#ccc"
             value={inputText}
             onChangeText={handleInputChange}
@@ -1072,7 +945,6 @@ const BotScreen = ({ navigation, route }) => {
         </TouchableWithoutFeedback>
       )}
 
-      <ImagePreviewModal />
     </SafeAreaView>
   );
 };
@@ -1124,49 +996,37 @@ const styles = StyleSheet.create({
    padding: 10,
   },
   
-  swipeableButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-  },
-  swipeButton: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#007AFF',
-    marginHorizontal: 5,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-
-
-
-  additionalButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  // WhatsApp style image preview container
+  imagePreviewContainer: {
     position: 'absolute',
-    bottom: 15, // Adjust based on your layout
-    width: '100%',
-    paddingHorizontal: 20, // Add padding for spacing
-  },
-  buttonRow: {
+    bottom: 128,
+    left: 10,
+    right: 10,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 10,
+    padding: 5,
     flexDirection: 'row',
+    width:200,
+    alignItems: 'center',
     justifyContent: 'space-between',
-    width: '100%',
+    borderWidth: 1,
+    borderColor: '#4C8EF7',
   },
-  additionalButton2: {
-    flex: 1, // Allow buttons to take equal space
-    alignItems: 'center', // Center the content
+  imagePreviewThumbnail: {
+    width: 60,
+    height: 60,
+    borderRadius: 5,
+    marginRight: 10,
+  
   },
- 
+  removeImageButton: {
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    backgroundColor: '#4C8EF7',
+    borderRadius: 15,
+    padding: 2,
+  },
   chatBoxContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1468,6 +1328,23 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     backgroundColor: '#ccc',
+  },
+  additionalButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    position: 'absolute',
+    bottom: 15, // Adjust based on your layout
+    width: '100%',
+    paddingHorizontal: 20, // Add padding for spacing
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  additionalButton2: {
+    flex: 1, // Allow buttons to take equal space
+    alignItems: 'center', // Center the content
   },
   additionalButton: {
     alignItems: 'center',

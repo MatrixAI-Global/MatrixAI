@@ -61,7 +61,7 @@ const CustomToast = ({ visible, title, message, onHide }) => {
             // Auto hide after 3 seconds
             const timer = setTimeout(() => {
                 onHide();
-            }, 3000);
+            }, 1000);
             
             return () => clearTimeout(timer);
         } else {
@@ -136,17 +136,39 @@ const AudioVideoUploadScreen = () => {
     const [toastVisible, setToastVisible] = useState(false);
     const [toastTitle, setToastTitle] = useState('');
     const [toastMessage, setToastMessage] = useState('');
+    const [toastType, setToastType] = useState('default');
+    const fadeAnim = useRef(new Animated.Value(0)).current;
     
     // Function to show custom toast
-    const showCustomToast = (title, message) => {
+    const showCustomToast = (title, message, type = 'default') => {
         setToastTitle(title);
         setToastMessage(message);
+        setToastType(type);
         setToastVisible(true);
+        
+        // Animate fade in
+        Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+        }).start();
+        
+        // Auto hide toast after 3 seconds
+        setTimeout(() => {
+            hideCustomToast();
+        }, 1000);
     };
     
     // Function to hide custom toast
     const hideCustomToast = () => {
-        setToastVisible(false);
+        // Animate fade out
+        Animated.timing(fadeAnim, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+        }).start(() => {
+            setToastVisible(false);
+        });
     };
 
     // Function to generate a secure random audio ID
@@ -294,7 +316,7 @@ const AudioVideoUploadScreen = () => {
                 if (Platform.OS === 'ios') {
                     // Set a timeout to prevent hanging if Sound initialization takes too long
                     const timeoutPromise = new Promise(resolve => {
-                        setTimeout(() => resolve(null), 3000); // 3 second timeout
+                        setTimeout(() => resolve(null), 1000); // 3 second timeout
                     });
                     
                     const soundPromise = new Promise(resolve => {
@@ -504,16 +526,18 @@ const AudioVideoUploadScreen = () => {
             await refreshFiles();
             
             // Custom toast implementation
-            showCustomToast('Import Complete', 'Your file has been imported successfully.');
+            showCustomToast('Import Complete', 'Your file has been imported successfully.', 'success');
 
             setUploading(false);
             setPopupVisible(false);
             
-            // Add a longer delay before navigating to ensure database has time to update
-            setTimeout(() => {
+            // Add a longer delay before navigating to ensure the toast is visible for at least a moment
+            const navigateToTranslation = () => {
                 // Navigate to translation screen with the generated audioid
                 handlePress({ audioid: audioID });
-            }, 2000);
+            };
+            
+            setTimeout(navigateToTranslation, 1500);
             
         } catch (error) {
             console.error('Upload error details:', {
@@ -525,6 +549,9 @@ const AudioVideoUploadScreen = () => {
                     uri: file.uri
                 } : 'No file'
             });
+            
+            // Show error toast
+            showCustomToast('Upload Failed', 'There was a problem uploading your file.', 'error');
             
             Alert.alert(
                 'Error',
@@ -646,14 +673,14 @@ const AudioVideoUploadScreen = () => {
                 await saveFilesToLocalStorage(updatedFiles);
                 
                 // Show success toast
-                showCustomToast('Success', 'File deleted successfully');
+                showCustomToast('Success', 'File deleted successfully.', 'success');
             } else {
                 console.error('Error deleting audio:', data.error);
-                Alert.alert('Error', data.error || 'Failed to delete the audio file.');
+                showCustomToast('Error', data.error || 'Failed to delete the audio file.', 'error');
             }
         } catch (error) {
             console.error('Error deleting audio:', error);
-            Alert.alert('Error', 'An error occurred while deleting the audio file.');
+            showCustomToast('Error', 'An error occurred while deleting the audio file.', 'error');
         }
     };
 
@@ -783,17 +810,17 @@ const AudioVideoUploadScreen = () => {
                 await saveFilesToLocalStorage(updatedFiles);
                 
                 // Show success toast
-                showCustomToast('Success', 'File name updated successfully');
+                showCustomToast('Success', 'File name updated successfully.', 'success');
                 
                 setEditModalVisible(false); // Close edit modal
                 setNewFileName('');
             } else {
                 console.error('Error updating audio:', data.error);
-                Alert.alert('Error', 'Failed to update the audio name.');
+                showCustomToast('Error', 'Failed to update the audio name.', 'error');
             }
         } catch (error) {
             console.error('Error updating audio name:', error);
-            Alert.alert('Error', 'An error occurred while updating the audio name.');
+            showCustomToast('Error', 'An error occurred while updating the audio name.', 'error');
         }
     };
     
@@ -940,10 +967,10 @@ const AudioVideoUploadScreen = () => {
             setIsFilterMode(false);
             
             // Show success toast
-            showCustomToast('Success', `${filesToDelete.length} files deleted successfully`);
+            showCustomToast('Success', `${filesToDelete.length} files deleted successfully.`, 'success');
         } catch (error) {
             console.error('Error deleting files:', error);
-            Alert.alert('Error', 'Failed to delete some files');
+            showCustomToast('Error', 'Failed to delete some files', 'error');
         } finally {
             setIsDeleting(false);
         }
@@ -997,6 +1024,113 @@ const AudioVideoUploadScreen = () => {
         );
         setLanguages(sortedLanguages);
     }, []);
+
+    const toastStyles = StyleSheet.create({
+        toastContainer: {
+            position: 'absolute',
+            bottom: 40,
+            left: 20,
+            right: 20,
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            borderRadius: 12,
+            padding: 16,
+            shadowColor: '#000',
+            shadowOffset: {
+                width: 0,
+                height: 2,
+            },
+            shadowOpacity: 0.25,
+            shadowRadius: 3.84,
+            elevation: 5,
+            flexDirection: 'row',
+            alignItems: 'center',
+        },
+        toastContent: {
+            flex: 1,
+        },
+        toastTitle: {
+            fontSize: 16,
+            fontWeight: '600',
+            marginBottom: 4,
+        },
+        toastMessage: {
+            fontSize: 14,
+            color: '#666',
+        },
+        successToast: {
+            backgroundColor: 'rgba(52, 211, 153, 0.95)', // Modern green
+        },
+        errorToast: {
+            backgroundColor: 'rgba(248, 113, 113, 0.95)', // Modern red
+        },
+        infoToast: {
+            backgroundColor: 'rgba(96, 165, 250, 0.95)', // Modern blue
+        },
+        closeToastButton: {
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            width: 24,
+            height: 24,
+            borderRadius: 12,
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 10,
+        },
+        closeToastButtonText: {
+            fontSize: 18,
+            fontWeight: 'bold',
+            color: '#fff',
+        }
+    });
+
+    const renderToast = () => {
+        if (!toastVisible) return null;
+
+        const getToastStyle = () => {
+            switch (toastType) {
+                case 'success':
+                    return toastStyles.successToast;
+                case 'error':
+                    return toastStyles.errorToast;
+                case 'info':
+                    return toastStyles.infoToast;
+                default:
+                    return {};
+            }
+        };
+
+        return (
+            <Animated.View 
+                style={[
+                    toastStyles.toastContainer, 
+                    getToastStyle(),
+                    { opacity: fadeAnim }
+                ]}
+            >
+                <TouchableOpacity 
+                    style={toastStyles.closeToastButton} 
+                    onPress={hideCustomToast}
+                >
+                    <Text style={toastStyles.closeToastButtonText}>×</Text>
+                </TouchableOpacity>
+                <View style={toastStyles.toastContent}>
+                    <Text style={[
+                        toastStyles.toastTitle,
+                        { color: toastType === 'default' ? '#000' : '#fff' }
+                    ]}>
+                        {toastTitle}
+                    </Text>
+                    <Text style={[
+                        toastStyles.toastMessage,
+                        { color: toastType === 'default' ? '#666' : '#fff' }
+                    ]}>
+                        {toastMessage}
+                    </Text>
+                </View>
+            </Animated.View>
+        );
+    };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -1181,12 +1315,7 @@ const AudioVideoUploadScreen = () => {
             </Modal>
 
             {/* Custom Toast */}
-            <CustomToast
-                visible={toastVisible}
-                title={toastTitle}
-                message={toastMessage}
-                onHide={hideCustomToast}
-            />
+            {renderToast()}
 
         </SafeAreaView>
     );
@@ -1686,34 +1815,44 @@ color:'#000',
     },
     toastContainer: {
         position: 'absolute',
-        bottom: 100,
+        bottom: 40,
         left: 20,
         right: 20,
-        alignItems: 'center',
-        zIndex: 9999,
-    },
-    toastContent: {
-        backgroundColor: '#333',
-        padding: 15,
-        borderRadius: 8,
-        width: '100%',
-        flexDirection: 'column',
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        borderRadius: 12,
+        padding: 16,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
         shadowOpacity: 0.25,
         shadowRadius: 3.84,
         elevation: 5,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    toastContent: {
+        flex: 1,
     },
     toastTitle: {
         fontSize: 16,
-        fontWeight: 'bold',
-        marginBottom: 5,
-        color: '#fff',
+        fontWeight: '600',
+        marginBottom: 4,
     },
     toastMessage: {
         fontSize: 14,
-        color: '#ddd',
+        color: '#666',
     },
+    successToast: {
+        backgroundColor: 'rgba(52, 211, 153, 0.95)', // Modern green
+    },
+    errorToast: {
+        backgroundColor: 'rgba(248, 113, 113, 0.95)', // Modern red
+    },
+    infoToast: {
+        backgroundColor: 'rgba(96, 165, 250, 0.95)', // Modern blue
+    }
 });
 
 export default AudioVideoUploadScreen;

@@ -17,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 const { width } = Dimensions.get("window");
 
 const CreatePPTScreen = ({ route, navigation }) => {
-  const { message, number } = route.params; // Extract text from params
+  const { message, number,template } = route.params; // Extract text from params
   const [pptUrl, setPptUrl] = useState(null); // Store the downloaded PPT URL
   const [loading, setLoading] = useState(true); // Track loading state
   const shimmerTranslateX = new Animated.Value(-200); // For shimmer animation
@@ -44,6 +44,7 @@ const CreatePPTScreen = ({ route, navigation }) => {
         {
           query: message,
           number: number,
+          template: template
         },
         {
           headers: {

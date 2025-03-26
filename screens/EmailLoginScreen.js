@@ -204,7 +204,7 @@ const EmailLoginScreen = ({ navigation }) => {
                     />
                 </TouchableOpacity>
             </View>
-            <View style={styles.TermsContainer}>
+            {/* <View style={styles.TermsContainer}>
                 <CheckBox
                     value={isChecked}
                     onValueChange={setChecked}
@@ -213,7 +213,7 @@ const EmailLoginScreen = ({ navigation }) => {
                 <TouchableOpacity style={styles.TermsLink} onPress={() => navigation.navigate('TermsOfService')}>
                     <Text style={styles.TermsLinkText}>Terms of Service</Text>
                 </TouchableOpacity>
-            </View>
+            </View> */}
             {/* Forgot Password Link */}
             <TouchableOpacity style={styles.forgotPasswordContainer} onPress={handleForgotPassword}>
                 <Text style={styles.forgotPasswordText}>Forgot Password?</Text>

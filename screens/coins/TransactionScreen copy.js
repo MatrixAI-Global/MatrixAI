@@ -3,7 +3,11 @@ import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndi
 import axios from 'axios';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useAuthUser } from '../../hooks/useAuthUser';
+
 const TransactionScreen2 = ({ navigation }) => {
+
+  const { uid } = useAuthUser();
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -14,7 +18,7 @@ const TransactionScreen2 = ({ navigation }) => {
   const fetchTransactions = async () => {
     try {
       const response = await axios.post('https://matrix-server.vercel.app/AllTransactions', {
-        uid: "31ca978d-53c8-4b61-963f-fdacc2f5e9c6"
+        uid: uid
       });
       
       if (response.data.success) {

@@ -104,7 +104,7 @@ const ProfileScreen = ({ navigation }) => {
     };
 
     const handleInside = () => {
-        navigation.navigate('Inside');
+        navigation.navigate('ReferralScreen');
     };
 
     const handleAIShop = () => {
