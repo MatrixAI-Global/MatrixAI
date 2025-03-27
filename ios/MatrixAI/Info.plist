@@ -36,11 +36,13 @@
 	<key>NSFaceIDUsageDescription</key>
 	<string>$(PRODUCT_NAME) needs access to Face ID</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string>MatrixAI needs access to your location to provide location-based services and personalized experiences.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>$(PRODUCT_NAME) needs access to your microphone</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>$(PRODUCT_NAME) needs access to your photo library</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>MatrixAI needs access to speech recognition to transcribe your voice commands and provide voice-based features.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>AntDesign.ttf</string>
