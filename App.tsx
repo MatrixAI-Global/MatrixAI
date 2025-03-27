@@ -75,7 +75,9 @@ import HelpScreen from './screens/HelpScreen.js';
 import AddonScreen from './screens/coins/AddonScreen.js';
 import FeedbackScreen from './screens/FeedbackScreen.js';
 import PaymentScreen from './screens/coins/PaymentScreen.js';
+import AirwallexPaymentScreen from './screens/coins/AirwallexPaymentScreen.js';
 import StripeProvider from './components/StripeProvider';
+import AirwallexProvider from './components/AirwallexProvider';
 
 const Stack = createStackNavigator();
 
@@ -125,6 +127,7 @@ const App = () => {
                         <ModalProvider>
                             <ProStatusProvider>
                             <StripeProvider>
+                            <AirwallexProvider>
                             <NavigationContainer>
                                 <Stack.Navigator>
                                     {/* Onboarding Screen */}
@@ -401,6 +404,11 @@ const App = () => {
                                         options={{ headerShown: false }} 
                                     />
                                     <Stack.Screen 
+                                        name="AirwallexPaymentScreen" 
+                                        component={AirwallexPaymentScreen} 
+                                        options={{ headerShown: false }} 
+                                    />
+                                    <Stack.Screen 
                                         name="CustomerSupportScreen" 
                                         component={CustomerSupportScreen} 
                                         options={{ headerShown: false }} 
@@ -427,6 +435,7 @@ const App = () => {
                                     />
                                 </Stack.Navigator>
                             </NavigationContainer>
+                            </AirwallexProvider>
                             </StripeProvider>
                             </ProStatusProvider>
                         </ModalProvider>

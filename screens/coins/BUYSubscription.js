@@ -158,7 +158,7 @@ const BUYSubscription = ({ navigation, route }) => {
     const formattedEndDate = endDate.toISOString();
     
     // Navigate to payment screen with necessary details
-    navigation.navigate('PaymentScreen', {
+    navigation.navigate('AirwallexPaymentScreen', {
       uid: uid,
       plan: plan,
       planDetails: planDetails,
