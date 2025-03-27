@@ -105,6 +105,14 @@ android {
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
     }
+    
+    // Exclude problematic modules
+    configurations {
+        implementation.exclude group: "com.reactnativedocumentpicker", module: "react-native-document-picker"
+        compileOnly.exclude group: "com.reactnativedocumentpicker", module: "react-native-document-picker"
+        runtimeOnly.exclude group: "com.reactnativedocumentpicker", module: "react-native-document-picker"
+        api.exclude group: "com.reactnativedocumentpicker", module: "react-native-document-picker"
+    }
 }
 
 dependencies {

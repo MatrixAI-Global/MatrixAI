@@ -18,4 +18,18 @@ buildscript {
     }
 }
 
+// Add allprojects section with JitPack repository
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url "https://www.jitpack.io" }
+    }
+    
+    // Exclude problematic packages
+    configurations.all {
+        exclude group: "com.reactnativedocumentpicker", module: "react-native-document-picker"
+    }
+}
+
 apply plugin: "com.facebook.react.rootproject"

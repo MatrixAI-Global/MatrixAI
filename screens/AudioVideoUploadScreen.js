@@ -1138,7 +1138,7 @@ const AudioVideoUploadScreen = () => {
            
           
                
-           <Image source={require('../assets/logo8.png')} style={styles.headerIcon2} />
+           <Image source={require('../assets/logo12.png')} style={styles.headerIcon2} />
           
             <View style={styles.topButtonsContainer}>
             <TouchableOpacity style={styles.headerIcon3} onPress={() => navigation.goBack()}>
@@ -1604,8 +1604,8 @@ color:'#000',
         marginRight: 10,
     },
     topIcon: {
-        width: 34,
-        height: 34,
+        width: 24,
+        height: 24,
         resizeMode: 'contain',
     },
     topHelp: {
@@ -1617,8 +1617,8 @@ color:'#000',
         padding: 12,
     },
     topHelpIcon: {
-        width: 34,
-        height: 34,
+        width: 24,
+        height: 24,
         resizeMode: 'contain',
         marginRight: 8,
     },
@@ -1676,8 +1676,8 @@ color:'#000',
         marginRight:10,
     },
     headerIcon2: {
-        width: 200,
-        height: 50,
+        width: 250,
+        height: 80,
         alignSelf:'center',
         resizeMode: 'contain',
     },
