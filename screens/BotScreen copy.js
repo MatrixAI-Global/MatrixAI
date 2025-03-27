@@ -882,13 +882,13 @@ const BotScreen2 = ({ navigation, route }) => {
           onContentSizeChange={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
           onLayout={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
           ref={flatListRef}
-          style={{ marginBottom: showAdditionalButtons ? 50 : 0 }}
+          style={{ marginBottom: showAdditionalButtons ? 100 : 0 }}
         />
       )}
 
       {/* Loading Animation */}
       {isLoading && (
-        <View style={[styles.loadingContainer, { bottom: showAdditionalButtons ? -70 : -130 }]}>
+        <View style={[styles.loadingContainer, { bottom: showAdditionalButtons ? -15 : -130 }]}>
           <LottieView
             source={require('../assets/dot.json')}
             autoPlay
@@ -899,7 +899,7 @@ const BotScreen2 = ({ navigation, route }) => {
       )}
 
       {/* Quick Action Buttons */}
-      <View style={[styles.quickActionContainer, { bottom: showAdditionalButtons ? 30 : -30 }]}>
+      <View style={[styles.quickActionContainer, { bottom: showAdditionalButtons ? 85 : -30 }]}>
         <TouchableOpacity 
           style={styles.quickActionButton}
           onPress={() => transcription && fetchDeepSeekResponse(`Please provide a summary of this text in very structured format in the original language of the transcription: ${transcription}`)}
@@ -921,7 +921,7 @@ const BotScreen2 = ({ navigation, route }) => {
       </View>
 
       {/* Chat Input Box */}
-      <View style={[styles.chatBoxContainer, { bottom: showAdditionalButtons ? -20 : -80 }]}>
+      <View style={[styles.chatBoxContainer, { bottom: showAdditionalButtons ? 35 : -80 }]}>
         <TextInput
           style={styles.textInput}
           placeholder="Type a message..."
@@ -933,9 +933,9 @@ const BotScreen2 = ({ navigation, route }) => {
         />
         <TouchableOpacity onPress={handleAttach} style={styles.sendButton}>
           {showAdditionalButtons ? (
-            <Ionicons name="close" size={24} color="#4C8EF7" />
+            <Ionicons name="close" size={28} color="#4C8EF7" />
           ) : (
-            <Ionicons name="add" size={24} color="#4C8EF7" />
+            <Ionicons name="add" size={28} color="#4C8EF7" />
           )}
         </TouchableOpacity>
        
@@ -949,21 +949,21 @@ const BotScreen2 = ({ navigation, route }) => {
                 <View style={styles.buttonRow}>
                     <TouchableOpacity style={styles.additionalButton2} onPress={() => handleImageOCR('camera')}>
                         <View style={styles.additionalButton}>
-                            <Ionicons name="camera" size={24} color="#4C8EF7" />
+                            <Ionicons name="camera" size={28} color="#4C8EF7" />
                         </View>
                         <Text>Photo</Text>
                     </TouchableOpacity>
                     
                     <TouchableOpacity style={styles.additionalButton2} onPress={() => handleImageOCR('gallery')}>
                         <View style={styles.additionalButton}>
-                            <Ionicons name="image" size={24} color="#4C8EF7" />
+                            <Ionicons name="image" size={28} color="#4C8EF7" />
                         </View>
                         <Text>Image</Text>
                     </TouchableOpacity>
                     
                     <TouchableOpacity style={styles.additionalButton2}>
                         <View style={styles.additionalButton}>
-                            <Ionicons name="attach" size={24} color="#4C8EF7" />
+                            <Ionicons name="attach" size={28} color="#4C8EF7" />
                         </View>
                         <Text>Document</Text>
                     </TouchableOpacity>
@@ -1055,7 +1055,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   sendButton: {
-    padding: 10,
+    padding: 5,
   },
   sendIcon: {
     width: 20,
@@ -1286,13 +1286,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor:'#D1D1D151',
     borderRadius:15,
-  padding:8,
+    width:'90%',
+    paddingVertical:23,
+   padding:28,
   },
   additionalButtonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     position: 'absolute',
-    bottom: -85, // Adjust based on your layout
+    bottom: -65, // Adjust based on your layout
     width: '100%',
     paddingHorizontal: 10, // Add padding for spacing
   },
@@ -1310,13 +1312,15 @@ const styles = StyleSheet.create({
     alignSelf:'center',
     backgroundColor:'#76767651',
     borderRadius:15,
-  padding:8,
+    width:'90%',
+    paddingVertical:23,
+   padding:28,
   zIndex:30,
   },
 
   additionalIcon: {
-    width: 24,
-    height: 24,
+    width: 28,
+    height: 28,
     resizeMode: 'contain',
   },
   summaryPromptContainer: {

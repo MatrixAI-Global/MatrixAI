@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -35,26 +35,19 @@ const decode = (base64) => {
 };
 
 const BotScreen = ({ navigation, route }) => {
-  const { chatName, chatDescription, chatImage, chatid } = route.params;
+  // Default fallback values for route params
+  const { chatName, chatDescription, chatImage, chatid = Date.now().toString() } = route?.params || {};
+  
+  // Use ref to track if we've already processed the initial chatid
+  const initialChatIdProcessed = useRef(false);
+  
+  console.log('BotScreen initialized with chatid:', chatid);
+  
   const flatListRef = React.useRef(null);
-  const [chats, setChats] = useState([
-    {
-      id: '1',
-      name: 'First Chat',
-      description: 'Your initial chat with MatrixAI Bot.',
-      role: '',
-      messages: [
-        {
-          id: '1',
-          text: "Hello.👋 I'm your new friend, MatrixAI Bot. You can ask me any questions.",
-          sender: 'bot',
-        },
-      ],
-    },
-  ]);
-  const [currentChatId, setCurrentChatId] = useState('1');
+  const [chats, setChats] = useState([]);
+  const [currentChatId, setCurrentChatId] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const currentChat = chats.find(chat => chat.id === currentChatId);
+  const currentChat = chats.find(chat => chat.id === currentChatId) || { messages: [] };
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [showInput, setShowInput] = useState(true);
@@ -62,7 +55,6 @@ const BotScreen = ({ navigation, route }) => {
   const [isTyping, setIsTyping] = useState(false);  // Track if user is typing
   const [dataLoaded, setDataLoaded] = useState(false); // Track if data is loaded
   const [expandedMessages, setExpandedMessages] = useState({}); // Track expanded messages
-  const uid = 'user123';
   const [showAdditionalButtons, setShowAdditionalButtons] = useState(false); 
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState(null);
@@ -72,6 +64,15 @@ const BotScreen = ({ navigation, route }) => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [imageType, setImageType] = useState('');
   const [imageFileName, setImageFileName] = useState('');
+
+  // Set initial chat ID from route params if available - prevent infinite updates
+  useEffect(() => {
+    if (!initialChatIdProcessed.current && chatid && chatid !== 'undefined' && chatid !== 'null') {
+      console.log('Setting initial chatid from route params:', chatid);
+      setCurrentChatId(chatid);
+      initialChatIdProcessed.current = true;
+    }
+  }, [chatid]);
 
   const onDeleteChat = async (chatId) => {
     try {
@@ -90,16 +91,17 @@ const BotScreen = ({ navigation, route }) => {
         }
       }
       
-      // Optionally, delete chat from server
-      try {
-        await axios.post('https://matrix-server.vercel.app/deleteChat', {
-          uid,
-          chatid: chatId
-        });
-        console.log('Chat deleted from server');
-      } catch (serverError) {
-        console.error('Error deleting chat from server:', serverError);
+      // Delete chat from Supabase
+      const { error: deleteError } = await supabase
+        .from('user_chats')
+        .delete()
+        .eq('chat_id', chatId);
+      
+      if (deleteError) {
+        console.error('Error deleting chat from Supabase:', deleteError);
         // Continue with local deletion even if server deletion fails
+      } else {
+        console.log('Chat deleted from Supabase');
       }
     } catch (error) {
       console.error('Error deleting chat:', error);
@@ -189,6 +191,21 @@ const BotScreen = ({ navigation, route }) => {
 
   const handleSendMessage = async () => {
     if (inputText.trim() || selectedImage) {
+      try {
+        // Get current user session first to ensure we have authentication
+        const { data: sessionData } = await supabase.auth.getSession();
+        const userId = sessionData?.session?.user?.id || 'anonymous';
+        
+        // If there's no current chat ID, create a new chat
+        if (!currentChatId) {
+          const newChatId = Date.now().toString();
+          console.log('Creating new chat before sending message:', newChatId);
+          setCurrentChatId(newChatId);
+          await startNewChat(newChatId);
+          // Wait briefly to ensure the chat is created
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+        
       // If there's an image, process it
       if (selectedImage) {
         try {
@@ -202,7 +219,7 @@ const BotScreen = ({ navigation, route }) => {
           const fileContent = await RNFS.readFile(selectedImage, 'base64');
           
           // Create file path for Supabase storage
-          const filePath = `users/${uid}/Image/${imageID}.${fileExtension}`;
+            const filePath = `users/${userId}/Image/${imageID}.${fileExtension}`;
           
           // Upload to Supabase storage
           const { data: uploadData, error: uploadError } = await supabase.storage
@@ -221,12 +238,13 @@ const BotScreen = ({ navigation, route }) => {
             .from('user-uploads')
             .getPublicUrl(filePath);
           
-          // Add the image to messages
+            // Add the image to messages first in the local state
           const newMessage = {
             id: Date.now().toString(),
             image: publicUrl,
             text: inputText.trim() ? inputText : "",
-            sender: 'user'
+              sender: 'user',
+              timestamp: new Date().toISOString()
           };
           
           setMessages((prev) => [...prev, newMessage]);
@@ -318,38 +336,226 @@ const BotScreen = ({ navigation, route }) => {
           setIsLoading(false);
         }
       } else {
-        // Regular text message handling (existing code)
+          // Regular text message handling
+          try {
+            setIsLoading(true);
+            
+            // Create message object with timestamp
         const newMessage = {
           id: Date.now().toString(),
           text: inputText,
           sender: 'user',
+              timestamp: new Date().toISOString()
         };
+            
+            // Update local state first
         const updatedMessages = [...messages, newMessage];
         setMessages(updatedMessages);
-        // Update the current chat's messages
+            
+            // Update the current chat's messages in local state
         setChats(prevChats => prevChats.map(chat => 
           chat.id === currentChatId ? { ...chat, messages: updatedMessages } : chat
         ));
 
-        // Save the user's message to the server
+            // Clear input
+            setInputText('');
+            setIsTyping(false);
+
+            // Save the user's message to Supabase
         await saveChatHistory(inputText, 'user');
         
-        fetchDeepSeekResponse(inputText);  // Fetch response from DeepSeek
-        setInputText('');
+            // Fetch response from DeepSeek
+            await fetchDeepSeekResponse(inputText);
+          } catch (error) {
+            console.error('Error handling text message:', error);
+            Alert.alert('Error', 'Failed to process message');
+            
+            // Add error message to the chat
+            setMessages(prev => [
+              ...prev,
+              { 
+                id: Date.now().toString(), 
+                text: 'Error processing message. Please try again.', 
+                sender: 'bot',
+                timestamp: new Date().toISOString()
+              },
+            ]);
+          } finally {
+            setIsLoading(false);
+          }
       }
       setIsTyping(false);
+      } catch (error) {
+        console.error('Error handling message:', error);
+        Alert.alert('Error', 'Failed to send message');
+      setIsTyping(false);
+      }
     }
   };
 
   const saveChatHistory = async (messageText, sender) => {
     try {
-      const response = await axios.post('https://matrix-server.vercel.app/sendChat', {
-        uid,
-        chatid,
-        updatedMessage: messageText,
-        sender,
-      });
-      console.log('Message saved:', response.data);
+      // Get current user session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) {
+        console.error('No authenticated user found');
+        return;
+      }
+      
+      const userId = session.user.id;
+      
+      // Make sure we have a valid chat id
+      if (!currentChatId) {
+        console.log('No current chat ID, creating a new chat');
+        const newChatId = Date.now().toString();
+        setCurrentChatId(newChatId);
+        
+        // Create a new empty chat first
+        const timestamp = new Date().toISOString();
+        const newChat = {
+          chat_id: newChatId,
+          user_id: userId,
+          name: 'New Chat',
+          description: messageText.substring(0, 30) + (messageText.length > 30 ? '...' : ''),
+          role: currentRole || '',
+          role_description: '',
+          messages: [],
+          created_at: timestamp,
+          updated_at: timestamp
+        };
+        
+        // Insert the chat before adding the message
+        const { error: insertError } = await supabase
+          .from('user_chats')
+          .insert(newChat);
+        
+        if (insertError) {
+          console.error('Error creating new chat:', insertError);
+          return;
+        }
+        
+        // Update local state
+        setChats(prevChats => [
+          {
+            id: newChatId,
+            name: 'New Chat',
+            description: messageText.substring(0, 30) + (messageText.length > 30 ? '...' : ''),
+            role: currentRole || '',
+            roleDescription: '',
+            messages: [],
+          },
+          ...prevChats
+        ]);
+      }
+      
+      // Now we proceed with adding the message, using the currentChatId which is now guaranteed to exist
+      const chatIdToUse = currentChatId;
+      
+      // Check if chat exists in the database
+      const { data: existingChat, error: chatError } = await supabase
+        .from('user_chats')
+        .select('*')
+        .eq('chat_id', chatIdToUse)
+        .single();
+      
+      if (chatError && chatError.code !== 'PGRST116') { // PGRST116 is "not found" error
+        console.error('Error checking chat existence:', chatError);
+        return;
+      }
+      
+      const timestamp = new Date().toISOString();
+      const newMessage = {
+        id: Date.now().toString(),
+        text: messageText,
+        sender: sender,
+        timestamp: timestamp
+      };
+      
+      if (existingChat) {
+        // Chat exists, update messages array
+        // Limit the number of messages to prevent database size issues
+        // Keep only the last 50 messages
+        const updatedMessages = [...(existingChat.messages || []), newMessage].slice(-50);
+        
+        const { error: updateError } = await supabase
+          .from('user_chats')
+          .update({
+            messages: updatedMessages,
+            updated_at: timestamp,
+            // Also update description to the latest message for preview
+            description: messageText.substring(0, 30) + (messageText.length > 30 ? '...' : '')
+          })
+          .eq('chat_id', chatIdToUse);
+        
+        if (updateError) {
+          console.error('Error updating chat:', updateError);
+          
+          // If error is related to size, try with fewer messages
+          if (updateError.message && updateError.message.includes('size')) {
+            console.log('Trying with fewer messages due to size constraint');
+            
+            // Try again with only 10 most recent messages
+            const reducedMessages = [...(existingChat.messages || []), newMessage].slice(-10);
+            
+            const { error: retryError } = await supabase
+              .from('user_chats')
+              .update({
+                messages: reducedMessages,
+                updated_at: timestamp,
+                description: messageText.substring(0, 30) + (messageText.length > 30 ? '...' : '')
+              })
+              .eq('chat_id', chatIdToUse);
+              
+            if (retryError) {
+              console.error('Error on retry with reduced messages:', retryError);
+              return;
+            }
+          } else {
+            return;
+          }
+        }
+        
+        console.log('Chat history updated in Supabase');
+      } else {
+        // This is just a fallback - we should never get here as we create the chat first if it doesn't exist
+        console.log('Chat not found, creating a new one with the message');
+        
+        // Create new chat with only this message to ensure size limits
+        const newChat = {
+          chat_id: chatIdToUse,
+          user_id: userId,
+          name: 'New Chat',
+          description: messageText.substring(0, 30) + (messageText.length > 30 ? '...' : ''),
+          role: currentRole || '',
+          role_description: '',
+          messages: [newMessage],
+          created_at: timestamp,
+          updated_at: timestamp
+        };
+        
+        const { error: insertError } = await supabase
+          .from('user_chats')
+          .insert(newChat);
+        
+        if (insertError) {
+          console.error('Error creating new chat:', insertError);
+          return;
+        }
+        
+        console.log('New chat created in Supabase');
+      }
+    
+      
+      // Update the chat in the local state
+      setChats(prevChats => prevChats.map(chat => 
+        chat.id === chatIdToUse 
+          ? { 
+              ...chat, 
+              messages: [...(chat.messages || []), newMessage],
+              description: chat.description || messageText.substring(0, 30) + (messageText.length > 30 ? '...' : '')
+            } 
+          : chat
+      ));
     } catch (error) {
       console.error('Error saving chat history:', error);
     }
@@ -440,10 +646,8 @@ const BotScreen = ({ navigation, route }) => {
            /[a-zA-Z]_\{[^}]+\}/.test(text);
   };
 
-  const renderMessage = ({ item }) => {
-    // Log the messages state for debugging
-    console.log('Messages:', messages);
-    
+  // Memoize the message rendering to prevent excessive renders
+  const renderMessage = React.useCallback(({ item }) => {
     // Ensure messages is an array and data is loaded
     if (!dataLoaded || !Array.isArray(messages) || messages.length === 0) return null; 
   
@@ -830,52 +1034,367 @@ const BotScreen = ({ navigation, route }) => {
             </Text>
           </TouchableOpacity>
         )}
-        {/* Add Tail */}
-        <View style={isBot ? styles.botTail : styles.userTail} />
+   
       </Animatable.View>
     );
-  };
+  }, [dataLoaded, messages, expandedMessages]);
+
+  // Also memoize the FlatList to prevent unnecessary re-renders
+  const memoizedFlatList = React.useMemo(() => (
+    <View style={{ flex: 1, position: 'relative' }}>
+    <FlatList
+          data={messages}
+          keyExtractor={(item) => item.id}
+          renderItem={renderMessage}
+          contentContainerStyle={styles.chat}
+          onContentSizeChange={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
+          onLayout={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
+          ref={flatListRef}
+          style={{ marginBottom: showAdditionalButtons ? 200 : 90 }}
+        />
+    </View>
+  ), [messages, renderMessage, showAdditionalButtons]);
 
   useEffect(() => {
-    // Fetch chat history when component mounts
-    const fetchChatHistory = async () => {
+    let chatSubscription;
+    
+    // Function to fetch all user chats
+    const fetchUserChats = async () => {
       try {
-        const response = await axios.post('https://matrix-server.vercel.app/getChat', { uid, chatid });
-        const history = response.data.messages || []; // Default to an empty array if undefined
+        // Get current user session
+        const { data: { session } } = await supabase.auth.getSession();
         
-        // Process the history to handle image URLs
-        const processedHistory = history.map(msg => {
-          if (msg.text && msg.text.includes('ddtgdhehxhgarkonvpfq.supabase.co/storage/v1/')) {
+        if (!session?.user?.id) {
+          console.error('No authenticated user found');
+          
+          // For anonymous users, create a local chat and stop trying to fetch from Supabase
+          const newChatId = chatid && chatid !== 'undefined' && chatid !== 'null' 
+            ? chatid 
+            : Date.now().toString();
+          
+          const localChatObj = {
+            id: newChatId,
+            name: 'New Chat',
+            description: '',
+            role: '',
+            roleDescription: '',
+            messages: [],
+          };
+          
+          setChats([localChatObj]);
+          setCurrentChatId(newChatId);
+          setMessages([]);
+          setDataLoaded(true);
+          return; // Exit early for anonymous users
+        }
+        
+        // Rest of the original function continues for authenticated users
+        const userId = session.user.id;
+        
+        // Query all chats for this user
+        const { data: userChats, error: chatsError } = await supabase
+          .from('user_chats')
+          .select('*')
+          .eq('user_id', userId)
+          .order('updated_at', { ascending: false });
+        
+        if (chatsError) {
+          console.error('Error fetching user chats:', chatsError);
+          setDataLoaded(true);
+          return;
+        }
+        
+        if (userChats && userChats.length > 0) {
+          // Process each chat to handle image messages
+          const processedChats = userChats.map(chat => {
+            const processedMessages = (chat.messages || []).map(msg => {
+              if (msg && msg.text && typeof msg.text === 'string' && 
+                  msg.text.includes('supabase.co/storage/v1/')) {
             return {
               ...msg,
-              image: msg.text, // Store the URL as image property
-              text: '' // Clear the text since it's an image
+                  image: msg.text,
+                  text: ''
             };
           }
           return msg;
         });
 
-        setChats(prevChats => [
-          ...prevChats,
-          {
-            id: Date.now().toString(),
-            name: 'First Chat',
-            description: 'Your initial chat with MatrixAI Bot.',
-            role: '',
-            messages: processedHistory,
-          },
-        ]);
-        setCurrentChatId(Date.now().toString());
-        setMessages(processedHistory); // Set processed messages from the server
-        setDataLoaded(true); // Mark data as loaded
+            return {
+              id: chat.chat_id,
+              name: chat.name || 'Chat',
+              description: chat.description || '',
+              role: chat.role || '',
+              roleDescription: chat.role_description || '',
+              messages: processedMessages,
+            };
+          });
+          
+          setChats(processedChats);
+          
+          // If there's a specific chatid from route params, load that chat
+          if (chatid && chatid !== 'undefined' && chatid !== 'null') {
+            const specificChat = processedChats.find(chat => chat.id === chatid);
+            if (specificChat) {
+              console.log('Loading specific chat:', chatid);
+              setCurrentChatId(chatid);
+              setMessages(specificChat.messages || []);
+              setCurrentRole(specificChat.role || '');
+            } else {
+              // Create a new chat with the specific ID if not found
+              console.log('Creating new chat with ID:', chatid);
+              startNewChat(chatid);
+            }
+          } else {
+            // No specific chat requested, load the most recent one
+            const mostRecentChat = processedChats[0];
+            console.log('Loading most recent chat:', mostRecentChat.id);
+            setCurrentChatId(mostRecentChat.id);
+            setMessages(mostRecentChat.messages || []);
+            setCurrentRole(mostRecentChat.role || '');
+          }
+        } else {
+          // No chats found for this user, create a new one
+          console.log('No chats found, creating a new chat');
+          const newChatId = chatid && chatid !== 'undefined' && chatid !== 'null' 
+            ? chatid 
+            : Date.now().toString();
+          startNewChat(newChatId);
+        }
+        
+        setDataLoaded(true);
+        
+        // Set up real-time subscription for chat updates
+        setupChatSubscription(userId);
       } catch (error) {
-        console.error('Error fetching chat history:', error);
-        setDataLoaded(true); // Still mark as loaded even if error
+        console.error('Error in fetchUserChats:', error);
+        setDataLoaded(true);
+        
+        // Fallback to creating a new chat if there's an error
+        const newChatId = chatid && chatid !== 'undefined' && chatid !== 'null' 
+          ? chatid 
+          : Date.now().toString();
+        startNewChat(newChatId);
       }
     };
-
-    fetchChatHistory();
+    
+    // Setup real-time subscription to chat updates
+    const setupChatSubscription = (userId) => {
+      // Check if subscription already exists
+      if (chatSubscription) {
+        chatSubscription.unsubscribe();
+      }
+      
+      chatSubscription = supabase
+        .channel('user_chats_changes')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'user_chats',
+          filter: `user_id=eq.${userId}`
+        }, (payload) => {
+          console.log('Real-time update received:', payload);
+          
+          // Handle different types of changes
+          if (payload.eventType === 'INSERT') {
+            handleChatInsert(payload.new);
+          } else if (payload.eventType === 'UPDATE') {
+            handleChatUpdate(payload.new);
+          } else if (payload.eventType === 'DELETE') {
+            handleChatDelete(payload.old);
+          }
+        })
+        .subscribe();
+    };
+    
+    // Handle a new chat being inserted
+    const handleChatInsert = (newChat) => {
+      // Process messages for images
+      const processedMessages = newChat.messages.map(msg => {
+        if (msg.text && typeof msg.text === 'string' && 
+            msg.text.includes('supabase.co/storage/v1/')) {
+          return {
+            ...msg,
+            image: msg.text,
+            text: ''
+          };
+        }
+        return msg;
+      });
+      
+      // Add the new chat to the state
+      setChats(prevChats => {
+        // Check if chat already exists
+        const chatExists = prevChats.some(chat => chat.id === newChat.chat_id);
+        if (chatExists) return prevChats;
+        
+        // Add the new chat
+        return [{
+          id: newChat.chat_id,
+          name: newChat.name || 'Chat',
+          description: newChat.description || '',
+          role: newChat.role || '',
+          roleDescription: newChat.role_description || '',
+          messages: processedMessages,
+        }, ...prevChats];
+      });
+    };
+    
+    // Handle a chat being updated
+    const handleChatUpdate = (updatedChat) => {
+      // Process messages for images
+      const processedMessages = updatedChat.messages.map(msg => {
+        if (msg.text && typeof msg.text === 'string' && 
+            msg.text.includes('supabase.co/storage/v1/')) {
+          return {
+            ...msg,
+            image: msg.text,
+            text: ''
+          };
+        }
+        return msg;
+      });
+      
+      // Update the chat in the state
+      setChats(prevChats => prevChats.map(chat => 
+        chat.id === updatedChat.chat_id 
+          ? {
+              ...chat,
+              name: updatedChat.name || 'Chat',
+              description: updatedChat.description || '',
+              role: updatedChat.role || '',
+              roleDescription: updatedChat.role_description || '',
+              messages: processedMessages,
+            }
+          : chat
+      ));
+      
+      // If this is the current chat, update the messages and role
+      if (currentChatId === updatedChat.chat_id) {
+        setMessages(processedMessages);
+        setCurrentRole(updatedChat.role || '');
+      }
+    };
+    
+    // Handle a chat being deleted
+    const handleChatDelete = (deletedChat) => {
+      setChats(prevChats => prevChats.filter(chat => chat.id !== deletedChat.chat_id));
+      
+      // If the deleted chat is the current chat, select another chat
+      if (currentChatId === deletedChat.chat_id) {
+        setChats(prevChats => {
+          // Get the remaining chats
+          const remainingChats = prevChats.filter(chat => chat.id !== deletedChat.chat_id);
+          
+          if (remainingChats.length > 0) {
+            // Select the most recent chat
+            const newCurrentChat = remainingChats[0];
+            setCurrentChatId(newCurrentChat.id);
+            setMessages(newCurrentChat.messages || []);
+            setCurrentRole(newCurrentChat.role || '');
+          } else {
+            // No chats remain, start a new one
+            startNewChat();
+          }
+          
+          return remainingChats;
+        });
+      }
+    };
+    
+    // Fetch chats on mount
+    fetchUserChats();
+    
+    // Cleanup subscription on unmount
+    return () => {
+      if (chatSubscription) {
+        chatSubscription.unsubscribe();
+      }
+    };
   }, []);
+
+  // Modify the startNewChat to accept chatId parameter and ensure proper initialization
+  const startNewChat = async (customChatId) => {
+    try {
+      // Generate a new chat ID if none provided
+      const newChatId = customChatId || Date.now().toString();
+      console.log(`Starting new chat with ID: ${newChatId}`);
+      
+      // Get current user session first to ensure we have authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      // Create a local chat object first regardless of authentication
+      const timestamp = new Date().toISOString();
+      const localChatObj = {
+      id: newChatId,
+      name: 'New Chat',
+      description: '',
+      role: '',
+        roleDescription: '',
+      messages: [],
+    };
+      
+      // Update local state immediately
+      setChats(prevChats => [localChatObj, ...prevChats.filter(chat => chat.id !== newChatId)]);
+    setCurrentChatId(newChatId);
+    setIsLoading(false);
+    setMessages([]);
+    setCurrentRole('');
+    setIsSidebarOpen(false);
+      
+      // If user is not authenticated, just use the local state
+      if (!session?.user?.id) {
+        console.log('No authenticated user, using local chat only');
+        return;
+      }
+      
+      const userId = session.user.id;
+      
+      // Check if the chat already exists in Supabase
+      const { data: existingChat, error: checkError } = await supabase
+        .from('user_chats')
+        .select('*')
+        .eq('chat_id', newChatId)
+        .single();
+      
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('Error checking if chat exists:', checkError);
+      }
+      
+      // If chat already exists, just use local updates
+      if (existingChat) {
+        console.log('Chat already exists in Supabase, using existing data');
+        return;
+      }
+      
+      // Create a new chat object for Supabase
+      const newChat = {
+        chat_id: newChatId,
+        user_id: userId,
+        name: 'New Chat',
+        description: '',
+        role: '',
+        role_description: '',
+        messages: [],
+        created_at: timestamp,
+        updated_at: timestamp
+      };
+      
+      // Insert the new chat in Supabase
+      const { error: insertError } = await supabase
+        .from('user_chats')
+        .insert(newChat);
+      
+      if (insertError) {
+        console.error('Error creating new chat in Supabase:', insertError);
+        // Continue using local state, already set up above
+      } else {
+        console.log('New chat created in Supabase');
+      }
+    } catch (error) {
+      console.error('Error during new chat creation:', error);
+      // Local state has already been updated, so no need to update again
+    }
+  };
 
   const handleAttach = () => {
     setShowAdditionalButtons(prev => !prev); // Toggle additional buttons visibility
@@ -888,29 +1407,68 @@ const BotScreen = ({ navigation, route }) => {
   
 
   
-  const selectChat = (chatId) => {
+  const selectChat = async (chatId) => {
     setCurrentChatId(chatId);
     const selectedChat = chats.find(chat => chat.id === chatId);
-    setMessages(selectedChat ? selectedChat.messages : []);
-    setCurrentRole(selectedChat?.role || '');
+    
+    if (selectedChat) {
+      setMessages(selectedChat.messages || []);
+      setCurrentRole(selectedChat.role || '');
+    } else {
+      setMessages([]);
+      setCurrentRole('');
+    }
+    
     setIsSidebarOpen(false);
-  };
-
-  const startNewChat = () => {
-    const newChatId = Date.now().toString();
-    const newChat = {
-      id: newChatId,
-      name: 'New Chat',
-      description: '',
-      role: '',
-      messages: [],
-    };
-    setChats(prevChats => [newChat, ...prevChats]);
-    setCurrentChatId(newChatId);
-    setIsLoading(false);
-    setMessages([]);
-    setCurrentRole('');
-    setIsSidebarOpen(false);
+    
+    try {
+      // Get the most up-to-date chat data from Supabase
+      const { data: chatData, error: chatError } = await supabase
+        .from('user_chats')
+        .select('*')
+        .eq('chat_id', chatId)
+        .single();
+      
+      if (chatError) {
+        console.error('Error fetching selected chat:', chatError);
+        return;
+      }
+      
+      if (chatData) {
+        // Process messages for images
+        const processedMessages = chatData.messages.map(msg => {
+          if (msg.text && typeof msg.text === 'string' && 
+              msg.text.includes('supabase.co/storage/v1/')) {
+            return {
+              ...msg,
+              image: msg.text,
+              text: ''
+            };
+          }
+          return msg;
+        });
+        
+        // Update local state with latest data
+        setMessages(processedMessages);
+        setCurrentRole(chatData.role || '');
+        
+        // Update the chat in the local state
+        setChats(prevChats => prevChats.map(chat => 
+          chat.id === chatId 
+            ? { 
+                ...chat, 
+                messages: processedMessages,
+                name: chatData.name,
+                description: chatData.description,
+                role: chatData.role,
+                roleDescription: chatData.role_description
+              } 
+            : chat
+        ));
+      }
+    } catch (error) {
+      console.error('Error selecting chat:', error);
+    }
   };
 
   const handleImageOCR = async (source = 'gallery') => {
@@ -944,7 +1502,15 @@ const BotScreen = ({ navigation, route }) => {
   };
 
   // Function to set the current role
-  const handleRoleSelection = (role) => {
+  const handleRoleSelection = async (role) => {
+    // First ensure we have a current chat
+    if (!currentChatId) {
+      // Create a new chat if we don't have one
+      const newChatId = Date.now().toString();
+      await startNewChat(newChatId);
+      setCurrentChatId(newChatId);
+    }
+    
     let roleDescription = '';
     
     // Provide detailed context for specific roles
@@ -983,12 +1549,65 @@ const BotScreen = ({ navigation, route }) => {
       id: Date.now().toString(),
       text: userVisibleMessage,
       sender: 'bot',
+      timestamp: new Date().toISOString()
     };
     
     setMessages(prev => [...prev, newMessage]);
     
-    // Save only the user-visible message to chat history
-    saveChatHistory(userVisibleMessage, 'bot');
+    try {
+      // Check if the chat exists in the database
+      const { data: existingChat, error: checkError } = await supabase
+        .from('user_chats')
+        .select('*')
+        .eq('chat_id', currentChatId)
+        .single();
+      
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('Error checking if chat exists:', checkError);
+      }
+      
+      if (existingChat) {
+        // If the chat exists, update it
+        const { error: updateError } = await supabase
+          .from('user_chats')
+          .update({
+            role: role,
+            role_description: roleDescription,
+            updated_at: new Date().toISOString(),
+            messages: [...(existingChat.messages || []), newMessage]
+          })
+          .eq('chat_id', currentChatId);
+        
+        if (updateError) {
+          console.error('Error updating role in Supabase:', updateError);
+        } else {
+          console.log('Role updated in Supabase');
+        }
+      } else {
+        // If the chat doesn't exist, create it
+        const { error: insertError } = await supabase
+          .from('user_chats')
+          .insert({
+            chat_id: currentChatId,
+            user_id: (await supabase.auth.getSession()).data.session.user.id,
+            name: 'New Chat',
+            description: userVisibleMessage,
+            role: role,
+            role_description: roleDescription,
+            messages: [newMessage],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        
+        if (insertError) {
+          console.error('Error creating chat with role in Supabase:', insertError);
+        } else {
+          console.log('New chat with role created in Supabase');
+        }
+      }
+    } catch (error) {
+      console.error('Error saving role to Supabase:', error);
+    }
   };
 
   // Function to render a single line of text with math expressions highlighted
@@ -1290,25 +1909,12 @@ const BotScreen = ({ navigation, route }) => {
         <TouchableOpacity onPress={() => navigation.navigate('CameraScreen')}>
           <MaterialCommunityIcons name="video-outline" size={28} color="#4C8EF7" marginHorizontal={10} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={startNewChat}>
-          <MaterialCommunityIcons name="chat-plus-outline" size={24} color="#4C8EF7" />
-        </TouchableOpacity>
-     
        
       </View>
 
       {/* Chat List */}
       <Animatable.View animation="fadeIn" duration={1000} style={{ flex: 1 }}>
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={(item) => item.id}
-          renderItem={renderMessage}
-          contentContainerStyle={styles.chat}
-          onContentSizeChange={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
-          onLayout={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
-          style={{ marginBottom: showAdditionalButtons ? (selectedImage ? 155 : 125) : (selectedImage ? 95 : 70) }}
-        />
+        {memoizedFlatList}
 
         {/* Placeholder for New Chat */}
         {messages.length === 0 && dataLoaded && (
@@ -1399,8 +2005,8 @@ const BotScreen = ({ navigation, route }) => {
       {/* Loading animation */}
       {isLoading && (
         <View style={[styles.loadingContainer, { 
-          bottom: showAdditionalButtons && selectedImage ? 50 : 
-                 showAdditionalButtons ? -10 : 
+          bottom: showAdditionalButtons && selectedImage ? 100 : 
+                 showAdditionalButtons ? 40 : 
                  selectedImage ? -10 : 
                  -70 
         }]}>
@@ -1415,7 +2021,7 @@ const BotScreen = ({ navigation, route }) => {
       
       {/* Image Preview (WhatsApp Style) */}
       {selectedImage && (
-        <View style={[styles.imagePreviewContainer, { bottom: showAdditionalButtons ? 128 : 68 }]}>
+        <View style={[styles.imagePreviewContainer, { bottom: showAdditionalButtons ? 177 : 68 }]}>
           <View style={styles.imageIconContainer}>
             <Ionicons name="image-outline" size={24} color="#fff" />
           </View>
@@ -1430,8 +2036,16 @@ const BotScreen = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
       )}
-      
-       <View style={[styles.chatBoxContainer, { bottom: showAdditionalButtons ? 80 : 20}]}>
+
+       {!selectedImage && (
+        <View style={[styles.NewChat, { bottom: showAdditionalButtons ? 175 : 68 }]}>
+          <TouchableOpacity onPress={startNewChat} style={styles.NewChatButton}>
+          <MaterialCommunityIcons name="chat-plus-outline" size={24} color="#fff" />
+          <Text style={styles.NewChatText}>New Chat</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+       <View style={[styles.chatBoxContainer, { bottom: showAdditionalButtons ? 130 : 20}]}>
           <TextInput
             style={[styles.textInput, { textAlignVertical: 'center' }]}
             placeholder={selectedImage ? "Add a caption..." : "Send a message..."}
@@ -1445,9 +2059,9 @@ const BotScreen = ({ navigation, route }) => {
           />
             <TouchableOpacity onPress={handleAttach} style={styles.sendButton}>
                   {showAdditionalButtons ? (
-                    <Ionicons name="close" size={24} color="#4C8EF7" />
+                    <Ionicons name="close" size={28} color="#4C8EF7" />
                   ) : (
-                    <MaterialCommunityIcons name="plus" size={24} color="#4C8EF7" />
+                    <MaterialCommunityIcons name="plus" size={28} color="#4C8EF7" />
                   )}
                 </TouchableOpacity>
                
@@ -1461,21 +2075,21 @@ const BotScreen = ({ navigation, route }) => {
                 <View style={styles.buttonRow}>
                     <TouchableOpacity style={styles.additionalButton2} onPress={() => handleImageOCR('camera')}>
                         <View style={styles.additionalButton}>
-                            <Ionicons name="camera" size={24} color="#4C8EF7" />
+                            <Ionicons name="camera" size={28} color="#4C8EF7" />
                         </View>
                         <Text>Photo</Text>
                     </TouchableOpacity>
                     
                     <TouchableOpacity style={styles.additionalButton2} onPress={() => handleImageOCR('gallery')}>
                         <View style={styles.additionalButton}>
-                            <Ionicons name="image" size={24} color="#4C8EF7" />
+                            <Ionicons name="image" size={28} color="#4C8EF7" />
                         </View>
                         <Text>Image</Text>
                     </TouchableOpacity>
                     
                     <TouchableOpacity style={styles.additionalButton2}>
                         <View style={styles.additionalButton}>
-                            <Ionicons name="attach" size={24} color="#4C8EF7" />
+                            <Ionicons name="attach" size={28} color="#4C8EF7" />
                         </View>
                         <Text>Document</Text>
                     </TouchableOpacity>
@@ -1540,13 +2154,34 @@ const styles = StyleSheet.create({
   headerIcon2: {
     marginHorizontal: 5,
   },
+  NewChat: {
+    position: 'absolute',
+    alignSelf: 'center',
+    backgroundColor: '#4C8EF7',
+    borderRadius: 10,
+    marginBottom: 3,
+  },
+  NewChatButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 5,
+    justifyContent: 'center',
+
+    borderRadius: 20,
+  },
+  NewChatText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+
   botIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
   },
   sendButton: {
-   padding: 10,
+   padding: 5,
   },
   
   // WhatsApp style image preview container
@@ -1628,6 +2263,7 @@ const styles = StyleSheet.create({
   messageContainer: {
     maxWidth: '85%',
     marginVertical: 4,
+  
     padding: 12,
     borderRadius: 5,
     backgroundColor: '#fff',
@@ -1902,7 +2538,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     position: 'absolute',
-    bottom: 15, // Adjust based on your layout
+    bottom: 30, // Adjust based on your layout
     width: '100%',
     paddingHorizontal: 20, // Add padding for spacing
   },
@@ -1914,12 +2550,16 @@ const styles = StyleSheet.create({
   additionalButton2: {
     flex: 1, // Allow buttons to take equal space
     alignItems: 'center', // Center the content
+
+   
   },
   additionalButton: {
     alignItems: 'center',
     backgroundColor:'#D1D1D151',
     borderRadius:15,
-  padding:8,
+    width:'90%',
+   paddingVertical:23,
+  padding:28,
   },
   additionalButton3: {
     alignItems: 'center',

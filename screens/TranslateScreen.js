@@ -1686,7 +1686,7 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
         <SafeAreaView style={styles.container}>
             
             <View style={styles.headerContainer2}>
-                <Image source={require('../assets/logo10.png')} style={styles.headerTitle} />
+                <Image source={require('../assets/logo12.png')} style={styles.headerTitle} />
             </View>
                  <View style={styles.headerContainer}>
                 <TouchableOpacity style={styles.iconButton} onPress={() => navigation.goBack()}>
@@ -2482,9 +2482,7 @@ const styles = StyleSheet.create({
         height: 80,
         resizeMode: 'contain',
        
-        
-        left:'25%',
-        position:'absolute',
+       
       },
     container: {
         flex: 1,
@@ -2505,9 +2503,12 @@ const styles = StyleSheet.create({
         backgroundColor:'#fff',
     },
     headerContainer2: {
-        flexDirection: 'row',
+       
         alignItems: 'center',
-        justifyContent: 'space-between',
+        alignSelf:'center',
+        marginTop:-40,
+        marginBottom:-50,
+        zIndex:100,
         padding: 16,
        
         backgroundColor:'#fff',
@@ -2828,7 +2829,7 @@ flexDirection:'row',
    header: {
     fontSize: 13,
     fontWeight: '600',
-
+zIndex:101,
     alignSelf:'center',
 
    
@@ -2836,6 +2837,7 @@ flexDirection:'row',
 
     iconButton: {
         padding: 8,
+        zIndex:101,
     },
     icon: {
         width: 24,

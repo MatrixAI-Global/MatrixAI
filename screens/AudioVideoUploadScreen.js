@@ -1137,8 +1137,9 @@ const AudioVideoUploadScreen = () => {
             {/* Header Section */}
            
           
-               
+             <View style={styles.header3}>
            <Image source={require('../assets/logo12.png')} style={styles.headerIcon2} />
+           </View>
           
             <View style={styles.topButtonsContainer}>
             <TouchableOpacity style={styles.headerIcon3} onPress={() => navigation.goBack()}>
@@ -1584,12 +1585,21 @@ color:'#000',
         fontSize: 12,
         textAlign: 'center',
     },
+   header3:{
    
+    alignItems:'center',
+    alignSelf:'center',
+  marginTop:-25,
+  marginBottom:-20,
+   
+    width:'100%',
+    
+   },
     topButtonsContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         marginHorizontal: 16,
-        marginBottom: 12,
+        marginBottom: 1,
     },
     topButton: {
         backgroundColor: '#FF6600',

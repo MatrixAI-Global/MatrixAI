@@ -160,15 +160,12 @@ const ProfileScreen = ({ navigation }) => {
     }, []);
     return (
         <SafeAreaView style={styles.container2}>
-            <View style={[styles.header2,]}>
-          <TouchableOpacity style={styles.headerIcon3} onPress={() => navigation.goBack()}>
-                                       <Image
-                                           source={require('../assets/back.png')} 
-                                           style={styles.headerIcon}
-                                       />
-                                   </TouchableOpacity>
-                    <Text style={styles.headerTitle2}>Matrix AI</Text>
-        </View>
+            <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Image source={require('../assets/back.png')} style={styles.headerIcon} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Profile</Text>
+      </View>
         <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} bounces={false}>
         
             <Header2 uid={uid} />
@@ -320,13 +317,29 @@ const styles = StyleSheet.create({
     
     header: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: '#007AFF',
-        borderRadius: 20,
+        padding: 16,
+        backgroundColor: '#fff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E0E0E0',
+      },
+      backButton: {
         padding: 8,
-        marginVertical: 10,
-    },
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+      },
+      headerIcon: {
+        width: 24,
+        height: 24,
+        resizeMode: 'contain',
+      },
+      headerTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginLeft: 16,
+        color: '#333',
+      },
     timeCreditsContainer: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -342,12 +355,7 @@ const styles = StyleSheet.create({
         padding: 8,
         marginRight: 10,
     },
-    headerIcon: {
-        width: 24,
-        height: 24,
-        resizeMode: 'contain',
-     
-    },
+  
     timeText: {
         color: '#fff',
         fontSize: 14,
