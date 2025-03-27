@@ -74,7 +74,10 @@ import OrderHistoryScreen from './screens/OrderHistoryScreen.js';
 import HelpScreen from './screens/HelpScreen.js';
 import AddonScreen from './screens/coins/AddonScreen.js';
 import FeedbackScreen from './screens/FeedbackScreen.js';
-    const Stack = createStackNavigator();
+import PaymentScreen from './screens/coins/PaymentScreen.js';
+import StripeProvider from './components/StripeProvider';
+
+const Stack = createStackNavigator();
 
 interface AuthContextType {
     uid: string | null;
@@ -121,6 +124,7 @@ const App = () => {
                     <>
                         <ModalProvider>
                             <ProStatusProvider>
+                            <StripeProvider>
                             <NavigationContainer>
                                 <Stack.Navigator>
                                     {/* Onboarding Screen */}
@@ -315,7 +319,7 @@ const App = () => {
                                         options={{ headerShown: false }} 
                                     />
                                     <Stack.Screen 
-                                        name="SuccessScreen" 
+                                        name="PaymentSuccess" 
                                         component={SuccessScreen} 
                                         options={{ headerShown: false }} 
                                     />
@@ -392,6 +396,11 @@ const App = () => {
                                         options={{ headerShown: false }} 
                                     />
                                     <Stack.Screen 
+                                        name="PaymentScreen" 
+                                        component={PaymentScreen} 
+                                        options={{ headerShown: false }} 
+                                    />
+                                    <Stack.Screen 
                                         name="CustomerSupportScreen" 
                                         component={CustomerSupportScreen} 
                                         options={{ headerShown: false }} 
@@ -418,9 +427,9 @@ const App = () => {
                                     />
                                 </Stack.Navigator>
                             </NavigationContainer>
+                            </StripeProvider>
                             </ProStatusProvider>
-                            </ModalProvider>
-                        <Toast />
+                        </ModalProvider>
                     </>
                 )}
             </AuthContext.Consumer>

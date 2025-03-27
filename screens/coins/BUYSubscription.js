@@ -4,7 +4,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Ionicons';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import PlanCard from '../../components/PlanCard';
-
+import { createPaymentIntent, confirmSubscriptionPurchase } from '../../utils/stripeApi';
 
 const BUYSubscription = ({ navigation, route }) => {
   const { uid, plan, price } = route.params;
@@ -18,6 +18,7 @@ const BUYSubscription = ({ navigation, route }) => {
   const [originalPrice, setOriginalPrice] = useState(price);
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date());
+  const [paymentMethodId, setPaymentMethodId] = useState(null);
 
   useEffect(() => {
     // Set end date based on plan
@@ -34,10 +35,13 @@ const BUYSubscription = ({ navigation, route }) => {
     }
     setEndDate(end);
 
+    // Clean and set price values
     // Remove HKD from price string to get number
-    const numericPrice = price.replace('HKD', '');
-    setOriginalPrice(numericPrice);
-    setFinalPrice(numericPrice);
+    const cleanPrice = price.replace(/[^0-9.]/g, '');
+    console.log('Original price:', price);
+    console.log('Cleaned price:', cleanPrice);
+    setOriginalPrice(cleanPrice);
+    setFinalPrice(cleanPrice);
 
     // Fetch suggested coupons
     fetchCoupons();
@@ -128,9 +132,12 @@ const BUYSubscription = ({ navigation, route }) => {
     const discountAmount = selectedCoupon.coupon_amount;
     setDiscount(discountAmount);
     
-    // Calculate final price
-    const discountedPrice = originalPrice * (1 - discountAmount / 100);
-    setFinalPrice(discountedPrice.toFixed(0));
+    // Calculate final price - ensure we're working with numbers
+    const originalPriceNum = parseFloat(originalPrice);
+    const discountedPrice = originalPriceNum * (1 - discountAmount / 100);
+    const finalPriceValue = discountedPrice.toFixed(0);
+    console.log('Discounted price calculation:', originalPriceNum, discountAmount, finalPriceValue);
+    setFinalPrice(finalPriceValue);
     
     // Set applied coupon
     setAppliedCoupon(selectedCoupon);
@@ -145,67 +152,22 @@ const BUYSubscription = ({ navigation, route }) => {
     setAppliedCoupon(null);
   };
 
-  const handleConfirm = async () => {
-    // Show confirmation alert
-    Alert.alert(
-      'Confirm Purchase',
-      `You are about to purchase the ${planDetails.title} for ${finalPrice}HKD. Would you like to proceed?`,
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Confirm',
-          onPress: async () => {
-            try {
-              // Show loading indicator
-              setProcessing(true);
-              
-              // Prepare request data
-              const requestData = {
-                uid: uid,
-                plan: plan,
-                totalPrice: parseInt(finalPrice),
-                couponId: appliedCoupon ? appliedCoupon.id : ""
-              };
-              
-              // Make API call
-              const response = await fetch('https://matrix-server.vercel.app/BuySubscription', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(requestData),
-              });
-              
-              const result = await response.json();
-              
-              // Handle API response
-              if (result.success) {
-                // Navigate to success screen
-                navigation.replace('SuccessScreen', {
-                  message: `Successfully purchased ${planDetails.title}!`,
-                  planDetails: planDetails,
-                  finalPrice: `${finalPrice}HKD`,
-                  discount: discount > 0 ? `${discount}%` : null,
-                  startDate: startDate.toLocaleDateString(),
-                  endDate: endDate.toLocaleDateString(),
-                });
-              } else {
-                // Show error message
-                Alert.alert('Error', result.message || 'Failed to process payment');
-              }
-            } catch (error) {
-              console.error('Payment error:', error);
-              Alert.alert('Error', 'Something went wrong while processing your payment');
-            } finally {
-              setProcessing(false);
-            }
-          },
-        },
-      ]
-    );
+  const handleConfirm = () => {
+    // Format dates as strings to avoid serialization issues
+    const formattedStartDate = startDate.toISOString();
+    const formattedEndDate = endDate.toISOString();
+    
+    // Navigate to payment screen with necessary details
+    navigation.navigate('PaymentScreen', {
+      uid: uid,
+      plan: plan,
+      planDetails: planDetails,
+      finalPrice: finalPrice,
+      discount: discount,
+      appliedCoupon: appliedCoupon,
+      startDate: formattedStartDate,
+      endDate: formattedEndDate,
+    });
   };
 
   const renderSuggestedCoupon = ({ item }) => (
@@ -317,15 +279,12 @@ const BUYSubscription = ({ navigation, route }) => {
 
       {/* Confirm Button */}
       <TouchableOpacity 
-        style={[styles.confirmButton, processing && styles.disabledButton]} 
+        style={styles.confirmButton} 
         onPress={handleConfirm}
-        disabled={processing}
       >
-        {processing ? (
-          <ActivityIndicator size="small" color="#fff" />
-        ) : (
-          <Text style={styles.confirmButtonText}>Confirm Purchase</Text>
-        )}
+        <Text style={styles.confirmButtonText}>
+          Proceed to Payment
+        </Text>
       </TouchableOpacity>
       </View>
 
@@ -333,7 +292,7 @@ const BUYSubscription = ({ navigation, route }) => {
       {processing && (
         <View style={styles.processingOverlay}>
           <ActivityIndicator size="large" color="#fff" />
-          <Text style={styles.processingText}>Processing your purchase...</Text>
+          <Text style={styles.processingText}>Processing your payment...</Text>
         </View>
       )}
     </LinearGradient>
@@ -429,6 +388,12 @@ const styles = StyleSheet.create({
     color: '#FF6600',
     fontStyle: 'italic',
     marginTop: 5,
+  },
+  paymentSection: {
+    marginBottom: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 12,
+    padding: 15,
   },
   couponSection: {
     marginBottom: 15,
@@ -556,9 +521,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#fff',
-  },
-  disabledButton: {
-    backgroundColor: '#ccc',
   },
   processingOverlay: {
     position: 'absolute',

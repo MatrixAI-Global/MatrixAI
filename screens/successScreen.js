@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const SuccessScreen = ({ navigation, route }) => {
   const animationRef = useRef(null);
-  const { message, planDetails, finalPrice, discount, startDate, endDate } = route.params;
+  // const { message, planDetails, finalPrice, discount, startDate, endDate } = route.params;
 
   useEffect(() => {
     return () => {
@@ -27,14 +27,14 @@ const SuccessScreen = ({ navigation, route }) => {
         />
       </View>
       <Text style={styles.title}>Success!</Text>
-      <Text style={styles.subtitle}>{message}</Text>
+      {/* <Text style={styles.subtitle}>{message}</Text>
       <Text style={styles.details}>
         <Text>Plan: {planDetails.title}{"\n"}</Text>
         <Text>Final Price: {finalPrice}{"\n"}</Text>
         {discount && <Text>Discount Applied: {discount}{"\n"}</Text>}
         <Text>Start Date: {startDate}{"\n"}</Text>
         <Text>End Date: {endDate}{"\n"}</Text>
-      </Text>
+      </Text> */}
       <TouchableOpacity
         style={styles.doneButton}
         onPress={() => navigation.replace('Home')}
