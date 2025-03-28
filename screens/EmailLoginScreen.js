@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-    View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Dimensions, ActivityIndicator, Modal, Pressable
+    View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Dimensions, ActivityIndicator, Modal, Pressable, Platform, Linking, Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -9,14 +9,126 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import Toast from 'react-native-toast-message';
 import { CheckBox } from '@react-native-community/checkbox';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { setupAuthLinking, handleGoogleSignIn } from '../utils/linkingConfig';
+import { debugGoogleAuth, testRedirectMethods } from '../utils/googleAuthDebug';
 const { width } = Dimensions.get('window');
+
+// Generate a nonce for security purposes
+const generateNonce = (length = 32) => {
+  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += charset.charAt(Math.floor(Math.random() * charset.length));
+  }
+  return result;
+};
 
 const EmailLoginScreen = ({ navigation }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [googleLoading, setGoogleLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [isChecked, setChecked] = useState(false);
+
+    useEffect(() => {
+        // Configure Google Sign-In only for iOS
+        if (Platform.OS === 'ios') {
+            GoogleSignin.configure({
+                iosClientId: '1046714115920-vk3nng2cli9ggeo7cdg9jd87g1620bbk.apps.googleusercontent.com',
+                webClientId: '1046714115920-vk3nng2cli9ggeo7cdg9jd87g1620bbk.apps.googleusercontent.com',
+                scopes: ['profile', 'email'],
+                offlineAccess: true,
+            });
+        }
+        
+        // Set up deep link handler for auth callbacks
+        const unsubscribe = setupAuthLinking(navigation);
+        
+        return unsubscribe;
+    }, [navigation]);
+
+    // Handle Google login - direct implementation without the utility
+    const handleDirectGoogleLogin = async () => {
+        if (Platform.OS !== 'ios') {
+            Toast.show({
+                type: 'info',
+                text1: 'Info',
+                text2: 'Google login is only available on iOS',
+                position: 'bottom'
+            });
+            return;
+        }
+
+        try {
+            setGoogleLoading(true);
+            
+            // Use direct Supabase OAuth flow with the supabase callback
+            const { data, error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: 'https://ddtgdhehxhgarkonvpfq.supabase.co/auth/v1/callback'
+                }
+            });
+            
+            if (error) throw error;
+            
+            console.log('Google auth URL:', data?.url);
+            
+            // Open the URL to start the OAuth flow
+            if (data?.url) {
+                await Linking.openURL(data.url);
+            }
+            
+        } catch (error) {
+            console.error('Error during Google login:', error);
+            Toast.show({
+                type: 'error',
+                text1: 'Login Failed',
+                text2: error.message || 'Failed to login with Google',
+                position: 'bottom'
+            });
+        } finally {
+            setGoogleLoading(false);
+        }
+    };
+    
+    // Debug Google auth flow
+    const debugAuth = async () => {
+        try {
+            const result = await debugGoogleAuth();
+            console.log('Debug result:', result);
+            
+            // Show the results in an alert
+            if (result.success) {
+                // Create a message with validation information
+                let message = `Redirect URI:\n${result.redirectUri}\n\n`;
+                message += `Client ID:\n${result.clientId}\n\n`;
+                
+                if (result.validation) {
+                    message += 'VALIDATION:\n';
+                    message += `• ${result.validation.issues.join('\n• ')}\n\n`;
+                    
+                    if (result.validation.suggestions && result.validation.suggestions.length) {
+                        message += 'SUGGESTED URIS TO TRY:\n';
+                        message += `• ${result.validation.suggestions.join('\n• ')}`;
+                    }
+                }
+                
+                Alert.alert(
+                    'Debug Info (Copy to fix in Google Cloud)',
+                    message,
+                    [{ text: 'OK' }]
+                );
+            } else {
+                Alert.alert('Debug Error', result.error || 'Unknown error');
+            }
+        } catch (error) {
+            console.error('Error in debugAuth:', error);
+            Alert.alert('Debug Error', error.message || 'Unknown error');
+        }
+    };
 
     const handleLogin = async () => {
         // Validate email and password
@@ -237,13 +349,31 @@ const EmailLoginScreen = ({ navigation }) => {
 
             {/* Social Buttons */}
             <View style={styles.socialButtonsContainer}>
-                <TouchableOpacity style={styles.socialButton}>
-                    <FontAwesome name="google" size={24} color="#DB4437" />
+                <TouchableOpacity 
+                    style={[styles.socialButton, googleLoading && styles.disabledButton]}
+                    onPress={handleDirectGoogleLogin}
+                    disabled={googleLoading}
+                >
+                    {googleLoading ? (
+                        <ActivityIndicator size="small" color="#DB4437" />
+                    ) : (
+                        <FontAwesome name="google" size={24} color="#DB4437" />
+                    )}
                 </TouchableOpacity>
                
                 <TouchableOpacity style={styles.socialButton}>
                     <FontAwesome name="apple" size={24} color="#000" />
                 </TouchableOpacity>
+                
+                {/* Debug button - hidden in production */}
+                {__DEV__ && (
+                    <TouchableOpacity 
+                        style={styles.socialButton}
+                        onPress={debugAuth}
+                    >
+                        <FontAwesome name="bug" size={24} color="#333" />
+                    </TouchableOpacity>
+                )}
             </View>
 
             {/* Sign Up Link */}
@@ -369,6 +499,9 @@ const styles = StyleSheet.create({
         height: 50,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    disabledButton: {
+        opacity: 0.7,
     },
     signupText: {
         fontSize: 14,

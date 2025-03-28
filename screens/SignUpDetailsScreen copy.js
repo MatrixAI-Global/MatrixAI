@@ -21,13 +21,14 @@ const SignUpDetailsScreen2 = ({ navigation }) => {
    
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView>
+            
             {/* Back Button */}
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
                 <View style={styles.backButtonCircle}>
-                    <Image source={require('../assets/back.png')} style={styles.backArrow} />
+                    <Icon name="arrow-back" size={20} color="#fff" />
                 </View>
             </TouchableOpacity>
+
 
             {/* Header */}
             <Text style={styles.headerText}>Complete Your Profile</Text>
@@ -119,7 +120,7 @@ const SignUpDetailsScreen2 = ({ navigation }) => {
                 <Text style={styles.footerText}>Privacy Policy</Text>
                 <Text style={styles.footerText}>Term of Service</Text>
             </View>
-            </ScrollView>
+            
         </SafeAreaView>
     );
 };
@@ -132,7 +133,7 @@ const styles = StyleSheet.create({
     },
     backButton: {
         position: 'absolute',
-        top: 50,
+        top: 10,
         left: 20,
     },
     backButtonCircle: {

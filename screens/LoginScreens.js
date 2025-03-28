@@ -4,6 +4,8 @@ import { supabase } from '../supabaseClient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { setupAuthLinking, handleGoogleSignIn } from '../utils/linkingConfig';
+import { debugGoogleAuth } from '../utils/googleAuthDebug';
 
 // Generate a nonce at app startup
 const generateNonce = (length = 32) => {
@@ -20,77 +22,17 @@ const LoginScreen = ({ navigation }) => {
 
   useEffect(() => {
     // Configure Google Sign-In only once when component mounts
-GoogleSignin.configure({
-  webClientId: '1046714115920-83sdiqi07763luik2p1d54ka442optra.apps.googleusercontent.com',
-  iosClientId: '1046714115920-83sdiqi07763luik2p1d54ka442optra.apps.googleusercontent.com',
-  androidClientId: '1046714115920-mhpi6f8p35f1ftieb4ss0ujr05vupoo4.apps.googleusercontent.com',
-  offlineAccess: true,
-  scopes: ['profile', 'email']
-});
-
-    // Handle deep linking
-    const handleDeepLink = async ({ url }) => {
-      console.log('Received deep link:', url);
-      
-      if (url) {
-        try {
-          // Extract the access_token and refresh_token from the URL if present
-          const params = new URL(url).searchParams;
-          const access_token = params.get('access_token');
-          const refresh_token = params.get('refresh_token');
-
-          if (access_token) {
-            const { data: { session }, error } = await supabase.auth.setSession({
-              access_token,
-              refresh_token,
-            });
-            
-            console.log('Session after setting tokens:', session);
-
-            if (error) throw error;
-
-            if (session) {
-              const userId = session.user.id;
-              await AsyncStorage.setItem('supabase-session', JSON.stringify(session));
-              await AsyncStorage.setItem('uid', userId);
-              await AsyncStorage.setItem('userLoggedIn', 'true');
-
-              // Check if user exists in users table
-              const { data: userData, error: userError } = await supabase
-                .from('users')
-                .select('*')
-                .eq('user_id', userId)
-                .single();
-
-              if (userError) throw userError;
-
-              if (userData) {
-                navigation.replace('Home');
-              } else {
-                navigation.navigate('SignUpDetails');
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Error handling auth callback:', error);
-          Alert.alert('Error', 'Failed to complete authentication');
-        }
-      }
-    };
-
-    // Add event listener for deep linking
-    const subscription = Linking.addEventListener('url', handleDeepLink);
-
-    // Check for initial URL
-    Linking.getInitialURL().then(url => {
-      if (url) {
-        handleDeepLink({ url });
-      }
+    GoogleSignin.configure({
+      webClientId: '1046714115920-vk3nng2cli9ggeo7cdg9jd87g1620bbk.apps.googleusercontent.com',
+      iosClientId: '1046714115920-vk3nng2cli9ggeo7cdg9jd87g1620bbk.apps.googleusercontent.com',
+      offlineAccess: true,
+      scopes: ['profile', 'email']
     });
 
-    return () => {
-      subscription.remove();
-    };
+    // Set up deep link handler for auth callbacks
+    const unsubscribe = setupAuthLinking(navigation);
+    
+    return unsubscribe;
   }, [navigation]);
 
   // Helper function to decode JWT token
@@ -113,86 +55,67 @@ GoogleSignin.configure({
       setIsLoading(true);
       console.log('Starting Google Sign-In process...');
       
-      // Sign out of any existing Google session
-      await GoogleSignin.signOut();
-      
-      // Start Google Sign-In
-      await GoogleSignin.hasPlayServices();
-      const userInfo = await GoogleSignin.signIn();
-      console.log('Google Sign-In response:', userInfo);
-
-      // Get the ID token from the user info
-      const idToken = userInfo?.data?.idToken; // Access idToken directly from userInfo
-      console.log('Raw userInfo:', userInfo);
-      console.log('Extracted ID token:', idToken ? 'Token exists' : 'No token found');
-
-      if (!idToken) {
-        throw new Error('No ID token received from Google');
-      }
-
-      // Generate a nonce for this sign-in attempt
-      const currentNonce = generateNonce();
-
-      // Sign in to Supabase with the Google ID token
-      const { data: { session }, error } = await supabase.auth.signInWithIdToken({
+      // Use direct OAuth flow with Supabase callback
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        token: idToken,
-        nonce: currentNonce
-      });
-
-      console.log('Supabase auth response:', { session, error });
-
-      if (error) {
-        throw error;
-      }
-
-      if (session) {
-        console.log('Successfully authenticated with Supabase:', session.user);
-        const userId = session.user.id;
-        
-        // Store session data
-        await AsyncStorage.setItem('supabase-session', JSON.stringify(session));
-        await AsyncStorage.setItem('uid', userId);
-        await AsyncStorage.setItem('userLoggedIn', 'true');
-
-        try {
-          // Check if user exists in users table using text comparison for UUID
-          const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('user_id', userId)
-            .single();
-
-          console.log('User query response:', { userData, userError });
-
-          // If there's an error or no user found, proceed to signup
-          if (userError || !userData) {
-            console.log('User not found, proceeding to signup');
-            const userInfo = {
-              user_id: userId,
-              email: session.user.email,
-              name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || '',
-              avatar_url: session.user.user_metadata?.picture || '',
-              phone: session.user.phone || ''
-            };
-            console.log('Navigating to SignUpDetails with user info:', userInfo);
-            navigation.navigate('SignUpDetails', { userInfo });
-            return;
+        options: {
+          redirectTo: 'https://ddtgdhehxhgarkonvpfq.supabase.co/auth/v1/callback',
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
           }
-
-          // If user exists, go to main screen
-          console.log('User found, proceeding to main screen');
-          navigation.replace('Home');
-        } catch (error) {
-          console.error('Error checking user data:', error);
-          Alert.alert('Error', 'Failed to verify user information');
         }
+      });
+      
+      if (error) throw error;
+      
+      console.log('Google auth URL:', data?.url);
+      
+      // Open the URL to start the OAuth flow
+      if (data?.url) {
+        await Linking.openURL(data.url);
       }
+      
     } catch (error) {
       console.error('Detailed error:', error);
       Alert.alert('Error', `Failed to login with Google: ${error.message}`);
     } finally {
       setIsLoading(false);
+    }
+  };
+  
+  // Debug helper for Google OAuth
+  const debugGoogleSignIn = async () => {
+    try {
+      const result = await debugGoogleAuth();
+      console.log('Debug result:', result);
+      
+      if (result.success) {
+        // Create a message with validation information
+        let message = `Redirect URI:\n${result.redirectUri}\n\n`;
+        message += `Client ID:\n${result.clientId}\n\n`;
+        
+        if (result.validation) {
+          message += 'VALIDATION:\n';
+          message += `• ${result.validation.issues.join('\n• ')}\n\n`;
+          
+          if (result.validation.suggestions && result.validation.suggestions.length) {
+            message += 'SUGGESTED URIS TO TRY:\n';
+            message += `• ${result.validation.suggestions.join('\n• ')}`;
+          }
+        }
+        
+        Alert.alert(
+          'Debug Info (Copy to fix in Google Cloud)',
+          message,
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Debug Error', result.error || 'Unknown error');
+      }
+    } catch (error) {
+      console.error('Error in debugGoogleSignIn:', error);
+      Alert.alert('Debug Error', error.message);
     }
   };
 
@@ -234,6 +157,16 @@ GoogleSignin.configure({
           </>
         )}
       </TouchableOpacity>
+      
+      {/* Debug button - only shown in development */}
+      {__DEV__ && (
+        <TouchableOpacity
+          style={[styles.socialButton, { marginTop: 5, backgroundColor: '#f0f0f0' }]}
+          onPress={debugGoogleSignIn}
+        >
+          <Text style={[styles.buttonText, { color: '#333' }]}>Debug Google Sign-In</Text>
+        </TouchableOpacity>
+      )}
 
       <TouchableOpacity
         style={styles.socialButton}
@@ -259,10 +192,15 @@ GoogleSignin.configure({
         </Text>
       </Text>
 
-      <View style={styles.footerLinks}>
-        <Text style={styles.footerLink}>Privacy Policy </Text>
-        <Text style={styles.footerLink}> Term of Service</Text>
-      </View>
+      <View style={styles.footer}>
+                <TouchableOpacity onPress={() => navigation.navigate('PrivacyPolicy')}>
+                    <Text style={styles.footerLink}>Privacy Policy</Text>
+                </TouchableOpacity>
+                <Text style={styles.separator}> | </Text>
+                <TouchableOpacity onPress={() => navigation.navigate('TermsOfService')}>
+                    <Text style={styles.footerLink}>Terms of Service</Text>
+                </TouchableOpacity>
+            </View>
     </SafeAreaView>
   );
 };
@@ -324,28 +262,53 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  footerText: {
-    marginTop: 20,
-    fontSize: 14,
-    color: '#888',
-  },
+  
   signUpText: {
     color: '#2274F0',
     fontWeight: 'bold',
   },
-  footerLinks: {
+
+  disabledButton: {
+    opacity: 0.7,
+  },
+  footer: {
     flexDirection: 'row',
     justifyContent: 'center',
     marginTop: 20,
     width: '100%',
-  },
-  footerLink: {
+},
+footerText: {
+    color: '#aaa',
     fontSize: 12,
-    color: '#888',
-  },
-  disabledButton: {
-    opacity: 0.7,
-  },
+    marginTop: 10,
+},
+footerLink: {
+    color: '#aaa',
+    fontSize: 12,
+},
+separator: {
+    color: '#aaa',
+    fontSize: 12,
+    marginHorizontal: 5,
+},
+TermsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 20,
+    width: '100%',
+},
+TermsText: {
+    fontSize: 12,
+    color: '#aaa',
+},
+TermsLink: {
+    fontSize: 12,
+    color: '#2274F0',
+},
+TermsLinkText: {
+    fontSize: 12,
+    color: '#2274F0',
+},
 });
 
 export default LoginScreen;

@@ -61,6 +61,7 @@ const ProfileScreen = ({ navigation }) => {
                         await AsyncStorage.multiRemove([
                             'userLoggedIn',
                             'uid',
+                            'referralCode',
                             // Add any other keys you want to clear
                         ]);
                         

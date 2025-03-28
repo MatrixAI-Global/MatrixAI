@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Alert } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -19,10 +19,75 @@ const SignUpDetailsScreen = ({ navigation }) => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [referralCode, setReferralCode] = useState('');
+    const [preferredLanguage, setPreferredLanguage] = useState('English');
 
     useEffect(() => {
         console.log('Received user info:', userInfo);
     }, [userInfo]);
+
+    // Function to generate a random 6-digit alphanumeric code
+    const generateReferralCode = () => {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let result = '';
+        for (let i = 0; i < 6; i++) {
+            result += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return result;
+    };
+
+    // Function to check if referral code is valid
+    const checkReferralCode = async (code) => {
+        if (!code) return { valid: true, referrerId: null }; // Empty code is considered valid (optional)
+        
+        try {
+            const { data, error } = await supabase
+                .from('users')
+                .select('uid')
+                .eq('referral_code', code.toUpperCase())
+                .single();
+                
+            if (error) throw error;
+            
+            return { valid: !!data, referrerId: data?.uid };
+        } catch (error) {
+            console.error('Error checking referral code:', error);
+            return { valid: false, referrerId: null };
+        }
+    };
+
+    // Function to update referrer's invited_members and add coins
+    const updateReferrer = async (referrerId, newUserId) => {
+        try {
+            // Get current invited_members array
+            const { data: userData, error: userError } = await supabase
+                .from('users')
+                .select('invited_members')
+                .eq('uid', referrerId)
+                .single();
+                
+            if (userError) throw userError;
+            
+            // Prepare the updated array
+            const updatedInvitedMembers = userData.invited_members || [];
+            updatedInvitedMembers.push(newUserId);
+            
+            // Update the referrer record
+            const { error: updateError } = await supabase
+                .from('users')
+                .update({ 
+                    invited_members: updatedInvitedMembers,
+                    user_coins: supabase.rpc('increment', { x: 50 }) // Increment coins by 50
+                })
+                .eq('uid', referrerId);
+                
+            if (updateError) throw updateError;
+            
+            console.log('Referrer updated successfully');
+        } catch (error) {
+            console.error('Error updating referrer:', error);
+        }
+    };
 
     const handleSignUp = async () => {
         // Validate inputs
@@ -68,6 +133,23 @@ const SignUpDetailsScreen = ({ navigation }) => {
 
         setLoading(true);
         try {
+            // Check if referral code is valid
+            const { valid, referrerId } = await checkReferralCode(referralCode);
+            
+            if (referralCode && !valid) {
+                Toast.show({
+                    type: 'error',
+                    text1: 'Error',
+                    text2: 'Invalid referral code',
+                    position: 'bottom'
+                });
+                setLoading(false);
+                return;
+            }
+            
+            // Generate a unique referral code for the new user
+            const newReferralCode = generateReferralCode();
+            
             // Use Supabase directly for signup
             const { data, error } = await supabase.auth.signUp({
                 email: inputEmail.trim(),
@@ -76,7 +158,8 @@ const SignUpDetailsScreen = ({ navigation }) => {
                     data: {
                         name: name.trim(),
                         age: age ? parseInt(age, 10) : null,
-                        gender: gender
+                        gender: gender,
+                        preferred_language: preferredLanguage
                     }
                 }
             });
@@ -85,6 +168,19 @@ const SignUpDetailsScreen = ({ navigation }) => {
 
             console.log('Signup successful:', data);
             
+            // Instead of storing in the database now, pass the data to verification screen
+            const userData = {
+                uid: data.user.id,
+                name: name.trim(),
+                email: inputEmail.trim(),
+                age: age ? parseInt(age, 10) : null,
+                gender: gender,
+                preferred_language: preferredLanguage,
+                referral_code: newReferralCode,
+                referrerId: referrerId,
+                password: password // Pass password for auto-login after verification
+            };
+            
             Toast.show({
                 type: 'success',
                 text1: 'Success',
@@ -92,11 +188,12 @@ const SignUpDetailsScreen = ({ navigation }) => {
                 position: 'bottom'
             });
 
-            // Navigate to email verification screen
+            // Navigate to email verification screen with user data
             navigation.navigate('EmailVerification', {
                 email: inputEmail.trim(),
                 message: 'We have sent a verification link to your email. Please verify your email within 10 minutes to continue.',
-                isNewUser: true
+                isNewUser: true,
+                userData: userData // Pass the user data to be saved after verification
             });
         } catch (error) {
             console.error('Error during signup:', error);
@@ -134,7 +231,7 @@ const SignUpDetailsScreen = ({ navigation }) => {
 
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView>
+            <ScrollView showsVerticalScrollIndicator={false}>
                 {/* Back Button */}
                 <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
                     <View style={styles.backButtonCircle}>
@@ -212,6 +309,7 @@ const SignUpDetailsScreen = ({ navigation }) => {
                     </TouchableOpacity>
                 </View>
 
+                {/* Age Input */}
                 <View style={styles.inputContainer}>
                     <MaterialIcons name="cake" size={20} color="#aaa" style={styles.inputIcon} />
                     <TextInput
@@ -224,22 +322,55 @@ const SignUpDetailsScreen = ({ navigation }) => {
                     />
                 </View>
 
+                {/* Referral Code Input */}
+                <View style={styles.inputContainer}>
+                    <MaterialIcons name="card-giftcard" size={20} color="#aaa" style={styles.inputIcon} />
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Referral Code (Optional)"
+                        placeholderTextColor="#aaa"
+                        autoCapitalize="characters"
+                        value={referralCode}
+                        onChangeText={setReferralCode}
+                    />
+                </View>
+
                 {/* Gender Selection */}
-                <Text style={styles.genderLabel}>
+                <Text style={styles.labelText}>
                     <Icon name="people-outline" size={20} color="#000" style={{marginRight: 5}} />
                     Select Gender
                 </Text>
-                <View style={styles.genderContainer}>
+                <View style={styles.optionsContainer}>
                     {['Male', 'Female', 'Others'].map((item) => (
                         <TouchableOpacity
                             key={item}
                             style={[
-                                styles.genderButton,
-                                gender === item && styles.genderButtonSelected,
+                                styles.optionButton,
+                                gender === item && styles.optionButtonSelected,
                             ]}
                             onPress={() => setGender(item)}
                         >
                             <Text style={{ color: gender === item ? '#fff' : '#000' }}>{item}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+
+                {/* Language Selection */}
+                <Text style={styles.labelText}>
+                    <Icon name="language-outline" size={20} color="#000" style={{marginRight: 5}} />
+                    Preferred Language
+                </Text>
+                <View style={styles.optionsContainer}>
+                    {['English', 'Traditional Chinese', 'Simplified Chinese'].map((item) => (
+                        <TouchableOpacity
+                            key={item}
+                            style={[
+                                styles.optionButton,
+                                preferredLanguage === item && styles.optionButtonSelected,
+                            ]}
+                            onPress={() => setPreferredLanguage(item)}
+                        >
+                            <Text style={{ color: preferredLanguage === item ? '#fff' : '#000' }}>{item}</Text>
                         </TouchableOpacity>
                     ))}
                 </View>
@@ -274,7 +405,7 @@ const SignUpDetailsScreen = ({ navigation }) => {
                       <TouchableOpacity onPress={() => navigation.navigate('TermsOfService')}>
                         <Text style={styles.footerLink}>Terms of Service</Text>
                       </TouchableOpacity>
-                    </View>
+                </View>
             </ScrollView>
         </SafeAreaView>
     );
@@ -288,9 +419,9 @@ const styles = StyleSheet.create({
     },
     backButton: {
         position: 'absolute',
-        top: 50,
-        left: 20,
-        zIndex: 10,
+        top: 10,
+        left: 0,
+        zIndex: 100,
     },
     backButtonCircle: {
         width: 40,
@@ -305,7 +436,7 @@ const styles = StyleSheet.create({
     headerText: {
         fontSize: 24,
         fontWeight: 'bold',
-        marginTop: 80,
+        marginTop: 60,
         marginBottom: 30,
         textAlign: 'center',
     },
@@ -334,25 +465,28 @@ const styles = StyleSheet.create({
     eyeIcon: {
         padding: 5,
     },
-    genderLabel: {
+    labelText: {
         fontSize: 16,
         marginBottom: 10,
         fontWeight: 'bold',
         flexDirection: 'row',
         alignItems: 'center',
     },
-    genderContainer: {
+    optionsContainer: {
         flexDirection: 'row',
         justifyContent: 'space-around',
         marginBottom: 20,
+        flexWrap: 'wrap',
     },
-    genderButton: {
+    optionButton: {
         paddingVertical: 12,
-        paddingHorizontal: 20,
+        paddingHorizontal: 15,
         borderRadius: 10,
         backgroundColor: '#f2f2f2',
+        marginHorizontal: 5,
+        marginBottom: 10,
     },
-    genderButtonSelected: {
+    optionButtonSelected: {
         backgroundColor: '#2274F0',
     },
     centeredButtonContainer: {
@@ -387,21 +521,21 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'center',
         marginTop: 20,
+        marginBottom: 20,
         width: '100%',
-      },
-      footerLink: {
+    },
+    footerLink: {
         fontSize: 12,
         color: '#888',
-      },
-      separator: {
+    },
+    separator: {
         fontSize: 12,
         color: '#888',
         marginHorizontal: 5,
-      },
-      disabledButton: {
+    },
+    disabledButton: {
         opacity: 0.7,
-      },
-
+    },
 });
 
 export default SignUpDetailsScreen;
