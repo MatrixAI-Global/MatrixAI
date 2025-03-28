@@ -9,16 +9,22 @@ import {
   Alert,
   ScrollView,
   ActivityIndicator,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../supabaseClient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import * as ImagePicker from 'react-native-image-picker';
 import { useAuthUser } from '../hooks/useAuthUser';
+import { useLanguage } from '../context/LanguageContext';
+import { LANGUAGES } from '../utils/languageUtils';
 
 const EditProfile = ({ navigation }) => {
   const { uid } = useAuthUser();
+  const { t, currentLanguage, changeLanguage } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [profileData, setProfileData] = useState({
@@ -27,10 +33,12 @@ const EditProfile = ({ navigation }) => {
     age: '',
     email: '',
     dp_url: '',
+    preferred_language: '',
   });
   const [editingField, setEditingField] = useState(null);
   const [tempValue, setTempValue] = useState('');
   const [isEdited, setIsEdited] = useState(false);
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
 
   const fetchUserData = async () => {
     try {
@@ -43,7 +51,12 @@ const EditProfile = ({ navigation }) => {
       });
       const result = await response.json();
       if (result.success) {
-        setProfileData(result.data);
+        // Set preferred language if it exists in the profile data
+        const userData = result.data;
+        setProfileData({
+          ...userData,
+          preferred_language: userData.preferred_language || currentLanguage,
+        });
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -105,6 +118,7 @@ const EditProfile = ({ navigation }) => {
 
   const handleUpdate = async () => {
     try {
+      // Update the profile including the preferred language
       const response = await fetch('https://matrix-server.vercel.app/edituser', {
         method: 'POST',
         headers: {
@@ -116,19 +130,31 @@ const EditProfile = ({ navigation }) => {
           age: parseInt(profileData.age),
           gender: profileData.gender,
           dp_url: profileData.dp_url,
+          preferred_language: profileData.preferred_language,
         }),
       });
 
       const result = await response.json();
       if (result.success) {
-        Alert.alert('Success', 'Profile updated successfully');
+        // If language was changed, apply it
+        if (profileData.preferred_language !== currentLanguage) {
+          await changeLanguage(profileData.preferred_language);
+        }
+        
+        Alert.alert('Success', t('profileUpdated'));
         fetchUserData();
         setIsEdited(false);
       }
     } catch (error) {
       console.error('Error updating profile:', error);
-      Alert.alert('Error', 'Failed to update profile');
+      Alert.alert('Error', t('errorOccurred'));
     }
+  };
+
+  const handleSelectLanguage = async (language) => {
+    setProfileData(prev => ({ ...prev, preferred_language: language }));
+    setLanguageModalVisible(false);
+    setIsEdited(true);
   };
 
   const renderField = (label, value, field) => (
@@ -159,8 +185,26 @@ const EditProfile = ({ navigation }) => {
           autoFocus
         />
       ) : (
-        <Text style={styles.fieldValue}>{value || 'Not set'}</Text>
+        <Text style={styles.fieldValue}>{value || t('notSet')}</Text>
       )}
+    </View>
+  );
+
+  // Language field with dropdown
+  const renderLanguageField = () => (
+    <View style={styles.fieldContainer}>
+      <View style={styles.fieldHeader}>
+        <Text style={styles.fieldLabel}>{t('preferredLanguage')}</Text>
+        <TouchableOpacity
+          style={styles.editButton}
+          onPress={() => setLanguageModalVisible(true)}
+        >
+          <Ionicons name="pencil" size={20} color="#007AFF" />
+        </TouchableOpacity>
+      </View>
+      <Text style={styles.fieldValue}>
+        {profileData.preferred_language || t('notSet')}
+      </Text>
     </View>
   );
 
@@ -178,7 +222,7 @@ const EditProfile = ({ navigation }) => {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Image source={require('../assets/back.png')} style={styles.headerIcon} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Profile</Text>
+        <Text style={styles.headerTitle}>{t('editProfile')}</Text>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -206,21 +250,67 @@ const EditProfile = ({ navigation }) => {
         </View>
 
         <View style={styles.card}>
-          {renderField('Name', profileData.name, 'name')}
-          {renderField('Age', profileData.age, 'age')}
-          {renderField('Gender', profileData.gender, 'gender')}
+          {renderField(t('name'), profileData.name, 'name')}
+          {renderField(t('age'), profileData.age, 'age')}
+          {renderField(t('gender'), profileData.gender, 'gender')}
+          {renderLanguageField()}
           <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Email</Text>
+            <Text style={styles.fieldLabel}>{t('email')}</Text>
             <Text style={styles.fieldValue}>{profileData.email}</Text>
           </View>
         </View>
 
         {isEdited && (
           <TouchableOpacity style={styles.updateButton} onPress={handleUpdate}>
-            <Text style={styles.updateButtonText}>Update Profile</Text>
+            <Text style={styles.updateButtonText}>{t('updateProfile')}</Text>
           </TouchableOpacity>
         )}
       </ScrollView>
+
+      {/* Language Selection Modal */}
+      <Modal
+        visible={languageModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setLanguageModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{t('chooseLanguage')}</Text>
+              <TouchableOpacity onPress={() => setLanguageModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={Object.keys(LANGUAGES)}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.languageItem,
+                    profileData.preferred_language === item && styles.selectedLanguageItem,
+                  ]}
+                  onPress={() => handleSelectLanguage(item)}
+                >
+                  <Text
+                    style={[
+                      styles.languageText,
+                      profileData.preferred_language === item && styles.selectedLanguageText,
+                    ]}
+                  >
+                    {LANGUAGES[item].name}
+                  </Text>
+                  {profileData.preferred_language === item && (
+                    <Ionicons name="checkmark" size={20} color="#fff" />
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -355,6 +445,50 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 24,
+    maxHeight: '70%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  languageItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  selectedLanguageItem: {
+    backgroundColor: '#007AFF',
+  },
+  languageText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  selectedLanguageText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });
 

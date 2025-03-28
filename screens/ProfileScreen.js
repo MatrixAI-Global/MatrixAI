@@ -13,6 +13,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useProStatus } from '../hooks/useProStatus';
 import FeatureCardWithDetailsPro from '../components/FeatureCardWithDetailsPro';
 import FeatureCardWithDetailsAddon from '../components/FeatureCardWithDetailsAddon';
+import { useLanguage } from '../context/LanguageContext';
+import { clearLanguagePreference } from '../utils/languageUtils';
 
 const ProfileScreen = ({ navigation }) => {
     const { uid, loading } = useAuth();
@@ -20,6 +22,7 @@ const ProfileScreen = ({ navigation }) => {
     const [isSeller, setIsSeller] = useState(false);
     const [isVerified, setIsVerified] = useState(false);
     const { isPro } = useProStatus();
+    const { t } = useLanguage();
     useEffect(() => {
         if (uid) {
             checkUserStatus();
@@ -50,20 +53,27 @@ const ProfileScreen = ({ navigation }) => {
     };
 
     const handleLogout = () => {
-        Alert.alert('Logout', 'Are you sure you want to logout?', [
-            { text: 'Cancel', style: 'cancel' },
+        Alert.alert(t('logout'), t('logoutConfirmation'), [
+            { text: t('cancel'), style: 'cancel' },
             {
-                text: 'Logout',
+                text: t('logout'),
                 style: 'destructive',
                 onPress: async () => {
                     try {
+                        // Clear language preference
+                        await clearLanguagePreference();
+                        
                         // Remove user login status from AsyncStorage
                         await AsyncStorage.multiRemove([
                             'userLoggedIn',
                             'uid',
                             'referralCode',
+                            'supabase-session',
                             // Add any other keys you want to clear
                         ]);
+                        
+                        // Sign out from Supabase
+                        await supabase.auth.signOut();
                         
                         // Restart the app
                         RNRestart.Restart();
@@ -72,8 +82,8 @@ const ProfileScreen = ({ navigation }) => {
                     } catch (error) {
                         console.error('Error logging out:', error);
                         Alert.alert(
-                            'Logout Error',
-                            'Something went wrong while logging out. Please try again.'
+                            t('logoutError'),
+                            t('logoutErrorMessage')
                         );
                     }
                 },
@@ -165,7 +175,7 @@ const ProfileScreen = ({ navigation }) => {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Image source={require('../assets/back.png')} style={styles.headerIcon} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profile</Text>
+        <Text style={styles.headerTitle}>{t('profile')}</Text>
       </View>
         <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} bounces={false}>
         
@@ -278,7 +288,7 @@ const ProfileScreen = ({ navigation }) => {
             </View>
         
             <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                <Text style={styles.logoutText}>Logout</Text>
+                <Text style={styles.logoutText}>{t('logout')}</Text>
                 <Ionicons name="log-out-outline" size={20} marginLeft={10} color="#000" />
             </TouchableOpacity>
        <Text style={styles.logoutText2}>Version 1.0.0</Text>

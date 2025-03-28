@@ -64,6 +64,7 @@ const BotScreen = ({ navigation, route }) => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [imageType, setImageType] = useState('');
   const [imageFileName, setImageFileName] = useState('');
+  const [fullScreenImage, setFullScreenImage] = useState(null);
 
   // Set initial chat ID from route params if available - prevent infinite updates
   useEffect(() => {
@@ -669,11 +670,13 @@ const BotScreen = ({ navigation, route }) => {
             isBot ? styles.botMessageContainer : styles.userMessageContainer,
           ]}
         >
-          <Image
-            source={{ uri: item.image }}
-            style={styles.chatImage}
-            resizeMode="cover"
-          />
+          <TouchableOpacity onPress={() => handleImageTap(item.image)}>
+            <Image
+              source={{ uri: item.image }}
+              style={styles.chatImage}
+              resizeMode="cover"
+            />
+          </TouchableOpacity>
           {item.text && (
             <Text style={isBot ? styles.botText : styles.userText}>
               {item.text}
@@ -915,10 +918,13 @@ const BotScreen = ({ navigation, route }) => {
         ]}
       >
         {item.image ? ( // Check if the message has an image
-          <Image
-            source={{ uri: item.image }}
-            style={{ width: 200, height: 200, borderRadius: 10 }} // Adjust size as needed
-          />
+          <TouchableOpacity onPress={() => handleImageTap(item.image)}>
+            <Image
+              source={{ uri: item.image }}
+              style={styles.chatImage}
+              resizeMode="cover"
+            />
+          </TouchableOpacity>
         ) : (
           <View style={isBot ? styles.botTextContainer : styles.userTextContainer}>
             {formatMessageText(displayText).map((line, index) => {
@@ -1872,6 +1878,11 @@ const BotScreen = ({ navigation, route }) => {
     return { formattedMath: formatted, hasFraction, hasSquareRoot };
   };
 
+  // Function to handle image tap and show fullscreen view
+  const handleImageTap = (imageUri) => {
+    setFullScreenImage(imageUri);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Back Button */}
@@ -2112,6 +2123,27 @@ const BotScreen = ({ navigation, route }) => {
         </TouchableWithoutFeedback>
       )}
 
+      {/* Full Screen Image Modal */}
+      <Modal
+        visible={fullScreenImage !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setFullScreenImage(null)}
+      >
+        <View style={styles.fullScreenImageContainer}>
+          <Image
+            source={{ uri: fullScreenImage }}
+            style={styles.fullScreenImage}
+            resizeMode="contain"
+          />
+          <TouchableOpacity
+            style={styles.closeFullScreenButton}
+            onPress={() => setFullScreenImage(null)}
+          >
+            <Ionicons name="close" size={28} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -2851,6 +2883,27 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 10,
     marginVertical: 5,
+  },
+  fullScreenImageContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullScreenImage: {
+    width: '100%',
+    height: '90%',
+  },
+  closeFullScreenButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

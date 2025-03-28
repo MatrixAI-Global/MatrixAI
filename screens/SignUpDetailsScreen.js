@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Alert, Modal, FlatList } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Toast from 'react-native-toast-message';
 import { supabase } from '../supabaseClient';
+import { LANGUAGES, DEFAULT_LANGUAGE } from '../utils/languageUtils';
 
 const SignUpDetailsScreen = ({ navigation }) => {
     const route = useRoute();
@@ -20,7 +21,8 @@ const SignUpDetailsScreen = ({ navigation }) => {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [referralCode, setReferralCode] = useState('');
-    const [preferredLanguage, setPreferredLanguage] = useState('English');
+    const [preferredLanguage, setPreferredLanguage] = useState(DEFAULT_LANGUAGE);
+    const [languageModalVisible, setLanguageModalVisible] = useState(false);
 
     useEffect(() => {
         console.log('Received user info:', userInfo);
@@ -87,6 +89,11 @@ const SignUpDetailsScreen = ({ navigation }) => {
         } catch (error) {
             console.error('Error updating referrer:', error);
         }
+    };
+
+    const handleSelectLanguage = (language) => {
+        setPreferredLanguage(language);
+        setLanguageModalVisible(false);
     };
 
     const handleSignUp = async () => {
@@ -254,12 +261,11 @@ const SignUpDetailsScreen = ({ navigation }) => {
                     />
                 </View>
 
-                {/* Email Input */}
                 <View style={styles.inputContainer}>
                     <Icon name="mail-outline" size={20} color="#aaa" style={styles.inputIcon} />
                     <TextInput
-                        style={[styles.input, disableEmailInput && styles.disabledInput]}
-                        placeholder="Email"
+                        style={styles.input}
+                        placeholder="Email Address"
                         placeholderTextColor="#aaa"
                         keyboardType="email-address"
                         autoCapitalize="none"
@@ -269,49 +275,8 @@ const SignUpDetailsScreen = ({ navigation }) => {
                     />
                 </View>
 
-                {/* Password Input */}
                 <View style={styles.inputContainer}>
-                    <Icon name="lock-closed-outline" size={20} color="#aaa" style={styles.inputIcon} />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Enter Password"
-                        placeholderTextColor="#aaa"
-                        secureTextEntry={!showPassword}
-                        value={password}
-                        onChangeText={setPassword}
-                    />
-                    <TouchableOpacity onPress={togglePasswordVisibility} style={styles.eyeIcon}>
-                        <Icon 
-                            name={showPassword ? "eye-off-outline" : "eye-outline"} 
-                            size={20} 
-                            color="#aaa" 
-                        />
-                    </TouchableOpacity>
-                </View>
-
-                {/* Confirm Password Input */}
-                <View style={styles.inputContainer}>
-                    <Icon name="lock-closed-outline" size={20} color="#aaa" style={styles.inputIcon} />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Confirm Password"
-                        placeholderTextColor="#aaa"
-                        secureTextEntry={!showConfirmPassword}
-                        value={confirmPassword}
-                        onChangeText={setConfirmPassword}
-                    />
-                    <TouchableOpacity onPress={toggleConfirmPasswordVisibility} style={styles.eyeIcon}>
-                        <Icon 
-                            name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} 
-                            size={20} 
-                            color="#aaa" 
-                        />
-                    </TouchableOpacity>
-                </View>
-
-                {/* Age Input */}
-                <View style={styles.inputContainer}>
-                    <MaterialIcons name="cake" size={20} color="#aaa" style={styles.inputIcon} />
+                    <Icon name="calendar-outline" size={20} color="#aaa" style={styles.inputIcon} />
                     <TextInput
                         style={styles.input}
                         placeholder="Age (Optional)"
@@ -322,31 +287,15 @@ const SignUpDetailsScreen = ({ navigation }) => {
                     />
                 </View>
 
-                {/* Referral Code Input */}
-                <View style={styles.inputContainer}>
-                    <MaterialIcons name="card-giftcard" size={20} color="#aaa" style={styles.inputIcon} />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Referral Code (Optional)"
-                        placeholderTextColor="#aaa"
-                        autoCapitalize="characters"
-                        value={referralCode}
-                        onChangeText={setReferralCode}
-                    />
-                </View>
-
                 {/* Gender Selection */}
-                <Text style={styles.labelText}>
-                    <Icon name="people-outline" size={20} color="#000" style={{marginRight: 5}} />
-                    Select Gender
-                </Text>
-                <View style={styles.optionsContainer}>
+                <Text style={styles.genderLabel}>Select Gender</Text>
+                <View style={styles.genderContainer}>
                     {['Male', 'Female', 'Others'].map((item) => (
                         <TouchableOpacity
                             key={item}
                             style={[
-                                styles.optionButton,
-                                gender === item && styles.optionButtonSelected,
+                                styles.genderButton,
+                                gender === item && styles.genderButtonSelected,
                             ]}
                             onPress={() => setGender(item)}
                         >
@@ -355,58 +304,130 @@ const SignUpDetailsScreen = ({ navigation }) => {
                     ))}
                 </View>
 
-                {/* Language Selection */}
-                <Text style={styles.labelText}>
-                    <Icon name="language-outline" size={20} color="#000" style={{marginRight: 5}} />
-                    Preferred Language
-                </Text>
-                <View style={styles.optionsContainer}>
-                    {['English', 'Traditional Chinese', 'Simplified Chinese'].map((item) => (
-                        <TouchableOpacity
-                            key={item}
-                            style={[
-                                styles.optionButton,
-                                preferredLanguage === item && styles.optionButtonSelected,
-                            ]}
-                            onPress={() => setPreferredLanguage(item)}
-                        >
-                            <Text style={{ color: preferredLanguage === item ? '#fff' : '#000' }}>{item}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-
-                {/* Centered Submit Button */}
-                <View style={styles.centeredButtonContainer}>
-                    <TouchableOpacity style={styles.signupButton} onPress={handleSignUp}>
-                        {loading ? (
-                            <ActivityIndicator size="small" color="#fff" />
-                        ) : (
-                            <Text style={styles.signupButtonText}>Sign Up</Text>
-                        )}
+                {/* Language Selection Button */}
+                <View style={styles.languageSection}>
+                    <Text style={styles.languageLabel}>Preferred Language</Text>
+                    <TouchableOpacity 
+                        style={styles.languageSelector}
+                        onPress={() => setLanguageModalVisible(true)}
+                    >
+                        <Text style={styles.languageText}>
+                            {LANGUAGES[preferredLanguage]?.name || preferredLanguage}
+                        </Text>
+                        <Icon name="chevron-down" size={20} color="#666" />
                     </TouchableOpacity>
                 </View>
 
-                {/* Already have an account */}
-                <TouchableOpacity 
-                    style={styles.loginLinkContainer}
-                    onPress={() => navigation.navigate('EmailLogin')}
+                {/* Password Fields */}
+                <View style={styles.inputContainer}>
+                    <Icon name="lock-closed-outline" size={20} color="#aaa" style={styles.inputIcon} />
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Password"
+                        placeholderTextColor="#aaa"
+                        secureTextEntry={!showPassword}
+                        value={password}
+                        onChangeText={setPassword}
+                    />
+                    <TouchableOpacity style={styles.eyeIcon} onPress={togglePasswordVisibility}>
+                        <Icon name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#aaa" />
+                    </TouchableOpacity>
+                </View>
+
+                <View style={styles.inputContainer}>
+                    <Icon name="lock-closed-outline" size={20} color="#aaa" style={styles.inputIcon} />
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Confirm Password"
+                        placeholderTextColor="#aaa"
+                        secureTextEntry={!showConfirmPassword}
+                        value={confirmPassword}
+                        onChangeText={setConfirmPassword}
+                    />
+                    <TouchableOpacity style={styles.eyeIcon} onPress={toggleConfirmPasswordVisibility}>
+                        <Icon name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#aaa" />
+                    </TouchableOpacity>
+                </View>
+
+                {/* Referral Code */}
+                <View style={styles.inputContainer}>
+                    <Icon name="gift-outline" size={20} color="#aaa" style={styles.inputIcon} />
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Referral Code (Optional)"
+                        placeholderTextColor="#aaa"
+                        value={referralCode}
+                        onChangeText={setReferralCode}
+                        autoCapitalize="characters"
+                    />
+                </View>
+
+                {/* Signup Button */}
+                <TouchableOpacity
+                    style={styles.signupButton}
+                    onPress={handleSignUp}
+                    disabled={loading}
                 >
-                    <Text style={styles.loginLinkText}>
-                        Already have an account? <Text style={styles.loginLink}>Login</Text>
-                    </Text>
+                    {loading ? (
+                        <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                        <Text style={styles.signupButtonText}>Sign Up</Text>
+                    )}
                 </TouchableOpacity>
 
-                {/* Footer */}
-                <View style={styles.footerLinks}>
-                      <TouchableOpacity onPress={() => navigation.navigate('PrivacyPolicy')}>
-                        <Text style={styles.footerLink}>Privacy Policy</Text>
-                      </TouchableOpacity>
-                      <Text style={styles.separator}> | </Text>
-                      <TouchableOpacity onPress={() => navigation.navigate('TermsOfService')}>
-                        <Text style={styles.footerLink}>Terms of Service</Text>
-                      </TouchableOpacity>
+                {/* Login Link */}
+                <View style={styles.loginLinkContainer}>
+                    <Text style={styles.loginText}>Already have an account?</Text>
+                    <TouchableOpacity onPress={() => navigation.navigate('EmailLogin')}>
+                        <Text style={styles.loginLink}>Login</Text>
+                    </TouchableOpacity>
                 </View>
             </ScrollView>
+
+            {/* Language Selection Modal */}
+            <Modal
+                visible={languageModalVisible}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setLanguageModalVisible(false)}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Choose Language</Text>
+                            <TouchableOpacity onPress={() => setLanguageModalVisible(false)}>
+                                <Icon name="close" size={24} color="#333" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <FlatList
+                            data={Object.keys(LANGUAGES)}
+                            keyExtractor={(item) => item}
+                            renderItem={({ item }) => (
+                                <TouchableOpacity
+                                    style={[
+                                        styles.languageItem,
+                                        preferredLanguage === item && styles.selectedLanguageItem,
+                                    ]}
+                                    onPress={() => handleSelectLanguage(item)}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.languageItemText,
+                                            preferredLanguage === item && styles.selectedLanguageText,
+                                        ]}
+                                    >
+                                        {LANGUAGES[item].name}
+                                    </Text>
+                                    {preferredLanguage === item && (
+                                        <Icon name="checkmark" size={20} color="#fff" />
+                                    )}
+                                </TouchableOpacity>
+                            )}
+                        />
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -418,10 +439,8 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     backButton: {
-        position: 'absolute',
-        top: 10,
-        left: 0,
-        zIndex: 100,
+        marginBottom: 20,
+        alignSelf: 'flex-start',
     },
     backButtonCircle: {
         width: 40,
@@ -430,15 +449,12 @@ const styles = StyleSheet.create({
         backgroundColor: '#2274F0',
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#aaa',
     },
     headerText: {
-        fontSize: 24,
+        fontSize: 28,
         fontWeight: 'bold',
-        marginTop: 60,
+        color: '#333',
         marginBottom: 30,
-        textAlign: 'center',
     },
     inputContainer: {
         flexDirection: 'row',
@@ -446,9 +462,10 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#ddd',
         borderRadius: 10,
-        marginBottom: 20,
+        marginBottom: 15,
         paddingHorizontal: 15,
-        paddingVertical: 12,
+        height: 50,
+        backgroundColor: '#f9f9f9',
     },
     inputIcon: {
         marginRight: 10,
@@ -456,86 +473,134 @@ const styles = StyleSheet.create({
     input: {
         flex: 1,
         fontSize: 16,
-        color: '#000',
-    },
-    disabledInput: {
-        backgroundColor: '#f2f2f2',
-        color: '#aaa',
+        color: '#333',
     },
     eyeIcon: {
-        padding: 5,
+        padding: 10,
     },
-    labelText: {
+    genderLabel: {
         fontSize: 16,
+        fontWeight: '600',
+        color: '#555',
         marginBottom: 10,
-        fontWeight: 'bold',
-        flexDirection: 'row',
-        alignItems: 'center',
     },
-    optionsContainer: {
+    genderContainer: {
         flexDirection: 'row',
-        justifyContent: 'space-around',
+        justifyContent: 'space-between',
         marginBottom: 20,
-        flexWrap: 'wrap',
     },
-    optionButton: {
-        paddingVertical: 12,
-        paddingHorizontal: 15,
+    genderButton: {
+        flex: 1,
+        height: 50,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#ddd',
         borderRadius: 10,
-        backgroundColor: '#f2f2f2',
         marginHorizontal: 5,
+        backgroundColor: '#f9f9f9',
+    },
+    genderButtonSelected: {
+        backgroundColor: '#2274F0',
+        borderColor: '#2274F0',
+    },
+    languageSection: {
+        marginBottom: 20,
+    },
+    languageLabel: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#555',
         marginBottom: 10,
     },
-    optionButtonSelected: {
-        backgroundColor: '#2274F0',
-    },
-    centeredButtonContainer: {
+    languageSelector: {
+        flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 10,
+        justifyContent: 'space-between',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 10,
+        paddingHorizontal: 15,
+        height: 50,
+        backgroundColor: '#f9f9f9',
+    },
+    languageText: {
+        fontSize: 16,
+        color: '#333',
     },
     signupButton: {
         backgroundColor: '#2274F0',
-        paddingVertical: 12,
-        borderRadius: 30,
-        width: '90%',
+        height: 55,
+        borderRadius: 10,
+        justifyContent: 'center',
         alignItems: 'center',
+        marginTop: 30,
+        marginBottom: 15,
     },
     signupButtonText: {
         color: '#fff',
-        fontWeight: 'medium',
-        fontSize: 16,
+        fontSize: 18,
+        fontWeight: 'bold',
     },
     loginLinkContainer: {
-        alignItems: 'center',
-        marginTop: 20,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        marginBottom: 30,
     },
-    loginLinkText: {
-        fontSize: 14,
-        color: '#000',
+    loginText: {
+        color: '#666',
+        fontSize: 16,
+        marginRight: 5,
     },
     loginLink: {
         color: '#2274F0',
+        fontSize: 16,
         fontWeight: 'bold',
     },
-    footerLinks: {
+    modalContainer: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalContent: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
+        paddingBottom: 24,
+        maxHeight: '70%',
+    },
+    modalHeader: {
         flexDirection: 'row',
-        justifyContent: 'center',
-        marginTop: 20,
-        marginBottom: 20,
-        width: '100%',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E0E0E0',
     },
-    footerLink: {
-        fontSize: 12,
-        color: '#888',
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
     },
-    separator: {
-        fontSize: 12,
-        color: '#888',
-        marginHorizontal: 5,
+    languageItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E0E0E0',
     },
-    disabledButton: {
-        opacity: 0.7,
+    selectedLanguageItem: {
+        backgroundColor: '#2274F0',
     },
+    languageItemText: {
+        fontSize: 16,
+        color: '#333',
+    },
+    selectedLanguageText: {
+        color: '#fff',
+        fontWeight: 'bold',
+    }
 });
 
 export default SignUpDetailsScreen;

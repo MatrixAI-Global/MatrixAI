@@ -79,6 +79,10 @@ import AirwallexPaymentScreen from './screens/coins/AirwallexPaymentScreen.js';
 import StripeProvider from './components/StripeProvider';
 import AirwallexProvider from './components/AirwallexProvider';
 
+// Import the LanguageProvider
+import { LanguageProvider } from './context/LanguageContext';
+import { getPreferredLanguage } from './utils/languageUtils';
+
 const Stack = createStackNavigator();
 
 interface AuthContextType {
@@ -94,20 +98,24 @@ const App = () => {
     
     // Check if the user is logged in on initial app load
     useEffect(() => {
-        const checkLoginStatus = async () => {
+        const initializeApp = async () => {
             try {
+                // Check login status
                 const userStatus = await AsyncStorage.getItem('userLoggedIn');
                 if (userStatus === 'true') {
                     setIsLoggedIn(true);
                 }
+                
+                // Pre-load language preference (LanguageContext will handle this)
+                console.log('App initialized');
             } catch (error) {
-                console.error('Error checking login status:', error);
+                console.error('Error initializing app:', error);
             } finally {
                 setIsLoading(false);
             }
         };
 
-        checkLoginStatus();
+        initializeApp();
     }, []);
 
     // If still loading, show a spinner
@@ -124,6 +132,7 @@ const App = () => {
             <AuthContext.Consumer>
                 {({ uid }: AuthContextType) => (
                     <>
+                        <LanguageProvider>
                         <ModalProvider>
                             <ProStatusProvider>
                             <StripeProvider>
@@ -439,6 +448,7 @@ const App = () => {
                             </StripeProvider>
                             </ProStatusProvider>
                         </ModalProvider>
+                        </LanguageProvider>
                     </>
                 )}
             </AuthContext.Consumer>

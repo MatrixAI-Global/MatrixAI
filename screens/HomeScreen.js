@@ -13,6 +13,9 @@ import SidePanel from '../components/SidePanel';
 import { ProStatusProvider } from '../hooks/useProStatus';
 import FeatureCardWithDetailsPro from '../components/FeatureCardWithDetailsPro';  
 import FeatureCardWithDetailsAddon from '../components/FeatureCardWithDetailsAddon';
+import LanguageSelector from '../components/LanguageSelector';
+import { useLanguage } from '../context/LanguageContext';
+
 const { width } = Dimensions.get('window'); // Get screen width
 import { useProStatus } from '../hooks/useProStatus';
 import { useCoinsSubscription } from '../hooks/useCoinsSubscription';
@@ -23,9 +26,11 @@ const HomeScreen = ({ navigation }) => {
   const [isRotatingFast, setIsRotatingFast] = useState(false);
   const [isSidePanelVisible, setIsSidePanelVisible] = useState(false);
   const coinCount = useCoinsSubscription(uid);
+  const { t } = useLanguage();
   
   // Access the pro status
   const { isPro } = useProStatus();
+  
   // Gradient rotation animation
   useEffect(() => {
     Animated.loop(
@@ -70,6 +75,7 @@ const HomeScreen = ({ navigation }) => {
         {/* Fixed Header */}
         <View style={styles.fixedHeader}>
           <Header navigation={navigation} uid={uid} openDrawer={toggleSidePanel} />
+        
         </View>
 
         <ScrollView 
@@ -107,13 +113,13 @@ const HomeScreen = ({ navigation }) => {
                     <Image source={require('../assets/voice.png')} style={styles.micIcon} />
                   </View>
                   <View style={styles.columnContainer}>
-                    <Text style={styles.sectionTitle}>Speech to Text</Text>
-                    <Text style={styles.voiceChangeText}> Convert any audio to text</Text>
+                    <Text style={styles.sectionTitle}>{t('speechToText')}</Text>
+                    <Text style={styles.voiceChangeText}>{t('convertAudioToText')}</Text>
                   </View>
                 </View>
               </View>
               <TouchableOpacity style={styles.createButton} onPress={handleButtonPress}>
-                <Text style={styles.createButtonText}>Create</Text>
+                <Text style={styles.createButtonText}>{t('create')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -123,16 +129,16 @@ const HomeScreen = ({ navigation }) => {
           <View style={styles.featureRow}>
            
             <FeatureCard
-              title="Generate Image"
-              description="Create stunning Image with MatrixAI"
+              title={t('generateImage')}
+              description={t('createStunningImageDesc')}
               iconSource={require('../assets/card/image.png')}
               navigation={navigation}
               targetScreen="ImageTextScreen"
             />
         
             <FeatureCard
-              title="Generate Video"
-              description="Convert your own Video."
+              title={t('generateVideo')}
+              description={t('convertVideoDesc')}
               iconSource={require('../assets/card/video.png')}
               navigation={navigation}
               targetScreen="VideoUpload"
@@ -140,16 +146,16 @@ const HomeScreen = ({ navigation }) => {
             </View>
             <View style={styles.featureRow}>
             <FeatureCard
-              title="Remove Background"
-              description="Remove Background from you Images."
+              title={t('removeBackground')}
+              description={t('removeBackgroundDesc')}
               iconSource={require('../assets/card/image.png')}
               navigation={navigation}
               targetScreen="RemoveBackground"
             />
       
             <FeatureCard
-              title="Create PPT"
-              description="Create your prsentation is less than a minutue"
+              title={t('createPPT')}
+              description={t('createPPTDesc')}
               iconSource={require('../assets/card/ppt.png')}
               navigation={navigation}
               targetScreen="PPTGenerateScreen"
@@ -167,8 +173,8 @@ const HomeScreen = ({ navigation }) => {
           )}
            <View style={styles.endTextContainer}>
           <Text style={styles.crossBee}>MatrixAI❤️</Text>
-          <Text style={styles.AppYard3}>World's best AI tools</Text>
-          <Text style={styles.AppYard4}>@All rights reserved to MatrixAI</Text>
+          <Text style={styles.AppYard3}>{t('worldsBestAITools')}</Text>
+          <Text style={styles.AppYard4}>{t('allRightsReserved')}</Text>
         </View>
 
         </ScrollView>
@@ -306,13 +312,18 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   fixedHeader: {
-  
     backgroundColor: '#FFFFFF',
     zIndex: 1000,
     paddingHorizontal: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
+  languageSelector: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 1100,
+  }
 });
 
 export default HomeScreen;
