@@ -2264,17 +2264,16 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
   <TouchableWithoutFeedback onPress={() => setShowDropdown(false)}>
     <View style={styles.modalOverlay}>
         <View style={styles.pickerContainer}>
-    <Picker
-                        selectedValue={selectedLanguage}
-                        style={styles.picker}
-                        onValueChange={(itemValue) => {
-                            handleSelectLanguage(itemValue);
-                        }}
-                    >
-                        {languages.map((lang) => (
-                            <Picker.Item key={lang.value} label={lang.label} value={lang.value} />
-                        ))}
-                    </Picker>
+        <Picker
+        selectedValue={selectedLanguage}
+        style={styles.picker}
+        itemStyle={styles.pickerItem}
+        onValueChange={(itemValue) => handleSelectLanguage(itemValue)}
+    >
+        {languages.map((lang) => (
+            <Picker.Item key={lang.value} label={lang.label} value={lang.value} />
+        ))}
+    </Picker>
                     </View>
     </View>
   </TouchableWithoutFeedback>
@@ -2374,6 +2373,16 @@ const styles = StyleSheet.create({
         height: '250%', // Full height
     
     },
+    picker: {
+        backgroundColor: '#f0f0f0',
+        borderRadius: 8,
+        marginTop: 5,
+        color: '#000000',
+    },
+    pickerItem: {
+        color: '#000000',
+    },
+    
     mask: {
         position: 'absolute',
         right: 0, // Start from the right

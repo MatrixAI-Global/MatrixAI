@@ -11,6 +11,7 @@ import {
   Modal,
   Dimensions,
   Linking,
+  KeyboardAvoidingView,
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import * as Animatable from 'react-native-animatable';
@@ -368,28 +369,35 @@ const BotScreen2 = ({ navigation, route }) => {
         const fetchedMessages = response.data.messages || [];
         const hasChatHistory = fetchedMessages.length > 0;
 
-        setMessages((prev) => [
-          ...prev,
-          ...fetchedMessages.map(msg => ({
-            ...msg,
-            image: msg.imageUrl || msg.image,
-            text: msg.text.replace(/(\*\*|\#\#)/g, ""),
-          }))
-        ]);
+        if (hasChatHistory) {
+          // If we have chat history, update messages with fetched messages
+          setMessages((prev) => [
+            ...prev,
+            ...fetchedMessages.map(msg => ({
+              ...msg,
+              image: msg.imageUrl || msg.image,
+              text: msg.text.replace(/(\*\*|\#\#)/g, ""),
+            }))
+          ]);
+        } else {
+          // If no chat history, save the initial greeting message to database
+          const initialMessage = {
+            id: '1',
+            text: "Hello.👋 I'm your new friend, MatrixAI Bot. You can ask me any questions.",
+            sender: 'bot',
+          };
+          
+          // Save initial message to database
+          await saveChatHistory(initialMessage.text, initialMessage.sender);
+        }
 
         setDataLoaded(true);
-        
-        // Only show summary prompt after data is loaded and if there's no chat history
-     
       } catch (error) {
         console.error('Error fetching chat history:', error);
         setDataLoaded(true);
-       
       }
     };
 
-    // Initially hide the summary prompt while loading
-   
     fetchChatHistory();
   }, [audioid]);
   
@@ -886,17 +894,22 @@ const BotScreen2 = ({ navigation, route }) => {
           data={messages}
           keyExtractor={(item) => item.id}
           renderItem={renderMessage}
-          contentContainerStyle={styles.chat}
+          contentContainerStyle={[styles.chat,]}
           onContentSizeChange={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
           onLayout={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
           ref={flatListRef}
-          style={{ marginBottom: showAdditionalButtons ? 100 : 0 }}
+          style={{ marginBottom: showAdditionalButtons ? 200 : 100 }}
+         
         />
       )}
-
+        <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardAvoidingView}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 10}
+      >
       {/* Loading Animation */}
       {isLoading && (
-        <View style={[styles.loadingContainer, { bottom: showAdditionalButtons ? -15 : -130 }]}>
+        <View style={styles.loadingContainer}>
           <LottieView
             source={require('../assets/dot.json')}
             autoPlay
@@ -906,8 +919,25 @@ const BotScreen2 = ({ navigation, route }) => {
         </View>
       )}
 
+      {selectedImage && (
+        <View style={styles.imagePreviewContainer}>
+          <View style={styles.imageIconContainer}>
+            <Ionicons name="image-outline" size={24} color="#fff" />
+          </View>
+          <Text style={styles.imageNameText} numberOfLines={1} ellipsizeMode="middle">
+            {imageFileName || "Selected Image"}
+          </Text>
+          <TouchableOpacity 
+            style={styles.removeImageButton}
+            onPress={() => setSelectedImage(null)}
+          >
+            <Ionicons name="close-circle" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Quick Action Buttons */}
-      <View style={[styles.quickActionContainer, { bottom: showAdditionalButtons ? 85 : -30 }]}>
+      <View style={styles.quickActionContainer}>
         <TouchableOpacity 
           style={styles.quickActionButton}
           onPress={() => transcription && fetchDeepSeekResponse(`Please provide a summary of this text in very structured format in the original language of the transcription: ${transcription}`)}
@@ -929,7 +959,7 @@ const BotScreen2 = ({ navigation, route }) => {
       </View>
 
       {/* Chat Input Box */}
-      <View style={[styles.chatBoxContainer, { bottom: showAdditionalButtons ? 35 : -80 }]}>
+      <View style={styles.chatBoxContainer}>
         <TextInput
           style={styles.textInput}
           placeholder="Type a message..."
@@ -978,6 +1008,7 @@ const BotScreen2 = ({ navigation, route }) => {
                 </View>
             </View>
         )}
+</KeyboardAvoidingView>
 
       <Modal
         visible={isFullScreen}
@@ -1022,23 +1053,6 @@ const BotScreen2 = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
       </Modal>
-
-      {selectedImage && (
-        <View style={[styles.imagePreviewContainer, { bottom: showAdditionalButtons ? 68 : 8 }]}>
-          <View style={styles.imageIconContainer}>
-            <Ionicons name="image-outline" size={24} color="#fff" />
-          </View>
-          <Text style={styles.imageNameText} numberOfLines={1} ellipsizeMode="middle">
-            {imageFileName || "Selected Image"}
-          </Text>
-          <TouchableOpacity 
-            style={styles.removeImageButton}
-            onPress={() => setSelectedImage(null)}
-          >
-            <Ionicons name="close-circle" size={24} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      )}
     </SafeAreaView>
   );
 };
@@ -1047,7 +1061,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9F9F9',
-    marginBottom: 100,
   },
   header: {
     flexDirection: 'row',
@@ -1061,7 +1074,6 @@ const styles = StyleSheet.create({
   chatBoxContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    position: 'absolute',
     alignSelf:'center',
     width: '95%',
     borderRadius: 25,
@@ -1070,6 +1082,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 10,
     marginHorizontal: '5%',
+    marginBottom: 10,
   },
   messageImage: {
     width: 200,  // Adjust width based on your UI design
@@ -1101,8 +1114,6 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 10,
     borderRadius: 10,
-    zIndex: 100,
-    bottom: -60,
     marginHorizontal: 5,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1321,10 +1332,10 @@ const styles = StyleSheet.create({
   additionalButtonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    position: 'absolute',
-    bottom: -65, // Adjust based on your layout
     width: '100%',
-    paddingHorizontal: 10, // Add padding for spacing
+    paddingHorizontal: 10,
+    marginBottom: 10,
+    backgroundColor: '#fff',
   },
   buttonRow: {
     flexDirection: 'row',
@@ -1383,9 +1394,9 @@ const styles = StyleSheet.create({
   quickActionContainer: {
     flexDirection: 'row',
     justifyContent: 'flex-start',
-    position: 'absolute',
     width: '100%',
     paddingHorizontal: 10,
+    marginBottom: 10,
   },
   quickActionButton: {
 
@@ -1625,18 +1636,17 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   imagePreviewContainer: {
-    position: 'absolute',
-    left: 10,
-    right: 10,
     backgroundColor: '#f0f0f0',
     borderRadius: 10,
     padding: 10,
     flexDirection: 'row',
     width: '70%',
+ marginLeft:'15',
     alignItems: 'center',
     justifyContent: 'flex-start',
     borderWidth: 1,
     borderColor: '#4C8EF7',
+    marginBottom: 10,
     zIndex: 5,
   },
   imageIconContainer: {
@@ -1671,6 +1681,13 @@ const styles = StyleSheet.create({
   fullScreenImage: {
     width: '100%',
     height: '90%',
+  },
+  keyboardAvoidingView: {
+    width: '100%',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
 });
 

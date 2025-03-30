@@ -21,10 +21,14 @@ import * as ImagePicker from 'react-native-image-picker';
 import { useAuthUser } from '../hooks/useAuthUser';
 import { useLanguage } from '../context/LanguageContext';
 import { LANGUAGES } from '../utils/languageUtils';
+import { useTheme } from '../context/ThemeContext';
+import { ThemedView, ThemedText, ThemedCard } from '../components/ThemedView';
 
 const EditProfile = ({ navigation }) => {
   const { uid } = useAuthUser();
   const { t, currentLanguage, changeLanguage } = useLanguage();
+  const { currentTheme, changeTheme, themes, getThemeColors } = useTheme();
+  const colors = getThemeColors();
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [profileData, setProfileData] = useState({
@@ -34,11 +38,13 @@ const EditProfile = ({ navigation }) => {
     email: '',
     dp_url: '',
     preferred_language: '',
+    preferred_theme: '',
   });
   const [editingField, setEditingField] = useState(null);
   const [tempValue, setTempValue] = useState('');
   const [isEdited, setIsEdited] = useState(false);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
+  const [themeModalVisible, setThemeModalVisible] = useState(false);
 
   const fetchUserData = async () => {
     try {
@@ -51,11 +57,12 @@ const EditProfile = ({ navigation }) => {
       });
       const result = await response.json();
       if (result.success) {
-        // Set preferred language if it exists in the profile data
+        // Set preferred language and theme if it exists in the profile data
         const userData = result.data;
         setProfileData({
           ...userData,
           preferred_language: userData.preferred_language || currentLanguage,
+          preferred_theme: userData.preferred_theme || currentTheme,
         });
       }
     } catch (error) {
@@ -118,7 +125,7 @@ const EditProfile = ({ navigation }) => {
 
   const handleUpdate = async () => {
     try {
-      // Update the profile including the preferred language
+      // Update the profile including the preferred language and theme
       const response = await fetch('https://matrix-server.vercel.app/edituser', {
         method: 'POST',
         headers: {
@@ -131,6 +138,7 @@ const EditProfile = ({ navigation }) => {
           gender: profileData.gender,
           dp_url: profileData.dp_url,
           preferred_language: profileData.preferred_language,
+          preferred_theme: profileData.preferred_theme,
         }),
       });
 
@@ -139,6 +147,11 @@ const EditProfile = ({ navigation }) => {
         // If language was changed, apply it
         if (profileData.preferred_language !== currentLanguage) {
           await changeLanguage(profileData.preferred_language);
+        }
+        
+        // If theme was changed, apply it
+        if (profileData.preferred_theme !== currentTheme) {
+          await changeTheme(profileData.preferred_theme);
         }
         
         Alert.alert('Success', t('profileUpdated'));
@@ -157,10 +170,16 @@ const EditProfile = ({ navigation }) => {
     setIsEdited(true);
   };
 
+  const handleSelectTheme = async (theme) => {
+    setProfileData(prev => ({ ...prev, preferred_theme: theme }));
+    setThemeModalVisible(false);
+    setIsEdited(true);
+  };
+
   const renderField = (label, value, field) => (
     <View style={styles.fieldContainer}>
       <View style={styles.fieldHeader}>
-        <Text style={styles.fieldLabel}>{label}</Text>
+        <ThemedText style={styles.fieldLabel}>{label}</ThemedText>
         <TouchableOpacity
           style={styles.editButton}
           onPress={() => {
@@ -168,12 +187,12 @@ const EditProfile = ({ navigation }) => {
             setTempValue(value?.toString() || '');
           }}
         >
-          <Ionicons name="pencil" size={20} color="#007AFF" />
+          <Ionicons name="pencil" size={20} color={colors.primary} />
         </TouchableOpacity>
       </View>
       {editingField === field ? (
         <TextInput
-          style={styles.input}
+          style={[styles.input, {color: colors.text, borderBottomColor: colors.primary}]}
           value={tempValue}
           onChangeText={setTempValue}
           onBlur={() => {
@@ -185,7 +204,7 @@ const EditProfile = ({ navigation }) => {
           autoFocus
         />
       ) : (
-        <Text style={styles.fieldValue}>{value || t('notSet')}</Text>
+        <ThemedText style={styles.fieldValue}>{value || t('notSet')}</ThemedText>
       )}
     </View>
   );
@@ -194,42 +213,66 @@ const EditProfile = ({ navigation }) => {
   const renderLanguageField = () => (
     <View style={styles.fieldContainer}>
       <View style={styles.fieldHeader}>
-        <Text style={styles.fieldLabel}>{t('preferredLanguage')}</Text>
+        <ThemedText style={styles.fieldLabel}>{t('preferredLanguage')}</ThemedText>
         <TouchableOpacity
           style={styles.editButton}
           onPress={() => setLanguageModalVisible(true)}
         >
-          <Ionicons name="pencil" size={20} color="#007AFF" />
+          <Ionicons name="pencil" size={20} color={colors.primary} />
         </TouchableOpacity>
       </View>
-      <Text style={styles.fieldValue}>
+      <ThemedText style={styles.fieldValue}>
         {profileData.preferred_language || t('notSet')}
-      </Text>
+      </ThemedText>
+    </View>
+  );
+
+  // Theme field with dropdown
+  const renderThemeField = () => (
+    <View style={styles.fieldContainer}>
+      <View style={styles.fieldHeader}>
+        <ThemedText style={styles.fieldLabel}>{t('themeMode')}</ThemedText>
+        <TouchableOpacity
+          style={styles.editButton}
+          onPress={() => setThemeModalVisible(true)}
+        >
+          <Ionicons name="pencil" size={20} color={colors.primary} />
+        </TouchableOpacity>
+      </View>
+      <ThemedText style={styles.fieldValue}>
+        {themes[profileData.preferred_theme]?.name || t('notSet')}
+      </ThemedText>
     </View>
   );
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-      </View>
+      <ThemedView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </ThemedView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Image source={require('../assets/back.png')} style={styles.headerIcon} />
+    <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
+      <View style={[styles.header, {backgroundColor: colors.card, borderBottomColor: colors.border}]}>
+        <TouchableOpacity 
+          style={[styles.backButton, {borderColor: colors.border}]} 
+          onPress={() => navigation.goBack()}
+        >
+          <Image source={require('../assets/back.png')} style={[styles.headerIcon, {tintColor: colors.text}]} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('editProfile')}</Text>
+        <ThemedText style={styles.headerTitle}>{t('editProfile')}</ThemedText>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.profileImageContainer}>
-          <View style={styles.imageWrapper}>
+          <View style={[styles.imageWrapper, {backgroundColor: colors.card}]}>
             {uploading ? (
-              <ActivityIndicator size="large" color="#007AFF" />
+              <ActivityIndicator size="large" color={colors.primary} />
             ) : (
               <Image
                 source={
@@ -241,7 +284,7 @@ const EditProfile = ({ navigation }) => {
               />
             )}
             <TouchableOpacity
-              style={styles.imageEditButton}
+              style={[styles.imageEditButton, {backgroundColor: colors.primary}]}
               onPress={handleImagePick}
             >
               <Ionicons name="camera" size={20} color="#fff" />
@@ -249,19 +292,23 @@ const EditProfile = ({ navigation }) => {
           </View>
         </View>
 
-        <View style={styles.card}>
+        <ThemedCard style={styles.card}>
           {renderField(t('name'), profileData.name, 'name')}
           {renderField(t('age'), profileData.age, 'age')}
           {renderField(t('gender'), profileData.gender, 'gender')}
           {renderLanguageField()}
+          {renderThemeField()}
           <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>{t('email')}</Text>
-            <Text style={styles.fieldValue}>{profileData.email}</Text>
+            <ThemedText style={styles.fieldLabel}>{t('email')}</ThemedText>
+            <ThemedText style={styles.fieldValue}>{profileData.email}</ThemedText>
           </View>
-        </View>
+        </ThemedCard>
 
         {isEdited && (
-          <TouchableOpacity style={styles.updateButton} onPress={handleUpdate}>
+          <TouchableOpacity 
+            style={[styles.updateButton, {backgroundColor: colors.primary}]} 
+            onPress={handleUpdate}
+          >
             <Text style={styles.updateButtonText}>{t('updateProfile')}</Text>
           </TouchableOpacity>
         )}
@@ -275,11 +322,11 @@ const EditProfile = ({ navigation }) => {
         onRequestClose={() => setLanguageModalVisible(false)}
       >
         <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t('chooseLanguage')}</Text>
+          <View style={[styles.modalContent, {backgroundColor: colors.card}]}>
+            <View style={[styles.modalHeader, {borderBottomColor: colors.border}]}>
+              <ThemedText style={styles.modalTitle}>{t('chooseLanguage')}</ThemedText>
               <TouchableOpacity onPress={() => setLanguageModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#333" />
+                <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
 
@@ -290,19 +337,86 @@ const EditProfile = ({ navigation }) => {
                 <TouchableOpacity
                   style={[
                     styles.languageItem,
-                    profileData.preferred_language === item && styles.selectedLanguageItem,
+                    {borderBottomColor: colors.border},
+                    profileData.preferred_language === item && [styles.selectedLanguageItem, {backgroundColor: colors.primary}],
                   ]}
                   onPress={() => handleSelectLanguage(item)}
                 >
-                  <Text
+                  <ThemedText
                     style={[
                       styles.languageText,
                       profileData.preferred_language === item && styles.selectedLanguageText,
                     ]}
                   >
                     {LANGUAGES[item].name}
-                  </Text>
+                  </ThemedText>
                   {profileData.preferred_language === item && (
+                    <Ionicons name="checkmark" size={20} color="#fff" />
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Theme Selection Modal */}
+      <Modal
+        visible={themeModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setThemeModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={[styles.modalContent, {backgroundColor: colors.card}]}>
+            <View style={[styles.modalHeader, {borderBottomColor: colors.border}]}>
+              <ThemedText style={styles.modalTitle}>{t('chooseTheme')}</ThemedText>
+              <TouchableOpacity onPress={() => setThemeModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={Object.keys(themes)}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.themeItem,
+                    {borderBottomColor: colors.border},
+                    profileData.preferred_theme === item && [styles.selectedThemeItem, {backgroundColor: colors.primary}],
+                  ]}
+                  onPress={() => handleSelectTheme(item)}
+                >
+                  <View style={styles.themeColorPreview}>
+                    <View 
+                      style={[
+                        styles.themeColorSwatch, 
+                        { backgroundColor: themes[item].colors.background }
+                      ]} 
+                    />
+                    <View 
+                      style={[
+                        styles.themeColorSwatch, 
+                        { backgroundColor: themes[item].colors.card }
+                      ]} 
+                    />
+                    <View 
+                      style={[
+                        styles.themeColorSwatch, 
+                        { backgroundColor: themes[item].colors.primary }
+                      ]} 
+                    />
+                  </View>
+                  <ThemedText
+                    style={[
+                      styles.themeText,
+                      profileData.preferred_theme === item && styles.selectedThemeText,
+                    ]}
+                  >
+                    {themes[item].name}
+                  </ThemedText>
+                  {profileData.preferred_theme === item && (
                     <Ionicons name="checkmark" size={20} color="#fff" />
                   )}
                 </TouchableOpacity>
@@ -489,6 +603,38 @@ const styles = StyleSheet.create({
   selectedLanguageText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  themeItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  selectedThemeItem: {
+    backgroundColor: '#007AFF',
+  },
+  themeText: {
+    fontSize: 16,
+    color: '#333',
+    flex: 1,
+  },
+  selectedThemeText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  themeColorPreview: {
+    flexDirection: 'row',
+    marginRight: 12,
+  },
+  themeColorSwatch: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    marginRight: 4,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
 });
 

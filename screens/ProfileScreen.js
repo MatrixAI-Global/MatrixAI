@@ -15,6 +15,9 @@ import FeatureCardWithDetailsPro from '../components/FeatureCardWithDetailsPro';
 import FeatureCardWithDetailsAddon from '../components/FeatureCardWithDetailsAddon';
 import { useLanguage } from '../context/LanguageContext';
 import { clearLanguagePreference } from '../utils/languageUtils';
+import { useTheme } from '../context/ThemeContext';
+import { ThemedView, ThemedText, ThemedCard } from '../components/ThemedView';
+import { clearThemePreference } from '../utils/themeUtils';
 
 const ProfileScreen = ({ navigation }) => {
     const { uid, loading } = useAuth();
@@ -23,6 +26,9 @@ const ProfileScreen = ({ navigation }) => {
     const [isVerified, setIsVerified] = useState(false);
     const { isPro } = useProStatus();
     const { t } = useLanguage();
+    const { getThemeColors } = useTheme();
+    const colors = getThemeColors();
+    
     useEffect(() => {
         if (uid) {
             checkUserStatus();
@@ -63,6 +69,9 @@ const ProfileScreen = ({ navigation }) => {
                         // Clear language preference
                         await clearLanguagePreference();
                         
+                        // Clear theme preference
+                        await clearThemePreference();
+                        
                         // Remove user login status from AsyncStorage
                         await AsyncStorage.multiRemove([
                             'userLoggedIn',
@@ -92,12 +101,15 @@ const ProfileScreen = ({ navigation }) => {
     };
 
     const MenuItem = ({ iconName, label, onPress }) => (
-        <TouchableOpacity style={styles.menuItem} onPress={onPress}>
-            <View style={styles.iconContainer}>
-                <Ionicons name={iconName} size={20} color="#000" />
+        <TouchableOpacity 
+            style={[styles.menuItem, {backgroundColor: colors.card, borderBottomColor: colors.border}]} 
+            onPress={onPress}
+        >
+            <View style={[styles.iconContainer, {backgroundColor: colors.primary + '20'}]}>
+                <Ionicons name={iconName} size={20} color={colors.primary} />
             </View>
-            <Text style={styles.menuLabel}>{label}</Text>
-            <Ionicons name="chevron-forward" size={20} color="#B0B0B0" />
+            <ThemedText style={styles.menuLabel}>{label}</ThemedText>
+            <Ionicons name="chevron-forward" size={20} color={colors.text + '80'} />
         </TouchableOpacity>
     );
 
@@ -169,132 +181,104 @@ const ProfileScreen = ({ navigation }) => {
         )
       ]).start();
     }, []);
+    
     return (
-        <SafeAreaView style={styles.container2}>
-            <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Image source={require('../assets/back.png')} style={styles.headerIcon} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('profile')}</Text>
-      </View>
-        <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} bounces={false}>
-        
-            <Header2 uid={uid} />
-            
-            {/* Header Section */}
-             {/* Conditional rendering based on Pro status */}
-             {!isPro ? (
-                <FeatureCardWithDetails2 />
-            ) : (
-                <>
-                    <FeatureCardWithDetailsPro />
-                    {(coinCount < 200) && <FeatureCardWithDetailsAddon />}
-                </>
-            )}
-
-            {/* <View style={styles.header}>
-                <View style={styles.timeCreditsContainer}>
-                    <View style={styles.timeIconContainer}>
-                        <Ionicons name="time-outline" size={20} color="#fff" />
-                    </View>
-                    <View style={styles.timeIconContainer2}>
-                        <Text style={styles.timeText}>Time Credits</Text>
-                        <Text style={styles.timeValue}>14M 26S</Text>
-                    </View>
-                </View>
-                <TouchableOpacity style={styles.buyTimeButton} onPress={handleUpgradePress}>
-                    <Text style={styles.buyTimeText}>Buy time</Text>
+        <SafeAreaView style={[styles.container2, {backgroundColor: colors.background}]}>
+            <View style={[styles.header, {backgroundColor: colors.card, borderBottomColor: colors.border}]}>
+                <TouchableOpacity style={[styles.backButton, {borderColor: colors.border}]} onPress={() => navigation.goBack()}>
+                    <Image source={require('../assets/back.png')} style={[styles.headerIcon, {tintColor: colors.text}]} />
                 </TouchableOpacity>
-            </View> */}
-            <Text style={styles.menuTitle}>Your Information</Text>
-            {/* Updated Menu Items with navigation */}
-            <View style={styles.menuContainer}>
-            <MenuItem 
-                iconName="person-outline" 
-                label="Profile" 
-                onPress={handleEditProfile} 
-            />
-            {/* <MenuItem 
-                iconName="bookmark-outline" 
-                label="Wishlist" 
-                onPress={handleBookmark} 
-            /> */}
-            <MenuItem 
-                iconName="document-text-outline" 
-                label="Order History" 
-                onPress={() => navigation.navigate('OrderHistoryScreen')} 
-            />
-            <MenuItem 
-                iconName="people-outline" 
-                label="Refer & Earn" 
-                onPress={handleInside} 
-            />
-            <MenuItem 
-                iconName="cash-outline" 
-                label="Rewards" 
-                onPress={() => navigation.navigate('AddProductScreen')}
-            />
-            <MenuItem 
-                iconName="card-outline" 
-                label="Payment Management" 
-                onPress={() => navigation.navigate('AddProductScreen')}
-            />
-            
-
-            {/* {isSeller && isVerified && (
-                <MenuItem 
-                    iconName="add-circle-outline" 
-                    label="Add Products" 
-                    onPress={() => navigation.navigate('AddProductScreen')}
-                />
-            )}
-            {isSeller && isVerified ? (
-                <MenuItem 
-                    iconName="cart-outline" 
-                    label="Your AI Shop" 
-                    onPress={handleAIShop} 
-                />
-            ) : (
-                <MenuItem 
-                    iconName="cart-outline" 
-                    label="Open your AI Shop" 
-                    onPress={handleAIShop} 
-                />
-            )} */}
-                  </View>
-            <Text style={styles.menuTitle}>Other Information</Text>
-         <View style={styles.menuContainer}>   
-         <MenuItem 
-                iconName="chatbox-outline" 
-                label="Customer Support & FAQ" 
-                onPress={() => navigation.navigate('CustomerSupportScreen')}
-            />
-            <MenuItem 
-                iconName="help-circle-outline" 
-                label="Help" 
-                onPress={() => navigation.navigate('CustomerSupportScreen')}
-            />  
-
-            <MenuItem 
-                iconName="notifications-outline" 
-                label="Notifications" 
-                onPress={() => navigation.navigate('AddProductScreen')}
-            />
-             <MenuItem 
-                iconName="cash-outline" 
-                label="Charges" 
-                onPress={() => navigation.navigate('AddProductScreen')}
-            />
+                <ThemedText style={styles.headerTitle}>{t('profile')}</ThemedText>
             </View>
-        
-            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                <Text style={styles.logoutText}>{t('logout')}</Text>
-                <Ionicons name="log-out-outline" size={20} marginLeft={10} color="#000" />
-            </TouchableOpacity>
-       <Text style={styles.logoutText2}>Version 1.0.0</Text>
+            
+            <ScrollView 
+                style={[styles.container, {backgroundColor: colors.background}]} 
+                contentContainerStyle={styles.scrollContent} 
+                showsVerticalScrollIndicator={false} 
+                bounces={false}
+            >
+                <Header2 uid={uid} />
+                
+                {/* Conditional rendering based on Pro status */}
+                {!isPro ? (
+                    <FeatureCardWithDetails2 />
+                ) : (
+                    <>
+                        <FeatureCardWithDetailsPro />
+                        {(coinCount < 200) && <FeatureCardWithDetailsAddon />}
+                    </>
+                )}
 
-      
-        </ScrollView>
+                <ThemedText style={styles.menuTitle}>Your Information</ThemedText>
+                
+                {/* Menu Items */}
+                <ThemedCard style={styles.menuContainer}>
+                    <MenuItem 
+                        iconName="person-outline" 
+                        label="Profile" 
+                        onPress={handleEditProfile} 
+                    />
+                    <MenuItem 
+                        iconName="document-text-outline" 
+                        label="Order History" 
+                        onPress={() => navigation.navigate('OrderHistoryScreen')} 
+                    />
+                    <MenuItem 
+                        iconName="people-outline" 
+                        label="Refer & Earn" 
+                        onPress={handleInside} 
+                    />
+                    <MenuItem 
+                        iconName="cash-outline" 
+                        label="Rewards" 
+                        onPress={() => navigation.navigate('AddProductScreen')}
+                    />
+                    <MenuItem 
+                        iconName="card-outline" 
+                        label="Payment Management" 
+                        onPress={() => navigation.navigate('AddProductScreen')}
+                    />
+                </ThemedCard>
+
+                <ThemedText style={styles.menuTitle}>Support</ThemedText>
+                
+                <ThemedCard style={styles.menuContainer}>
+                    <MenuItem 
+                        iconName="help-circle-outline" 
+                        label="Help Center" 
+                        onPress={() => navigation.navigate('HelpScreen')} 
+                    />
+                    <MenuItem 
+                        iconName="headset-outline" 
+                        label="Customer Support" 
+                        onPress={() => navigation.navigate('CustomerSupportScreen')} 
+                    />
+                    <MenuItem 
+                        iconName="star-outline" 
+                        label="Rate Us" 
+                        onPress={() => navigation.navigate('FeedbackScreen')} 
+                    />
+                </ThemedCard>
+
+                <ThemedText style={styles.menuTitle}>Preferences</ThemedText>
+                
+                <ThemedCard style={styles.menuContainer}>
+                    <MenuItem 
+                        iconName="settings-outline" 
+                        label="Settings" 
+                        onPress={handleSettings} 
+                    />
+                    <MenuItem 
+                        iconName="log-out-outline" 
+                        label="Logout" 
+                        onPress={handleLogout} 
+                    />
+                </ThemedCard>
+                
+                <View style={styles.footer}>
+                    <ThemedText style={styles.versionText}>Version 1.0.0</ThemedText>
+                </View>
+            </ScrollView>
         </SafeAreaView>
     );
 };

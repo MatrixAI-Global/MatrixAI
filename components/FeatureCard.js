@@ -1,11 +1,15 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet, Dimensions, Animated } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import { ThemedCard, ThemedText } from './ThemedView';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window'); // Get the screen width
 
 const FeatureCard = ({ title, description, iconSource, navigation, targetScreen }) => {
   const rotation = useRef(new Animated.Value(0)).current;
+  const { getThemeColors } = useTheme();
+  const colors = getThemeColors();
 
   useEffect(() => {
     // Start the rotation animation
@@ -24,9 +28,12 @@ const FeatureCard = ({ title, description, iconSource, navigation, targetScreen 
     outputRange: ['0deg', '360deg'],
   });
 
+  // Calculate card size to be consistent
+  const cardSize = width * 0.42; // Consistent width for all cards
+
   return (
     <TouchableOpacity
-      style={styles.card}
+      style={[styles.card, { width: cardSize, height: cardSize, backgroundColor: colors.card }]}
       onPress={() => navigation.navigate(targetScreen)} // Navigate to the target screen
     >
       {/* Animated Gradient Background */}
@@ -46,26 +53,23 @@ const FeatureCard = ({ title, description, iconSource, navigation, targetScreen 
         />
       </Animated.View>
 
-      {/* Circle with icon */}
-      <View style={styles.circleContainer}>
-        <Image source={iconSource} style={styles.icon} />
-      </View>
+      <View style={styles.contentContainer}>
+        {/* Circle with icon */}
+        <View style={styles.circleContainer}>
+          <Image source={iconSource} style={styles.icon} />
+        </View>
 
-      {/* Card content */}
-      <Text style={styles.cardTitle}>{title}</Text>
-      <Text style={styles.cardDescription}>{description}</Text>
+        {/* Card content */}
+        <ThemedText style={styles.cardTitle}>{title}</ThemedText>
+        <ThemedText style={styles.cardDescription}>{description}</ThemedText>
+      </View>
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    width: width * 0.424, // 40% of the screen width
-    backgroundColor: '#fff',
-    aspectRatio: 1,
     borderRadius: 10,
-    padding: 15,
-    margin: 10,
     borderWidth: 1,
     borderColor: '#ccc',
     shadowColor: '#000',
@@ -73,20 +77,26 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 5, // For Android shadow
-    alignItems: 'flex-start',
     overflow: 'hidden', // Ensures gradient stays inside card
+    margin: 10,
+  },
+  contentContainer: {
+    flex: 1,
+    padding: 15,
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
   },
   animatedGradientContainer: {
     position: 'absolute',
     width: 350, // Diameter of the circle
     height: 350,
-    borderRadius: 75, // Ensures it's circular
+    borderRadius: 175, // Half of width/height for circle
     top: -80, // Position above the card content
     left: -40, // Slightly offset to the left
   },
   gradientBackground: {
     flex: 1,
-    borderRadius: 75, // Circular shape
+    borderRadius: 175, // Match the container
   },
   circleContainer: {
     width: 50,
@@ -107,15 +117,14 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#F3F3F3FF',
-    textAlign: 'left', // Left align the title
+    textAlign: 'left', // Center align the title
     width: '100%',
+    marginTop: -8,
   },
   cardDescription: {
     fontSize: 14,
-    color: '#FFFFFFFF',
     marginTop: 5,
-    textAlign: 'left',
+    textAlign: 'left', // Center align the description
     width: '100%',
   },
 });

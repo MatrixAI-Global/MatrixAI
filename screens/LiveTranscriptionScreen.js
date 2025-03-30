@@ -256,6 +256,9 @@ const LiveTranscriptionScreen = ({ navigation }) => {
 
   const MAX_RECORDING_DURATION = 300; // 5 minutes in seconds
 
+  // Add timerIdsRef after other refs
+  const timerIdsRef = useRef([]);
+
   useEffect(() => {
     // Initialize
     const setup = async () => {
@@ -367,16 +370,20 @@ const LiveTranscriptionScreen = ({ navigation }) => {
         console.log('No active recording to stop');
       }
       
-      // iOS requires specific configurations to work properly
+      // Create a unique path for each recording to avoid conflicts
+      const recordingId = Date.now().toString();
+      const tempFilePath = `${RNFS.DocumentDirectoryPath}/recording_${recordingId}.wav`;
+      
+      // Options optimized for both platforms
       const options = {
         sampleRate: 16000,  // 16kHz as required by API
         channels: 1,        // Mono
         bitsPerSample: 16,  // 16-bit
         audioSource: Platform.OS === 'android' ? 6 : 0,  // MIC source type
-        // For iOS, we explicitly set a wav file path to ensure audio is captured
-        wavFile: Platform.OS === 'ios' 
-          ? `${RNFS.DocumentDirectoryPath}/recording.wav` 
-          : '',
+        // Set a clear, unique file path for each recording
+        wavFile: tempFilePath,
+        // Add buffer size configuration - important for iOS
+        bufferSize: Platform.OS === 'ios' ? 4096 : 8192,
       };
       
       console.log('Initializing AudioRecord with options:', JSON.stringify(options));
@@ -385,6 +392,7 @@ const LiveTranscriptionScreen = ({ navigation }) => {
       await new Promise((resolve, reject) => {
         try {
           AudioRecord.init(options);
+          console.log('AudioRecord initialized successfully');
           resolve();
         } catch (error) {
           console.error('Error in AudioRecord.init():', error);
@@ -392,23 +400,12 @@ const LiveTranscriptionScreen = ({ navigation }) => {
         }
       });
       
-      // For iOS, we'll use a file-based approach
-      if (Platform.OS === 'ios') {
-        console.log('Using file-based audio capture approach for iOS');
-        // No need to setup listener for iOS
-        return true;
-      }
-      
-      // Setup the listener after initialization (Android only)
+      // For both platforms, set up the audio data listener
       setupAudioListener();
       return true;
     } catch (error) {
       console.error('Error initializing audio recorder:', error);
       setError(`Audio init error: ${error.message}`);
-      // For iOS, we'll return true anyway to allow recording to proceed
-      if (Platform.OS === 'ios') {
-        return true;
-      }
       return false;
     }
   };
@@ -428,17 +425,18 @@ const LiveTranscriptionScreen = ({ navigation }) => {
       chunkStartTime = Date.now();
       chunkCounter = 0;
 
-      // Set up new listener - use a single string parameter for the event name
+      // Set up new listener for both platforms
       dataSubscription = AudioRecord.on('data', data => {
         try {
           // Log data receipt for debugging
-          console.log('Audio data received, length:', data.length);
+          console.log(`[Audio] Data received, length: ${data.length}`);
           
           // Convert base64 data to raw binary buffer
           const chunk = Buffer.from(data, 'base64');
-          console.log('Raw chunk size', chunk.byteLength);
           
           if (chunk.byteLength > 0) {
+            console.log(`[Audio] Raw chunk size: ${chunk.byteLength} bytes`);
+            
             // Add to the current audio chunks array (for reference)
             audioChunksRef.current.push(data);
             
@@ -461,17 +459,17 @@ const LiveTranscriptionScreen = ({ navigation }) => {
               processAudioChunk(currentTime);
             }
           } else {
-            console.warn('Warning: Received empty audio chunk');
+            console.warn('[Audio] Warning: Received empty audio chunk');
           }
         } catch (error) {
-          console.error('Error in data listener:', error);
+          console.error('[Audio] Error in data listener:', error);
           setError(`Audio data error: ${error.message}`);
         }
       });
       
-      console.log('Audio listener setup complete');
+      console.log('[Audio] Listener setup complete');
     } catch (error) {
-      console.error('Error setting up audio listener:', error);
+      console.error('[Audio] Error setting up audio listener:', error);
       setError(`Error setting up audio: ${error.message}`);
     }
   };
@@ -558,16 +556,11 @@ const LiveTranscriptionScreen = ({ navigation }) => {
 
   const startRecording = async () => {
     try {
-      // For iOS, skip permission check
-      if (Platform.OS === 'ios') {
-        setPermissionGranted(true);
-      } else {
-        // For Android, still check permission
-        const hasPermission = await checkPermission();
-        if (!hasPermission) {
-          console.log('No permission to record');
-          return;
-        }
+      // For both platforms, check permissions
+      const hasPermission = await checkPermission();
+      if (!hasPermission) {
+        console.log('No permission to record');
+        return;
       }
       
       // Reset for new recording
@@ -607,18 +600,15 @@ const LiveTranscriptionScreen = ({ navigation }) => {
         return;
       }
       
-      // Start recording immediately
+      // Start recording
+      console.log('Starting audio recording...');
       try {
-        console.log('Starting audio recording...');
         AudioRecord.start();
         setRecording(true);
         startTimer();
         
-        // For iOS, since we don't use the event listener, we'll periodically check 
-        // for audio data using a timer
-        if (Platform.OS === 'ios') {
-          startIOSAudioTimer();
-        }
+        // Start pulse animation
+        startPulseAnimation();
       } catch (err) {
         console.error('Error starting recording:', err);
         setError(`Could not start recording: ${err.message}`);
@@ -634,150 +624,21 @@ const LiveTranscriptionScreen = ({ navigation }) => {
     }
   };
 
-  // For iOS, use a timer-based approach to check for audio data
-  const startIOSAudioTimer = () => {
-    let tempFilePath = `${RNFS.DocumentDirectoryPath}/recording.wav`;
-    let isProcessing = false;
-    let lastProcessTime = Date.now();
-    let processingAttempts = 0;
-    
-    console.log('[iOS Audio] Starting iOS audio timer with file path:', tempFilePath);
-    
-    const audioCheckInterval = setInterval(async () => {
-      if (!recording) {
-        console.log('[iOS Audio] Recording stopped, clearing interval');
-        clearInterval(audioCheckInterval);
-        return;
-      }
-      
-      if (isProcessing) {
-        console.log('[iOS Audio] Still processing previous chunk, skipping');
-        return;
-      }
-      
-      // Only process audio every 2 seconds
-      const currentTime = Date.now();
-      if (currentTime - lastProcessTime < 2000) {
-        return;
-      }
-      
-      processingAttempts++;
-      console.log(`[iOS Audio] Processing attempt #${processingAttempts}`);
-      lastProcessTime = currentTime;
-      
-      try {
-        // Mark as processing to prevent overlapping operations
-        isProcessing = true;
-        
-        // Temporarily stop recording to capture the chunk
-        console.log('[iOS Audio] Pausing recording to capture audio chunk...');
-        const audioFilePath = await AudioRecord.stop();
-        console.log('[iOS Audio] Recording paused, checking file at:', audioFilePath || tempFilePath);
-        
-        // Check if the file exists
-        const fileExists = await RNFS.exists(audioFilePath || tempFilePath);
-        console.log('[iOS Audio] File exists:', fileExists);
-        
-        if (fileExists) {
-          // Get stats to check file size
-          const fileStats = await RNFS.stat(audioFilePath || tempFilePath);
-          console.log('[iOS Audio] Audio file stats:', JSON.stringify(fileStats));
-          
-          if (fileStats.size > 44) { // WAV header is 44 bytes, so anything larger has audio data
-            console.log('[iOS Audio] Found audio data, file size:', fileStats.size);
-            
-            try {
-              // Read the file
-              const audioBase64 = await RNFS.readFile(audioFilePath || tempFilePath, 'base64');
-              console.log('[iOS Audio] Read audio file, base64 length:', audioBase64.length);
-              
-              if (audioBase64 && audioBase64.length > 0) {
-                // Convert to buffer
-                const audioBuffer = Buffer.from(audioBase64, 'base64');
-                
-                // Add some basic verification
-                if (audioBuffer.length > 44) {
-                  // Verify it's a valid WAV file
-                  const isWavFile = audioBuffer.toString('ascii', 0, 4) === 'RIFF' && 
-                                    audioBuffer.toString('ascii', 8, 12) === 'WAVE';
-                  
-                  console.log('[iOS Audio] WAV verification:', isWavFile ? 'Valid WAV file' : 'NOT a valid WAV file');
-                  
-                  if (isWavFile) {
-                    // Send to WebSocket directly
-                    if (websocketReady && websocketConnection && websocketConnection.readyState === WebSocket.OPEN) {
-                      console.log('[iOS Audio] Sending WAV chunk to WebSocket, size:', audioBuffer.length);
-                      const result = sendAudioChunkToWebSocket(audioBuffer, false);
-                      console.log('[iOS Audio] Send result:', result);
-                    } else {
-                      console.log('[iOS Audio] WebSocket not ready to receive audio. Ready:', websocketReady, 
-                                  'Connection:', websocketConnection ? 'exists' : 'null', 
-                                  'State:', websocketConnection ? websocketConnection.readyState : 'N/A');
-                    }
-                  } else {
-                    console.warn('[iOS Audio] Audio buffer is not a valid WAV file');
-                  }
-                } else {
-                  console.log('[iOS Audio] Audio buffer too small (only header):', audioBuffer.length);
-                }
-              }
-            } catch (readError) {
-              console.error('[iOS Audio] Error reading audio file:', readError);
-            }
-          } else {
-            console.log('[iOS Audio] Audio file exists but contains no audio data (size:', fileStats.size, ')');
-          }
-        } else {
-          console.log('[iOS Audio] Audio file not found:', audioFilePath || tempFilePath);
-        }
-        
-        // Restart recording with a clean file
-        try {
-          // Delete the old file to ensure we get fresh data
-          if (fileExists) {
-            await RNFS.unlink(audioFilePath || tempFilePath)
-              .then(() => console.log('[iOS Audio] File deleted'))
-              .catch(err => console.log('[iOS Audio] Error deleting file:', err));
-          }
-        } catch (e) {
-          console.log('[iOS Audio] Error handling file:', e);
-        }
-        
-        // Restart recording
-        console.log('[iOS Audio] Restarting audio recording...');
-        AudioRecord.start();
-        isProcessing = false;
-      } catch (error) {
-        console.error('[iOS Audio] Error in iOS audio timer:', error);
-        // Make sure to restart recording even if there's an error
-        try {
-          AudioRecord.start();
-        } catch (e) {
-          console.error('[iOS Audio] Failed to restart recording after error:', e);
-        }
-        isProcessing = false;
-      }
-    }, 500); // Check frequently, but we'll only process every 2 seconds
-    
-    // Store the interval ID for cleanup
-    timerIdsRef.current = [...(timerIdsRef.current || []), audioCheckInterval];
-  };
-  
-  // Add this at the top with other refs
-  const timerIdsRef = useRef([]);
-  
-  // Update stopRecording to clean up iOS timers
   const stopRecording = async () => {
     try {
       if (!recording) return;
       
-      // Clear any iOS audio check timers
+      // Clear any timers
       if (timerIdsRef.current && timerIdsRef.current.length > 0) {
         timerIdsRef.current.forEach(timerId => clearInterval(timerId));
         timerIdsRef.current = [];
       }
       
+      // Stop pulse animation
+      stopPulseAnimation();
+      
       // Stop recording
+      console.log('Stopping recording...');
       const audioFile = await AudioRecord.stop();
       setRecording(false);
       stopTimer();
@@ -786,17 +647,34 @@ const LiveTranscriptionScreen = ({ navigation }) => {
       setAudioPath(audioFile);
       console.log('Final audio file saved to:', audioFile);
 
-      // Send the complete WAV file to the WebSocket
+      // Send the complete audio file to the WebSocket
       if (isConnected && websocketConnection && websocketConnection.readyState === WebSocket.OPEN) {
         try {
-          // Read the final WAV file that includes all audio
-          const wavData = await RNFS.readFile(audioFile, 'base64');
-          const wavBuffer = Buffer.from(wavData, 'base64');
-          console.log('Sending final WAV file, size:', wavBuffer.length);
-          // Pass true for isLastChunk to indicate this is the final chunk
-          sendAudioChunkToWebSocket(wavBuffer, true);
+          // Read the final file that includes all audio
+          console.log('Reading audio file for final processing...');
+          const fileExists = await RNFS.exists(audioFile);
+          
+          if (fileExists) {
+            const fileStats = await RNFS.stat(audioFile);
+            console.log('Audio file size:', fileStats.size, 'bytes');
+            
+            if (fileStats.size > 44) { // WAV header is 44 bytes
+              const wavData = await RNFS.readFile(audioFile, 'base64');
+              const wavBuffer = Buffer.from(wavData, 'base64');
+              console.log('Sending final audio file, size:', wavBuffer.length, 'bytes');
+              
+              // Pass true for isLastChunk to indicate this is the final chunk
+              sendAudioChunkToWebSocket(wavBuffer, true);
+            } else {
+              console.warn('Audio file is too small, might not contain actual audio data');
+              setError('No audio data captured - please try again');
+            }
+          } else {
+            console.error('Final audio file not found:', audioFile);
+            setError('Final audio file not found - please try again');
+          }
         } catch (error) {
-          console.error('Error sending final WAV file:', error);
+          console.error('Error sending final audio file:', error);
           setError(`Error sending final file: ${error.message}`);
         }
       } else {

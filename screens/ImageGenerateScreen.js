@@ -69,6 +69,7 @@ const ImageGenerateScreen = () => {
   };
 
   return (
+    
 <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
   {/* Header Animation */}
  
@@ -97,6 +98,11 @@ const ImageGenerateScreen = () => {
     style={{width: '100%', height: 100}}
   />
       {/* Text Input Box */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardAvoidingView}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+      >
       {!isFinished && (
         <View style={styles.textInputContainer}>
           <TextInput
@@ -121,7 +127,7 @@ const ImageGenerateScreen = () => {
 </TouchableOpacity>
         </View>
       )}
-
+</KeyboardAvoidingView>
       {/* Buttons */}
       {isFinished && (
         <View style={styles.buttonContainer}>

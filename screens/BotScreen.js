@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   FlatList,
-
   TextInput,
   TouchableOpacity,
   Image,
@@ -13,6 +12,10 @@ import {
   Alert,
   Modal,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
+  BackHandler,
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import * as Animatable from 'react-native-animatable';
@@ -25,6 +28,7 @@ import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import RNFS from 'react-native-fs';
 import { Buffer } from 'buffer';
 import { supabase } from '../supabaseClient';
+import Toast from 'react-native-toast-message';
 
 import LeftNavbarBot from '../components/LeftNavbarBot';
 
@@ -66,6 +70,9 @@ const BotScreen = ({ navigation, route }) => {
   const [imageFileName, setImageFileName] = useState('');
   const [fullScreenImage, setFullScreenImage] = useState(null);
 
+  // Add keyboard state tracking
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+
   // Set initial chat ID from route params if available - prevent infinite updates
   useEffect(() => {
     if (!initialChatIdProcessed.current && chatid && chatid !== 'undefined' && chatid !== 'null') {
@@ -74,6 +81,41 @@ const BotScreen = ({ navigation, route }) => {
       initialChatIdProcessed.current = true;
     }
   }, [chatid]);
+
+  // Add keyboard event listeners
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      () => {
+        setKeyboardVisible(true);
+      }
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => {
+        setKeyboardVisible(false);
+      }
+    );
+
+    // Handle back button press for dismissing keyboard
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        if (keyboardVisible) {
+          Keyboard.dismiss();
+          return true;
+        }
+        return false;
+      }
+    );
+
+    // Cleanup event listeners
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+      backHandler.remove();
+    };
+  }, [keyboardVisible]);
 
   const onDeleteChat = async (chatId) => {
     try {
@@ -197,6 +239,11 @@ const BotScreen = ({ navigation, route }) => {
         const { data: sessionData } = await supabase.auth.getSession();
         const userId = sessionData?.session?.user?.id || 'anonymous';
         
+        setIsTyping(true);
+        
+        // Dismiss keyboard after sending message
+        Keyboard.dismiss();
+        
         // If there's no current chat ID, create a new chat
         if (!currentChatId) {
           const newChatId = Date.now().toString();
@@ -207,135 +254,135 @@ const BotScreen = ({ navigation, route }) => {
           await new Promise(resolve => setTimeout(resolve, 300));
         }
         
-      // If there's an image, process it
-      if (selectedImage) {
-        try {
-          setIsLoading(true);
-         
-          // Generate a unique image ID
-          const imageID = Date.now().toString(36) + Math.random().toString(36).substring(2, 15);
-          const fileExtension = imageFileName ? imageFileName.split('.').pop() : 'jpg';
-          
-          // Read the file as base64
-          const fileContent = await RNFS.readFile(selectedImage, 'base64');
-          
-          // Create file path for Supabase storage
-            const filePath = `users/${userId}/Image/${imageID}.${fileExtension}`;
-          
-          // Upload to Supabase storage
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('user-uploads')
-            .upload(filePath, decode(fileContent), {
-              contentType: imageType || 'image/jpeg',
-              upsert: false
-            });
+        // If there's an image, process it
+        if (selectedImage) {
+          try {
+            setIsLoading(true);
+           
+            // Generate a unique image ID
+            const imageID = Date.now().toString(36) + Math.random().toString(36).substring(2, 15);
+            const fileExtension = imageFileName ? imageFileName.split('.').pop() : 'jpg';
             
-          if (uploadError) {
-            throw new Error(`Upload error: ${uploadError.message}`);
-          }
-          
-          // Get the public URL for the uploaded image
-          const { data: { publicUrl } } = supabase.storage
-            .from('user-uploads')
-            .getPublicUrl(filePath);
-          
-            // Add the image to messages first in the local state
-          const newMessage = {
-            id: Date.now().toString(),
-            image: publicUrl,
-            text: inputText.trim() ? inputText : "",
-              sender: 'user',
-              timestamp: new Date().toISOString()
-          };
-          
-          setMessages((prev) => [...prev, newMessage]);
-          setSelectedImage(null);
-          setInputText('');
-
-          // Save the chat history for the image
-          await saveChatHistory(publicUrl, 'user');
-          
-          // If there's text, use it as the question, otherwise use a default
-          const question = inputText.trim() ? inputText : "What do you see in this image?";
-          
-          // Create system message with role information if available
-          let systemContent = 'You are MatrixAI Bot, a helpful AI assistant.';
-          
-          // Find the current chat to get the detailed roleDescription
-          const currentChatObj = chats.find(chat => chat.id === currentChatId);
-          
-          if (currentRole) {
-            if (currentChatObj && currentChatObj.roleDescription) {
-              // Use the detailed roleDescription for the system content
-              systemContent = `You are MatrixAI Bot, acting as a ${currentRole}. ${currentChatObj.roleDescription}`;
-            } else {
-              // Fallback to simpler system content if roleDescription isn't available
-              systemContent = `You are MatrixAI Bot, acting as a ${currentRole}. Please provide responses with the expertise and perspective of a ${currentRole} while being helpful and informative.`;
+            // Read the file as base64
+            const fileContent = await RNFS.readFile(selectedImage, 'base64');
+            
+            // Create file path for Supabase storage
+              const filePath = `users/${userId}/Image/${imageID}.${fileExtension}`;
+            
+            // Upload to Supabase storage
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('user-uploads')
+              .upload(filePath, decode(fileContent), {
+                contentType: imageType || 'image/jpeg',
+                upsert: false
+              });
+              
+            if (uploadError) {
+              throw new Error(`Upload error: ${uploadError.message}`);
             }
-          }
-          
-          // Send request to Volces API
-          const volcesResponse = await axios.post(
-            'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
-            {
-              model: 'doubao-vision-pro-32k-241028',
-              messages: [
-                {
-                  role: 'system',
-                  content: systemContent
-                },
-                {
-                  role: 'user',
-                  content: [
-                    {
-                      type: 'text',
-                      text: question
-                    },
-                    {
-                      type: 'image_url',
-                      image_url: {
-                        url: publicUrl
-                      }
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              headers: {
-                'Authorization': 'Bearer 95fad12c-0768-4de2-a4c2-83247337ea89',
-                'Content-Type': 'application/json'
+            
+            // Get the public URL for the uploaded image
+            const { data: { publicUrl } } = supabase.storage
+              .from('user-uploads')
+              .getPublicUrl(filePath);
+            
+              // Add the image to messages first in the local state
+            const newMessage = {
+              id: Date.now().toString(),
+              image: publicUrl,
+              text: inputText.trim() ? inputText : "",
+                sender: 'user',
+                timestamp: new Date().toISOString()
+            };
+            
+            setMessages((prev) => [...prev, newMessage]);
+            setSelectedImage(null);
+            setInputText('');
+
+            // Save the chat history for the image
+            await saveChatHistory(publicUrl, 'user');
+            
+            // If there's text, use it as the question, otherwise use a default
+            const question = inputText.trim() ? inputText : "What do you see in this image?";
+            
+            // Create system message with role information if available
+            let systemContent = 'You are MatrixAI Bot, a helpful AI assistant.';
+            
+            // Find the current chat to get the detailed roleDescription
+            const currentChatObj = chats.find(chat => chat.id === currentChatId);
+            
+            if (currentRole) {
+              if (currentChatObj && currentChatObj.roleDescription) {
+                // Use the detailed roleDescription for the system content
+                systemContent = `You are MatrixAI Bot, acting as a ${currentRole}. ${currentChatObj.roleDescription}`;
+              } else {
+                // Fallback to simpler system content if roleDescription isn't available
+                systemContent = `You are MatrixAI Bot, acting as a ${currentRole}. Please provide responses with the expertise and perspective of a ${currentRole} while being helpful and informative.`;
               }
             }
-          );
-          
-          // Extract the response from Volces API
-          const botMessage = volcesResponse.data.choices[0].message.content.trim();
-          
-          // Add the bot's response to messages
-          setMessages((prev) => [
-            ...prev,
-            { id: Date.now().toString(), text: botMessage, sender: 'bot' },
-          ]);
-          
-          // Save the chat history for the bot response
-          await saveChatHistory(botMessage, 'bot');
-          
-          // Clear the image and text
-          setSelectedImage(null);
-          setInputText('');
-          
-        } catch (error) {
-          console.error('Error processing image:', error);
-          Alert.alert('Error', 'Failed to process image');
-          
-          setMessages((prev) => [
-            ...prev,
-            { id: Date.now().toString(), text: 'Error processing image. Please try again.', sender: 'bot' },
-          ]);
-        } finally {
-          setIsLoading(false);
-        }
+            
+            // Send request to Volces API
+            const volcesResponse = await axios.post(
+              'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
+              {
+                model: 'doubao-vision-pro-32k-241028',
+                messages: [
+                  {
+                    role: 'system',
+                    content: systemContent
+                  },
+                  {
+                    role: 'user',
+                    content: [
+                      {
+                        type: 'text',
+                        text: question
+                      },
+                      {
+                        type: 'image_url',
+                        image_url: {
+                          url: publicUrl
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                headers: {
+                  'Authorization': 'Bearer 95fad12c-0768-4de2-a4c2-83247337ea89',
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+            
+            // Extract the response from Volces API
+            const botMessage = volcesResponse.data.choices[0].message.content.trim();
+            
+            // Add the bot's response to messages
+            setMessages((prev) => [
+              ...prev,
+              { id: Date.now().toString(), text: botMessage, sender: 'bot' },
+            ]);
+            
+            // Save the chat history for the bot response
+            await saveChatHistory(botMessage, 'bot');
+            
+            // Clear the image and text
+            setSelectedImage(null);
+            setInputText('');
+            
+          } catch (error) {
+            console.error('Error processing image:', error);
+            Alert.alert('Error', 'Failed to process image');
+            
+            setMessages((prev) => [
+              ...prev,
+              { id: Date.now().toString(), text: 'Error processing image. Please try again.', sender: 'bot' },
+            ]);
+          } finally {
+            setIsLoading(false);
+          }
       } else {
           // Regular text message handling
           try {
@@ -472,6 +519,13 @@ const BotScreen = ({ navigation, route }) => {
         timestamp: timestamp
       };
       
+      // Check if we need to update the chat name from 'New Chat' to 'MatrixAI Bot'
+      let chatName = existingChat?.name || '';
+      const shouldUpdateName = chatName === 'New Chat' && sender === 'user';
+      if (shouldUpdateName) {
+        chatName = 'MatrixAI Bot';
+      }
+      
       if (existingChat) {
         // Chat exists, update messages array
         // Limit the number of messages to prevent database size issues
@@ -483,6 +537,8 @@ const BotScreen = ({ navigation, route }) => {
           .update({
             messages: updatedMessages,
             updated_at: timestamp,
+            // Update name from 'New Chat' to 'MatrixAI Bot' if this is first user message
+            name: shouldUpdateName ? chatName : existingChat.name,
             // Also update description to the latest message for preview
             description: messageText.substring(0, 30) + (messageText.length > 30 ? '...' : '')
           })
@@ -503,6 +559,7 @@ const BotScreen = ({ navigation, route }) => {
               .update({
                 messages: reducedMessages,
                 updated_at: timestamp,
+                name: shouldUpdateName ? chatName : existingChat.name,
                 description: messageText.substring(0, 30) + (messageText.length > 30 ? '...' : '')
               })
               .eq('chat_id', chatIdToUse);
@@ -525,7 +582,7 @@ const BotScreen = ({ navigation, route }) => {
         const newChat = {
           chat_id: chatIdToUse,
           user_id: userId,
-          name: 'New Chat',
+          name: 'MatrixAI Bot', // Always use 'MatrixAI Bot' for new chats with messages
           description: messageText.substring(0, 30) + (messageText.length > 30 ? '...' : ''),
           role: currentRole || '',
           role_description: '',
@@ -553,6 +610,7 @@ const BotScreen = ({ navigation, route }) => {
           ? { 
               ...chat, 
               messages: [...(chat.messages || []), newMessage],
+              name: shouldUpdateName ? chatName : chat.name,
               description: chat.description || messageText.substring(0, 30) + (messageText.length > 30 ? '...' : '')
             } 
           : chat
@@ -1056,7 +1114,7 @@ const BotScreen = ({ navigation, route }) => {
           onContentSizeChange={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
           onLayout={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
           ref={flatListRef}
-          style={{ marginBottom: showAdditionalButtons ? 200 : 90 }}
+          style={{ marginBottom: showAdditionalButtons ? 135 : 30 }}
         />
     </View>
   ), [messages, renderMessage, showAdditionalButtons]);
@@ -1146,12 +1204,18 @@ const BotScreen = ({ navigation, route }) => {
               setMessages(specificChat.messages || []);
               setCurrentRole(specificChat.role || '');
             } else {
-              // Create a new chat with the specific ID if not found
+              // If a specific chat ID was requested but not found, create a new one with that ID
               console.log('Creating new chat with ID:', chatid);
               startNewChat(chatid);
+              Toast.show({
+                type: 'success',
+                text1: 'New Chat Created',
+                position: 'bottom',
+                visibilityTime: 2000,
+              });
             }
           } else {
-            // No specific chat requested, load the most recent one
+            // No specific chat requested, load the most recent one instead of creating a new one
             const mostRecentChat = processedChats[0];
             console.log('Loading most recent chat:', mostRecentChat.id);
             setCurrentChatId(mostRecentChat.id);
@@ -1161,10 +1225,14 @@ const BotScreen = ({ navigation, route }) => {
         } else {
           // No chats found for this user, create a new one
           console.log('No chats found, creating a new chat');
-          const newChatId = chatid && chatid !== 'undefined' && chatid !== 'null' 
-            ? chatid 
-            : Date.now().toString();
+          const newChatId = Date.now().toString();
           startNewChat(newChatId);
+          Toast.show({
+            type: 'success',
+            text1: 'New Chat Created',
+            position: 'bottom',
+            visibilityTime: 2000,
+          });
         }
         
         setDataLoaded(true);
@@ -1176,9 +1244,7 @@ const BotScreen = ({ navigation, route }) => {
         setDataLoaded(true);
         
         // Fallback to creating a new chat if there's an error
-        const newChatId = chatid && chatid !== 'undefined' && chatid !== 'null' 
-          ? chatid 
-          : Date.now().toString();
+        const newChatId = Date.now().toString();
         startNewChat(newChatId);
       }
     };
@@ -1324,6 +1390,14 @@ const BotScreen = ({ navigation, route }) => {
       // Generate a new chat ID if none provided
       const newChatId = customChatId || Date.now().toString();
       console.log(`Starting new chat with ID: ${newChatId}`);
+      
+      // Show toast for user feedback
+      Toast.show({
+        type: 'success',
+        text1: 'New Chat Created',
+        position: 'bottom',
+        visibilityTime: 2000,
+      });
       
       // Get current user session first to ensure we have authentication
       const { data: { session } } = await supabase.auth.getSession();
@@ -1538,7 +1612,7 @@ const BotScreen = ({ navigation, route }) => {
       roleDescription = `Licensed wealth management expert navigating Hong Kong's dynamic financial landscape, focusing on tax efficiency, retirement planning, and cross-border asset strategies. Core responsibilities include optimizing Mandatory Provident Fund (MPF) portfolios, advising on first-time buyer mortgage strategies, planning for emigration tax implications, mitigating risks in high-yield products (e.g., ELNs or crypto ETFs), and explaining Wealth Management Connect opportunities. Key skills & knowledge include expertise in Hong Kong's tax regime, knowledge of family trusts and offshore setups for asset protection, and familiarity with regulatory product risks. Common scenarios: "Should I invest in HKEX-listed tech stocks or US ETFs?" or "How to reduce tax on rental income from a Kowloon flat?" Communication style is risk-transparent, using localized analogies like comparing investments to property rentals, while ensuring compliance with SFC regulations. Limitations: Forbidden from recommending unregulated shadow banking products or guaranteeing risk-free returns. Mandatory warnings: Virtual asset platforms may lack proper licensing—verify with SFC.`;
     } 
     else {
-      roleDescription = `I'll now respond as a ${role}. How can I help you?`;
+      roleDescription = `I'll now a ${role}. How can I help you?`;
     }
     
     // Set current role and store the roleDescription internally for use in API calls
@@ -1550,7 +1624,7 @@ const BotScreen = ({ navigation, route }) => {
     ));
     
     // Add a simple message to the user indicating the role has been set
-    const userVisibleMessage = `I'll now respond as a ${role}. How can I help you?`;
+    const userVisibleMessage = `I'll now a ${role}. How can I help you?`;
     const newMessage = {
       id: Date.now().toString(),
       text: userVisibleMessage,
@@ -1885,6 +1959,7 @@ const BotScreen = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      
       {/* Back Button */}
       <TouchableOpacity 
         style={[styles.backButton, { marginLeft: isSidebarOpen ? 300 : 0 }]}
@@ -1914,13 +1989,13 @@ const BotScreen = ({ navigation, route }) => {
           {currentRole && <Text style={styles.botRole}>{currentRole}</Text>|| <Text style={styles.botRole}>MatrixAI Bot</Text>}
         
         </View>
-        <TouchableOpacity onPress={() => navigation.navigate('CallScreen')}>
+        {/* <TouchableOpacity onPress={() => navigation.navigate('CallScreen')}>
           <MaterialIcons name="call" size={24} color="#4C8EF7" marginHorizontal={1} />
         </TouchableOpacity>
         <TouchableOpacity onPress={() => navigation.navigate('CameraScreen')}>
           <MaterialCommunityIcons name="video-outline" size={28} color="#4C8EF7" marginHorizontal={10} />
         </TouchableOpacity>
-       
+        */}
       </View>
 
       {/* Chat List */}
@@ -2014,12 +2089,24 @@ const BotScreen = ({ navigation, route }) => {
         )}
       </Animatable.View>
       {/* Loading animation */}
-      {isLoading && (
+     
+      
+      {/* Image Preview (WhatsApp Style) */}
+     
+
+      {/* KeyboardAvoidingView to handle chat input */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardAvoidingView}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 30}
+      >
+
+{isLoading && (
         <View style={[styles.loadingContainer, { 
-          bottom: showAdditionalButtons && selectedImage ? 100 : 
-                 showAdditionalButtons ? 40 : 
-                 selectedImage ? -10 : 
-                 -70 
+          bottom: showAdditionalButtons && selectedImage ? 300 : 
+                 showAdditionalButtons ? 25 : 
+                 selectedImage ? -60 : 
+                 -85 
         }]}>
           <LottieView
             source={require('../assets/dot.json')}
@@ -2029,10 +2116,17 @@ const BotScreen = ({ navigation, route }) => {
           />
         </View>
       )}
-      
-      {/* Image Preview (WhatsApp Style) */}
-      {selectedImage && (
-        <View style={[styles.imagePreviewContainer, { bottom: showAdditionalButtons ? 177 : 68 }]}>
+        <View style={styles.inputContentContainer}>
+          {!selectedImage && (
+            <View style={styles.NewChat}>
+              <TouchableOpacity onPress={startNewChat} style={styles.NewChatButton}>
+                <MaterialCommunityIcons name="chat-plus-outline" size={24} color="#fff" />
+                <Text style={styles.NewChatText}>New Chat</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+           {selectedImage && (
+        <View style={[styles.imagePreviewContainer]}>
           <View style={styles.imageIconContainer}>
             <Ionicons name="image-outline" size={24} color="#fff" />
           </View>
@@ -2048,68 +2142,64 @@ const BotScreen = ({ navigation, route }) => {
         </View>
       )}
 
-       {!selectedImage && (
-        <View style={[styles.NewChat, { bottom: showAdditionalButtons ? 175 : 68 }]}>
-          <TouchableOpacity onPress={startNewChat} style={styles.NewChatButton}>
-          <MaterialCommunityIcons name="chat-plus-outline" size={24} color="#fff" />
-          <Text style={styles.NewChatText}>New Chat</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-       <View style={[styles.chatBoxContainer, { bottom: showAdditionalButtons ? 130 : 20}]}>
-          <TextInput
-            style={[styles.textInput, { textAlignVertical: 'center' }]}
-            placeholder={selectedImage ? "Add a caption..." : "Send a message..."}
-            placeholderTextColor="#ccc"
-            value={inputText}
-            onChangeText={handleInputChange}
-            onSubmitEditing={handleSendMessage}
-            multiline
-            numberOfLines={3}
-            maxLength={250}
-          />
+          <View style={styles.chatBoxContainer}>
+            <TextInput
+              style={[styles.textInput, { textAlignVertical: 'center' }]}
+              placeholder={selectedImage ? "Add a caption..." : "Send a message..."}
+              placeholderTextColor="#ccc"
+              value={inputText}
+              onChangeText={handleInputChange}
+              onSubmitEditing={() => {
+                handleSendMessage();
+                Keyboard.dismiss();
+              }}
+              multiline
+              numberOfLines={1}
+              maxLength={250}
+              returnKeyType="send"
+              blurOnSubmit={Platform.OS === 'ios' ? false : true}
+            />
             <TouchableOpacity onPress={handleAttach} style={styles.sendButton}>
-                  {showAdditionalButtons ? (
-                    <Ionicons name="close" size={28} color="#4C8EF7" />
-                  ) : (
-                    <MaterialCommunityIcons name="plus" size={28} color="#4C8EF7" />
-                  )}
-                </TouchableOpacity>
-               
-                <TouchableOpacity onPress={handleSendMessage} style={styles.sendButton}>
-                  <Ionicons name="send" size={24} color="#4C8EF7" />
-                </TouchableOpacity>
-        </View>
+              {showAdditionalButtons ? (
+                <Ionicons name="close" size={28} color="#4C8EF7" />
+              ) : (
+                <MaterialCommunityIcons name="plus" size={28} color="#4C8EF7" />
+              )}
+            </TouchableOpacity>
+                   
+            <TouchableOpacity onPress={handleSendMessage} style={styles.sendButton}>
+              <Ionicons name="send" size={24} color="#4C8EF7" />
+            </TouchableOpacity>
+          </View>
 
-        {showAdditionalButtons && (
-             <View style={styles.additionalButtonsContainer}>
-                <View style={styles.buttonRow}>
-                    <TouchableOpacity style={styles.additionalButton2} onPress={() => handleImageOCR('camera')}>
-                        <View style={styles.additionalButton}>
-                            <Ionicons name="camera" size={28} color="#4C8EF7" />
-                        </View>
-                        <Text>Photo</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity style={styles.additionalButton2} onPress={() => handleImageOCR('gallery')}>
-                        <View style={styles.additionalButton}>
-                            <Ionicons name="image" size={28} color="#4C8EF7" />
-                        </View>
-                        <Text>Image</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity style={styles.additionalButton2}>
-                        <View style={styles.additionalButton}>
-                            <Ionicons name="attach" size={28} color="#4C8EF7" />
-                        </View>
-                        <Text>Document</Text>
-                    </TouchableOpacity>
-                </View>
+          {showAdditionalButtons && (
+            <View style={styles.additionalButtonsContainer}>
+              <View style={styles.buttonRow}>
+                <TouchableOpacity style={styles.additionalButton2} onPress={() => handleImageOCR('camera')}>
+                  <View style={styles.additionalButton}>
+                    <Ionicons name="camera" size={28} color="#4C8EF7" />
+                  </View>
+                  <Text>Photo</Text>
+                </TouchableOpacity>
+                      
+                <TouchableOpacity style={styles.additionalButton2} onPress={() => handleImageOCR('gallery')}>
+                  <View style={styles.additionalButton}>
+                    <Ionicons name="image" size={28} color="#4C8EF7" />
+                  </View>
+                  <Text>Image</Text>
+                </TouchableOpacity>
+                      
+                <TouchableOpacity style={styles.additionalButton2}>
+                  <View style={styles.additionalButton}>
+                    <Ionicons name="attach" size={28} color="#4C8EF7" />
+                  </View>
+                  <Text>Document</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-        )}
-  
-
-     
+          )}
+        </View>
+      </KeyboardAvoidingView>
 
       {isSidebarOpen && (
         <TouchableWithoutFeedback onPress={() => setIsSidebarOpen(false)}>
@@ -2186,12 +2276,35 @@ const styles = StyleSheet.create({
   headerIcon2: {
     marginHorizontal: 5,
   },
-  NewChat: {
+  keyboardAvoidingView: {
     position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
+  },
+  inputContentContainer: {
+    width: '100%',
+    paddingBottom: 10,
+  },
+  chatBoxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    width: '95%',
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: 'blue',
+    paddingHorizontal: 10,
+    marginHorizontal: '5%',
+    backgroundColor: '#fff',
+
+  },
+  NewChat: {
     alignSelf: 'center',
     backgroundColor: '#4C8EF7',
     borderRadius: 10,
-    marginBottom: 3,
+    marginBottom: 10,
   },
   NewChatButton: {
     flexDirection: 'row',
@@ -2218,9 +2331,8 @@ const styles = StyleSheet.create({
   
   // WhatsApp style image preview container
   imagePreviewContainer: {
-    position: 'absolute',
-    left: 10,
-    right: 10,
+  marginBottom:5,
+  marginLeft:15,
     backgroundColor: '#f0f0f0',
     borderRadius: 10,
     padding: 10,
@@ -2254,19 +2366,6 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     padding: 2,
     zIndex: 10,
-  },
-  chatBoxContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    position: 'absolute',
-    alignSelf:'center',
-    width: '95%',
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: 'blue',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 10,
-    marginHorizontal: '5%',
   },
   headerTextContainer: {
     flex: 1,
@@ -2569,10 +2668,11 @@ const styles = StyleSheet.create({
   additionalButtonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    position: 'absolute',
-    bottom: 30, // Adjust based on your layout
     width: '100%',
-    paddingHorizontal: 20, // Add padding for spacing
+    marginTop: 10,
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    marginBottom: 10,
   },
   buttonRow: {
     flexDirection: 'row',

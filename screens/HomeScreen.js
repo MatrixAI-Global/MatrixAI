@@ -15,6 +15,8 @@ import FeatureCardWithDetailsPro from '../components/FeatureCardWithDetailsPro';
 import FeatureCardWithDetailsAddon from '../components/FeatureCardWithDetailsAddon';
 import LanguageSelector from '../components/LanguageSelector';
 import { useLanguage } from '../context/LanguageContext';
+import { ThemedView, ThemedText } from '../components/ThemedView';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window'); // Get screen width
 import { useProStatus } from '../hooks/useProStatus';
@@ -27,6 +29,8 @@ const HomeScreen = ({ navigation }) => {
   const [isSidePanelVisible, setIsSidePanelVisible] = useState(false);
   const coinCount = useCoinsSubscription(uid);
   const { t } = useLanguage();
+  const { getThemeColors } = useTheme();
+  const colors = getThemeColors();
   
   // Access the pro status
   const { isPro } = useProStatus();
@@ -69,13 +73,13 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <ProStatusProvider>
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="light-content" />
-
+      <SafeAreaView edges={['top']} style={styles.statusBarContainer}>
+        <StatusBar barStyle="light-content" backgroundColor="#2A76F1" />
+      </SafeAreaView>
+      <SafeAreaView edges={['bottom', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Fixed Header */}
-        <View style={styles.fixedHeader}>
+        <View style={[styles.fixedHeader, { backgroundColor: colors.background }]}>
           <Header navigation={navigation} uid={uid} openDrawer={toggleSidePanel} />
-        
         </View>
 
         <ScrollView 
@@ -84,7 +88,7 @@ const HomeScreen = ({ navigation }) => {
           bounces={false}
         >
           {/* Rotating Animated Gradient with Fixed Content */}
-          <View style={styles.content}>
+          <ThemedView style={styles.content}>
             <View style={styles.roundedCardContainer}>
               <Animated.View
                 style={[
@@ -113,8 +117,8 @@ const HomeScreen = ({ navigation }) => {
                     <Image source={require('../assets/voice.png')} style={styles.micIcon} />
                   </View>
                   <View style={styles.columnContainer}>
-                    <Text style={styles.sectionTitle}>{t('speechToText')}</Text>
-                    <Text style={styles.voiceChangeText}>{t('convertAudioToText')}</Text>
+                    <ThemedText style={styles.sectionTitle}>{t('speechToText')}</ThemedText>
+                    <ThemedText style={styles.voiceChangeText}>{t('convertAudioToText')}</ThemedText>
                   </View>
                 </View>
               </View>
@@ -122,12 +126,11 @@ const HomeScreen = ({ navigation }) => {
                 <Text style={styles.createButtonText}>{t('create')}</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </ThemedView>
 
           {/* Scrollable Content */}
           {/* Feature Cards */}
-          <View style={styles.featureRow}>
-           
+          <ThemedView style={styles.featureRow}>
             <FeatureCard
               title={t('generateImage')}
               description={t('createStunningImageDesc')}
@@ -143,8 +146,8 @@ const HomeScreen = ({ navigation }) => {
               navigation={navigation}
               targetScreen="VideoUpload"
             />
-            </View>
-            <View style={styles.featureRow}>
+          </ThemedView>
+          <ThemedView style={styles.featureRow}>
             <FeatureCard
               title={t('removeBackground')}
               description={t('removeBackgroundDesc')}
@@ -160,10 +163,10 @@ const HomeScreen = ({ navigation }) => {
               navigation={navigation}
               targetScreen="PPTGenerateScreen"
             />
-         
-          </View>
-           {/* Conditional rendering based on Pro status */}
-           {!isPro ? (
+          </ThemedView>
+          
+          {/* Conditional rendering based on Pro status */}
+          {!isPro ? (
             <FeatureCardWithDetails2/>
           ) : (
             <>
@@ -171,12 +174,11 @@ const HomeScreen = ({ navigation }) => {
               {(coinCount < 200) && <FeatureCardWithDetailsAddon/>}
             </>
           )}
-           <View style={styles.endTextContainer}>
-          <Text style={styles.crossBee}>MatrixAI❤️</Text>
-          <Text style={styles.AppYard3}>{t('worldsBestAITools')}</Text>
-          <Text style={styles.AppYard4}>{t('allRightsReserved')}</Text>
-        </View>
-
+          <ThemedView style={styles.endTextContainer}>
+            <ThemedText style={styles.crossBee}>MatrixAI❤️</ThemedText>
+            <ThemedText style={styles.AppYard3}>{t('worldsBestAITools')}</ThemedText>
+            <ThemedText style={styles.AppYard4}>{t('allRightsReserved')}</ThemedText>
+          </ThemedView>
         </ScrollView>
         <FloatingButton />
       </SafeAreaView>
@@ -305,7 +307,8 @@ const styles = StyleSheet.create({
   featureRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 10,
+    alignItems: 'center',
+    marginTop: 5,
   },
   scrollViewContent: {
   
@@ -323,6 +326,9 @@ const styles = StyleSheet.create({
     top: 10,
     right: 10,
     zIndex: 1100,
+  },
+  statusBarContainer: {
+    backgroundColor: '#2A76F1',
   }
 });
 

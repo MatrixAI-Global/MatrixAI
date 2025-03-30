@@ -28,8 +28,6 @@ import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import Sound from 'react-native-sound';
 import { useAuthUser } from '../hooks/useAuthUser';
 
- // Add this import if not present
-
 const audioIcon = require('../assets/mic3.png');
 const videoIcon = require('../assets/cliper.png');
 const backIcon = require('../assets/back.png');
@@ -118,7 +116,7 @@ const AudioVideoUploadScreen = () => {
     const [languages, setLanguages] = useState([
   
        
-            { label: 'Cantonese', value: 'zh-HK' },
+           
             { label: 'Chinese Traditional', value: 'zh-TW' },
             { label: 'English (UK)', value: 'en-GB' },
             { label: 'English (US)', value: 'en-US' },
@@ -126,7 +124,7 @@ const AudioVideoUploadScreen = () => {
             { label: 'German', value: 'de' },
             { label: 'Hindi', value: 'hi' },
             { label: 'Japanese', value: 'ja' },
-            { label: 'Mandarin', value: 'zh-CN' },
+            
             { label: 'Spanish', value: 'es' }
         
     ]);
@@ -138,6 +136,10 @@ const AudioVideoUploadScreen = () => {
     const [toastMessage, setToastMessage] = useState('');
     const [toastType, setToastType] = useState('default');
     const fadeAnim = useRef(new Animated.Value(0)).current;
+    const [supportedFormats] = useState([
+        'audio/wav', 'audio/x-wav', 'audio/mpeg', 'audio/mp3', 'audio/mp4', 
+        'audio/x-m4a', 'audio/aac', 'audio/ogg', 'audio/flac'
+    ]);
     
     // Function to show custom toast
     const showCustomToast = (title, message, type = 'default') => {
@@ -359,6 +361,28 @@ const AudioVideoUploadScreen = () => {
         });
     };
 
+    const isFormatSupported = (fileType) => {
+        // Check if the file type is in our supported formats list
+        return supportedFormats.includes(fileType);
+    };
+
+    const getFileExtension = (fileName) => {
+        return fileName.split('.').pop().toLowerCase();
+    };
+
+    const getMimeTypeFromExtension = (extension) => {
+        const mimeTypeMap = {
+            'mp3': 'audio/mpeg',
+            'wav': 'audio/wav',
+            'm4a': 'audio/x-m4a',
+            'aac': 'audio/aac',
+            'ogg': 'audio/ogg',
+            'flac': 'audio/flac',
+            'mp4': 'audio/mp4'
+        };
+        return mimeTypeMap[extension] || 'audio/mpeg'; // Default to mp3 if unknown
+    };
+
     const handleFileSelect = async () => {
         try {
             const res = await DocumentPicker.pick({
@@ -366,14 +390,38 @@ const AudioVideoUploadScreen = () => {
             });
     
             if (res && res[0]) {
-                setAudioFile(res[0]);
+                const file = res[0];
+                const fileExtension = getFileExtension(file.name);
+                
+                // If file.type is empty (happens on some Android devices),
+                // try to determine the MIME type from the file extension
+                const fileType = file.type || getMimeTypeFromExtension(fileExtension);
+                
+                console.log('Selected file:', {
+                    name: file.name,
+                    type: fileType,
+                    extension: fileExtension,
+                    size: file.size
+                });
+                
+                // Check if format is supported
+                if (!isFormatSupported(fileType)) {
+                    Alert.alert(
+                        'Unsupported Format', 
+                        `The file format ${fileExtension.toUpperCase()} is not supported. Please select a different audio file.`
+                    );
+                    return;
+                }
+                
+                // Set the file
+                setAudioFile(file);
                 
                 // Show loading indicator while calculating duration
                 setUploading(true);
                 
                 try {
                     // Get duration with improved error handling
-                    const durationInSeconds = await getAudioDuration(res[0].uri);
+                    const durationInSeconds = await getAudioDuration(file.uri);
                     setDuration(durationInSeconds);
                     console.log('Calculated audio duration:', durationInSeconds);
                 } catch (durationError) {
@@ -470,24 +518,53 @@ const AudioVideoUploadScreen = () => {
             // Generate a secure unique ID for the audio file
             const audioID = generateAudioID();
             const audioName = file.name || `audio_${Date.now()}.mp3`;
-            const fileExtension = audioName.split('.').pop();
+            const fileExtension = getFileExtension(audioName);
             
-            // Create file path for Supabase storage
+            // Create file path for Supabase storage with original extension
             const filePath = `users/${uid}/audioFile/${audioID}.${fileExtension}`;
+            
+            // Verify file exists and is accessible
+            try {
+                const fileExists = await RNFS.exists(file.uri);
+                if (!fileExists) {
+                    throw new Error('File does not exist at the specified path');
+                }
+                
+                // Try to get file stats to ensure it's readable
+                const fileStats = await RNFS.stat(file.uri);
+                if (!fileStats || fileStats.size <= 0) {
+                    throw new Error('File appears to be empty or inaccessible');
+                }
+                
+                console.log('File validation passed:', {
+                    size: fileStats.size,
+                    lastModified: fileStats.mtime
+                });
+            } catch (fileError) {
+                throw new Error(`File validation failed: ${fileError.message}`);
+            }
             
             // Read the file as base64
             const fileContent = await RNFS.readFile(file.uri, 'base64');
             
-            // Upload to Supabase storage
+            // Determine content type from file or extension
+            const contentType = file.type || getMimeTypeFromExtension(fileExtension);
+            
+            // Upload to Supabase storage with original format
             const { data: uploadData, error: uploadError } = await supabase.storage
                 .from('user-uploads')
                 .upload(filePath, decode(fileContent), {
-                    contentType: file.type || 'audio/mpeg',
+                    contentType: contentType,
                     upsert: false
                 });
                 
             if (uploadError) {
-                throw new Error(`Upload error: ${uploadError.message}`);
+                console.error('Supabase storage upload error:', {
+                    message: uploadError.message,
+                    error: uploadError,
+                    statusCode: uploadError.statusCode
+                });
+                throw new Error(`Storage upload error: ${uploadError.message || 'Unknown error'}`);
             }
             
             // Get the public URL for the uploaded file
@@ -495,13 +572,13 @@ const AudioVideoUploadScreen = () => {
                 .from('user-uploads')
                 .getPublicUrl(filePath);
                 
-            // Save metadata to database - provide the audioid since the database requires it
+            // Save metadata to database with file format info
             const { data: metadataData, error: metadataError } = await supabase
                 .from('audio_metadata')
                 .insert([
                     {
                         uid,
-                        audioid: audioID, // Use the secure generated audioID
+                        audioid: audioID,
                         audio_name: audioName,
                         language: selectedLanguage,
                         audio_url: publicUrl,
@@ -512,6 +589,13 @@ const AudioVideoUploadScreen = () => {
                 ]);
                 
             if (metadataError) {
+                console.error('Supabase metadata insert error:', {
+                    message: metadataError.message,
+                    error: metadataError,
+                    code: metadataError.code,
+                    details: metadataError.details,
+                    hint: metadataError.hint
+                });
                 throw new Error(`Metadata error: ${metadataError.message}`);
             }
             
@@ -542,6 +626,9 @@ const AudioVideoUploadScreen = () => {
         } catch (error) {
             console.error('Upload error details:', {
                 message: error.message,
+                code: error.code,
+                details: error.details,
+                hint: error.hint,
                 file: file ? {
                     name: file.name,
                     type: file.type,
@@ -555,7 +642,7 @@ const AudioVideoUploadScreen = () => {
             
             Alert.alert(
                 'Error',
-                'Failed to upload file. Please try again.'
+                `Failed to upload file: ${error.message}. Please try again.`
             );
             setUploadData(null);
         } finally {
@@ -1236,16 +1323,17 @@ const AudioVideoUploadScreen = () => {
             <Text style={styles.popupText}>Upload Audio</Text>
             
             <View style={styles.languageSelector}>
-                <Text style={styles.languageLabel}>Select Language:</Text>
-                <Picker
-                    selectedValue={selectedLanguage}
-                    style={styles.picker}
-                    onValueChange={(itemValue) => setSelectedLanguage(itemValue)}
-                >
-                    {languages.map((lang) => (
-                        <Picker.Item key={lang.value} label={lang.label} value={lang.value} />
-                    ))}
-                </Picker>
+            <Text style={styles.languageLabel}>Select Language:</Text>
+    <Picker
+        selectedValue={selectedLanguage}
+        style={styles.picker}
+        itemStyle={styles.pickerItem}
+        onValueChange={(itemValue) => setSelectedLanguage(itemValue)}
+    >
+        {languages.map((lang) => (
+            <Picker.Item key={lang.value} label={lang.label} value={lang.value} />
+        ))}
+    </Picker>
             </View>
 
             <View style={styles.popupButtons}>
@@ -1264,13 +1352,22 @@ const AudioVideoUploadScreen = () => {
                     <Image source={coin} style={styles.detailIcon2} />
 
                     {uploading ? (
-                        <ActivityIndicator size="small" color="#0000ff" />
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                            <ActivityIndicator size="small" color="#0000ff" />
+                            <Text style={[styles.convert, {marginLeft: 5}]}>
+                                Uploading...
+                            </Text>
+                        </View>
                     ) : (
                         <Text style={styles.convert}>Convert</Text>
                     )}
 
                     <Image source={Translate} style={styles.detailIcon5} />
                 </TouchableOpacity>
+            </View>
+            
+            <View style={styles.formatInfo}>
+                <Text style={styles.formatInfoText}>Supported formats: WAV, MP3, M4A, AAC, OGG, FLAC</Text>
             </View>
         </View>
     </View>
@@ -1490,10 +1587,11 @@ color:'#000',
     searchBox2: {
         flexDirection: 'row',
         alignItems: 'center',
-      
+        alignSelf:'center',
+  
      
      
-        width: '100%',
+        width: '95%',
         height: 50,
     },
     searchIcon: {
@@ -1817,11 +1915,16 @@ color:'#000',
         fontSize: 16,
         marginBottom: 5,
         fontWeight: '500',
+        color: '#000000',
     },
     picker: {
         backgroundColor: '#f0f0f0',
         borderRadius: 8,
         marginTop: 5,
+        color: '#000000',
+    },
+    pickerItem: {
+        color: '#000000',
     },
     toastContainer: {
         position: 'absolute',
@@ -1862,7 +1965,25 @@ color:'#000',
     },
     infoToast: {
         backgroundColor: 'rgba(96, 165, 250, 0.95)', // Modern blue
-    }
+    },
+    errorText: {
+        color: 'red',
+        marginTop: 10,
+        textAlign: 'center',
+        fontSize: 14,
+    },
+    formatInfo: {
+        marginTop: 15,
+        padding: 8,
+        backgroundColor: '#f0f0f0',
+        borderRadius: 5,
+        alignItems: 'center',
+    },
+    formatInfoText: {
+        fontSize: 12,
+        color: '#666',
+        textAlign: 'center',
+    },
 });
 
 export default AudioVideoUploadScreen;

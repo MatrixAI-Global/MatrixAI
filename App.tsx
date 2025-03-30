@@ -82,6 +82,8 @@ import AirwallexProvider from './components/AirwallexProvider';
 // Import the LanguageProvider
 import { LanguageProvider } from './context/LanguageContext';
 import { getPreferredLanguage } from './utils/languageUtils';
+// Import the ThemeProvider
+import { ThemeProvider } from './context/ThemeContext';
 
 const Stack = createStackNavigator();
 
@@ -132,6 +134,7 @@ const App = () => {
             <AuthContext.Consumer>
                 {({ uid }: AuthContextType) => (
                     <>
+                        <ThemeProvider>
                         <LanguageProvider>
                         <ModalProvider>
                             <ProStatusProvider>
@@ -449,6 +452,7 @@ const App = () => {
                             </ProStatusProvider>
                         </ModalProvider>
                         </LanguageProvider>
+                        </ThemeProvider>
                     </>
                 )}
             </AuthContext.Consumer>
