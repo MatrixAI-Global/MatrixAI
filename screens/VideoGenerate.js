@@ -14,6 +14,7 @@ import DocumentPicker from 'react-native-document-picker';
 import { useNavigation } from '@react-navigation/native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuthUser } from '../hooks/useAuthUser';
 const audioIcon = require('../assets/mic3.png');
 const videoIcon = require('../assets/cliper.png');
 const backIcon = require('../assets/back.png');
@@ -34,7 +35,7 @@ const VideoUploadScreen = () => {
   const [descriptionModalVisible, setDescriptionModalVisible] = useState(false);  // Separate modal state
   const [uploading, setUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
-  const UID = '595dfce5-0898-4364-9046-0aa850190321';
+  const { uid } = useAuthUser();
   // Handle selecting an image file
     useEffect(() => {
           fetchImages();
@@ -54,7 +55,7 @@ const VideoUploadScreen = () => {
 const fetchImages = async (UID) => {
     try {
       // Use backticks (``) for template literals to correctly insert UID
-      const response = await fetch(`https://matrix-server.vercel.app/getImage?uid=595dfce5-0898-4364-9046-0aa850190321`);
+      const response = await fetch(`https://matrix-server.vercel.app/getImage?uid=${uid}`);
       const result = await response.json();
   
       if (response.ok) {
@@ -67,6 +68,7 @@ const fetchImages = async (UID) => {
         setFiles(imageList); // Assuming `setFiles` is a state setter
       } else {
         console.error('Failed to fetch images:', result);
+        setFiles([]);
       }
     } catch (error) {
       console.error('Error fetching images:', error);
@@ -213,28 +215,29 @@ const fetchImages = async (UID) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.headerIcon} onPress={() => navigation.goBack()}>
-          <Image
-            source={require('../assets/back.png')}
-            style={styles.headerIcon}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Matrix AI</Text>
-        <TouchableOpacity>
-          <Image source={helpIcon} style={styles.headerIcon} />
-        </TouchableOpacity>
-      </View>
+     
+     <View style={styles.header3}>
+           <Image source={require('../assets/logo12.png')} style={styles.headerIcon2} />
+           </View>
+          
+            <View style={styles.topButtonsContainer}>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+                                   <Image
+                                       source={require('../assets/back.png')} 
+                                       style={styles.headerIcon}
+                                   />
+                               </TouchableOpacity>
+                <TouchableOpacity style={styles.topButton} onPress={handleFileSelect}>
+                    <Image source={uploadIcon} style={styles.topIcon} />
+                </TouchableOpacity>
+              
+                <View style={styles.topHelp}>
+                    <Image source={helpIcon2} style={styles.topHelpIcon} />
+                    <Text style={styles.helpText}>How to add voice memos to Transcribe</Text>
+                </View>
+            </View>
 
-      <View style={styles.topButtonsContainer}>
-        <TouchableOpacity style={styles.topButton} onPress={handleFileSelect}>
-          <Image source={uploadIcon} style={styles.topIcon} />
-        </TouchableOpacity>
-        <View style={styles.topHelp}>
-          <Image source={helpIcon2} style={styles.topHelpIcon} />
-          <Text style={styles.helpText}>How to add voice memos to Generate</Text>
-        </View>
-      </View>
+    
 
       <View style={styles.searchBox2}>
         <View style={styles.searchBox}>
@@ -321,6 +324,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     height: '88%',
 },
+backButton: {
+  padding: 8,
+  borderRadius: 20,
+  borderWidth: 1,
+  borderColor: '#E0E0E0',
+  marginRight:10,
+},
+headerIcon: {
+  width: 24,
+  height: 24,
+  resizeMode: 'contain',
+},
+header3:{
+   
+  alignItems:'center',
+  alignSelf:'center',
+marginTop:-25,
+marginBottom:-20,
+ 
+  width:'100%',
+  
+ },
+ headerIcon2: {
+  width: 250,
+  height: 80,
+  alignSelf:'center',
+  resizeMode: 'contain',
+},
 actionButton1: {
     backgroundColor: '#298EF9FF',
     borderRadius: 20,
@@ -398,12 +429,6 @@ actionIcon: {
     fontSize: 12,
     flexShrink: 1,
   },
-  searchBox2: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-    height: 50,
-  },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -414,8 +439,18 @@ actionIcon: {
     backgroundColor: '#fff',
     width: '90%',
     height: 40,
-    marginLeft: 5,
-  },
+    marginLeft:5,
+},
+searchBox2: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf:'center',
+
+ 
+ 
+    width: '95%',
+    height: 50,
+},
   searchIcon: {
     width: 20,
     height: 20,

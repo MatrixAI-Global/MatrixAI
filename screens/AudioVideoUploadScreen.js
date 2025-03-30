@@ -1222,6 +1222,7 @@ const AudioVideoUploadScreen = () => {
     return (
         <SafeAreaView style={styles.container}>
             {/* Header Section */}
+
            
           
              <View style={styles.header3}>
@@ -1229,10 +1230,10 @@ const AudioVideoUploadScreen = () => {
            </View>
           
             <View style={styles.topButtonsContainer}>
-            <TouchableOpacity style={styles.headerIcon3} onPress={() => navigation.goBack()}>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
                                    <Image
                                        source={require('../assets/back.png')} 
-                                       style={styles.headerIcon3}
+                                       style={styles.headerIcon}
                                    />
                                </TouchableOpacity>
                 <TouchableOpacity style={styles.topButton} onPress={handleFileSelect}>
@@ -1500,7 +1501,7 @@ const styles = StyleSheet.create({
     },
     deleteAllButtonText: {
         color: '#fff',
-        fontSize: 16,
+        fontSize: 12,
         fontWeight: 'bold',
     },
     
@@ -1553,6 +1554,18 @@ color:'#000',
         padding: 20,
         marginTop: 100, // Adjust this value to position the empty state below search box
     },
+    backButton: {
+        padding: 8,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+        marginRight:10,
+      },
+      headerIcon: {
+        width: 24,
+        height: 24,
+        resizeMode: 'contain',
+      },
     emptyImage: {
         width: 200,
         height: 200,

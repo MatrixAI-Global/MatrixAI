@@ -4,17 +4,18 @@ import Clipboard from '@react-native-clipboard/clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../supabaseClient';
 import { useAuthUser } from '../../hooks/useAuthUser';
-
+import { useCoinsSubscription } from '../../hooks/useCoinsSubscription';
 const ReferralScreen = ({ navigation }) => {
   const { uid } = useAuthUser();
+  const coinCount = useCoinsSubscription(uid);
   const [referralCode, setReferralCode] = useState('');
   const [loading, setLoading] = useState(true);
-  const [coins, setCoins] = useState(0);
+
 
   useEffect(() => {
     if (uid) {
       fetchReferralCode();
-      fetchCoins();
+    
     }
   }, [uid]);
 
@@ -88,27 +89,6 @@ const ReferralScreen = ({ navigation }) => {
     }
   };
 
-  const fetchCoins = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('coins')
-        .eq('uid', uid)
-        .single();
-
-      if (error) {
-        console.error('Error fetching coins:', error);
-        return;
-      }
-
-      if (data) {
-        setCoins(data.coins || 0);
-      }
-    } catch (error) {
-      console.error('Error:', error);
-    }
-  };
-
   const copyToClipboard = () => {
     Clipboard.setString(referralCode);
     Alert.alert('Copied!', 'Referral code copied to clipboard.');
@@ -127,14 +107,14 @@ const ReferralScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       {/* Back Button */}
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <Image source={require('../../assets/back.png')} style={styles.backIcon} />
-            </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                <Image source={require('../../assets/back.png')} style={styles.backIcon} />
+              </TouchableOpacity>
 
       {/* Blue Area */}
       <View style={styles.blueArea}>
         <Text style={styles.header}>Refer Your Friends</Text>
-        <Text style={styles.subHeader}>Get 25 coins for each Invite</Text>
+        <Text style={styles.subHeader}>Get 50 coins for each Invite</Text>
       </View>
 
       {/* Coin Box Overlapping Blue and White Areas */}
@@ -143,7 +123,7 @@ const ReferralScreen = ({ navigation }) => {
           <Image source={require('../../assets/coin.png')} style={styles.coinIcon} />
           <View style={styles.coinBox2}>
           <Text style={styles.coinText}>Total Coins</Text>
-          <Text style={styles.coinAmount}>{coins}</Text>
+          <Text style={styles.coinAmount}>{coinCount}</Text>
           </View>
         </View>
       </View>
@@ -161,8 +141,8 @@ const ReferralScreen = ({ navigation }) => {
           <View style={styles.instructionRow}>
             <Image source={require('../../assets/gift-icon.png')} style={styles.icon} />
             <Text style={styles.instructionText}>
-              When your friend signs up, you will get <Text style={styles.highlight}>25 coins</Text> and they will get{' '}
-              <Text style={styles.highlight}>15 coins</Text>
+              When your friend signs up, you will get <Text style={styles.highlight}>50 coins</Text> and they will get{' '}
+              <Text style={styles.highlight}>50 coins</Text>
             </Text>
           </View>
         </View>
@@ -197,14 +177,22 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    top: 70,
-    left: 10,
+    top: 50,
+    left: 20,
     zIndex: 10,
+    width: 35,
+    height: 35,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderColor: '#E0E0E0',
   },
   backIcon: {
     width: 24,
     height: 24,
     tintColor: '#fff',
+
   },
   blueArea: {
     backgroundColor: '#2158AB',

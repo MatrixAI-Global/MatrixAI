@@ -63,7 +63,7 @@ import SettingsScreen from './screens/SettingsScreen.js';
 import CallScreen from './screens/CallScreen.js';
 
 import LiveTranscriptionScreen from './screens/LiveTranscriptionScreen.js';
-import AudioRecordScreen from './screens/AudioRecordScreen.js';
+
 import EmailLoginScreen from './screens/EmailLoginScreen.js';
 import TermsOfServiceScreen from './screens/TermsOfServiceScreen.js';
 import PrivacyPolicyScreen from './screens/PrivacyPolicyScreen.js';
@@ -399,11 +399,7 @@ const App = () => {
                                         component={LiveTranscriptionScreen} 
                                         options={{ headerShown: false }} 
                                     />
-                                    <Stack.Screen 
-                                        name="AudioRecordScreen" 
-                                        component={AudioRecordScreen} 
-                                        options={{ headerShown: false }} 
-                                    />
+                                 
                                   
                                     <Stack.Screen 
                                         name="BUYSubscription" 

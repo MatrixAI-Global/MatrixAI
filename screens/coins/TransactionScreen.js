@@ -78,8 +78,8 @@ const TransactionScreen = ({ route, navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       {/* Back button */}
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <Image source={require('../../assets/back.png')} style={styles.backIcon} />
+      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <Image source={require('../../assets/back.png')} style={styles.headerIcon} />
       </TouchableOpacity>
 
       {/* Header with full background */}
@@ -152,19 +152,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   backButton: {
-    position: 'absolute',
-    top: 90,
-    left: 10,
+    padding: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
     zIndex: 1,
+    borderColor: '#E0E0E0',
   },
-  backIcon: {
-    width: 30,
-    height: 30,
+  headerIcon: {
+    width: 24,
+    height: 24,
+    resizeMode: 'contain',
   },
   header: {
     position: 'relative',
     height: 200,
     marginBottom: 40,
+    marginTop: -40,
   },
   headerImage: {
     width: '105%',

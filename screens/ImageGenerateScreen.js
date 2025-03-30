@@ -7,7 +7,8 @@ import {
   TextInput,
   Image,
   Animated,
-  Easing
+  Easing,
+  KeyboardAvoidingView
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -74,12 +75,12 @@ const ImageGenerateScreen = () => {
   {/* Header Animation */}
  
   <Animated.View style={[styles.header, { transform: [{ scale: scaleAnim }] }]}>
-             <TouchableOpacity style={styles.headerIcon} onPress={() => navigation.goBack()}>
-                                 <Image
-                                     source={require('../assets/back.png')} 
-                                     style={styles.headerIcon}
-                                 />
-                             </TouchableOpacity>
+  <TouchableOpacity 
+          style={[styles.backButton]} 
+          onPress={() => navigation.goBack()}
+        >
+          <Image source={require('../assets/back.png')} style={[styles.headerIcon]} />
+        </TouchableOpacity>
               <Text style={styles.headerTitle}>Matrix AI</Text>
             
           </Animated.View>
@@ -250,6 +251,18 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginTop: 2, // Align "-1" or "-4" below the icon
   },
+
+  backButton: {
+    padding: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  headerIcon: {
+    width: 24,
+    height: 24,
+    resizeMode: 'contain',
+  },
   tryAgainText: {
     fontSize: 16,
     color: '#000',
@@ -267,10 +280,11 @@ const styles = StyleSheet.create({
   },
   textInputContainer: {
     position: 'absolute',
-    bottom: 20,
+    bottom: -50,
     flexDirection: 'row',
     alignItems: 'center',
     width: '90%',
+    alignSelf:'center',
     backgroundColor: '#F9F9F9',
     borderRadius: 25,
     paddingVertical: 10,

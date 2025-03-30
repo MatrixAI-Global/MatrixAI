@@ -1980,8 +1980,8 @@ const BotScreen = ({ navigation, route }) => {
       
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <MaterialIcons name="arrow-back-ios" size={24} color="#000" style={styles.headerIcon} />
+        <TouchableOpacity style={styles.backButton2} onPress={() => navigation.goBack()}>
+         <Image source={require('../assets/back.png')} style={styles.headerIcon3} />
         </TouchableOpacity>
         <Image source={require('../assets/Avatar/Cat.png')} style={styles.botIcon} />
         <View style={styles.headerTextContainer}>
@@ -2251,6 +2251,13 @@ const styles = StyleSheet.create({
     alignItems:'center',
     borderRadius:15,
   },
+  backButton2: {
+    padding: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    marginRight:10,
+  },
   backIcon: {
     width: 24,
     height: 24,
@@ -2271,10 +2278,16 @@ const styles = StyleSheet.create({
   headerIcon: {
     width: 30,
     height: 30,
-    marginHorizontal: 5,
+    resizeMode: 'contain',
+   
   },
   headerIcon2: {
     marginHorizontal: 5,
+  },
+  headerIcon3: {
+    width: 24,
+    height: 24,
+    resizeMode: 'contain',
   },
   keyboardAvoidingView: {
     position: 'absolute',

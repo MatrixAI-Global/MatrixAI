@@ -7,7 +7,8 @@ import {
   TextInput,
   Image,
   Animated,
-  Easing
+  Easing,
+  KeyboardAvoidingView
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -75,12 +76,9 @@ const PPTGenerateScreen = () => {
       {/* Header Animation */}
   
       <Animated.View style={[styles.header, { transform: [{ scale: scaleAnim }] }]}>
-          <TouchableOpacity style={styles.headerIcon} onPress={() => navigation.goBack()}>
-                                       <Image
-                                           source={require('../assets/back.png')} 
-                                           style={styles.headerIcon}
-                                       />
-                                   </TouchableOpacity>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>  
+            <Image source={require('../assets/back.png')} style={styles.backIcon} />
+          </TouchableOpacity>
                     <Text style={styles.headerTitle}>Matrix AI</Text>
       </Animated.View>
     {!isFinished && (
@@ -113,7 +111,11 @@ const PPTGenerateScreen = () => {
        ))}
      </View>
       )}
-
+   <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardAvoidingView}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+      >
       {/* Text Input */}
       {!isFinished && (
         <View style={styles.textInputContainer}>
@@ -134,7 +136,7 @@ const PPTGenerateScreen = () => {
           </TouchableOpacity>
         </View>
       )}
-
+      </KeyboardAvoidingView>
       {/* Generate Button */}
       {isFinished && (
         <View style={styles.buttonContainer}>
@@ -188,12 +190,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
+  headerTitle:{
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#000',
+    marginLeft: 10,
+  },
   selectionContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
     marginVertical: 20,
     width: '100%',
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    marginRight:10,
+  },
+  backIcon: {
+    width: 24,
+    height: 24,
+    resizeMode: 'contain',
   },
   rectangle: {
     width: '45%',  
@@ -215,10 +235,11 @@ const styles = StyleSheet.create({
   },
   textInputContainer: {
     position: 'absolute',
-    bottom: 20,
+    bottom: -50,
     flexDirection: 'row',
     alignItems: 'center',
     width: '90%',
+    alignSelf:'center',
     backgroundColor: '#F9F9F9',
     borderRadius: 25,
     paddingVertical: 10,

@@ -27,7 +27,8 @@ import RNFS from 'react-native-fs';
 import 'react-native-get-random-values';
 import axios from 'axios';
 import { PERMISSIONS, request, check, RESULTS, openSettings } from 'react-native-permissions';
-
+import { supabase } from '../supabaseClient';
+import { useAuthUser } from '../hooks/useAuthUser';
 // Global refs
 let dataSubscription = null;
 let websocketConnection = null;
@@ -79,6 +80,46 @@ const createWavFile = (pcmData, sampleRate = 16000, bitsPerSample = 16, channels
   return wavBuffer;
 };
 
+// Add this helper function after all imports and before any other functions
+// Utility function to normalize file paths across platforms
+const normalizeFilePath = (filePath) => {
+  if (!filePath) return null;
+  
+  // Handle iOS symlinks and double prefixing issues
+  if (Platform.OS === 'ios') {
+    // Remove double prefixing if it exists
+    if (filePath.includes('/Documents//var/mobile/')) {
+      // Replace the double prefix with just the DocumentDirectoryPath
+      return filePath.replace(
+        /^\/var\/mobile\/.*Documents\/\/var\/mobile\/.*Documents\//,
+        `${RNFS.DocumentDirectoryPath}/`
+      );
+    }
+    
+    // Handle /private prefix (symlink in iOS)
+    if (filePath.startsWith('/private/')) {
+      return filePath.replace(/^\/private/, '');
+    }
+  }
+  
+  return filePath;
+};
+
+// Now use this function throughout the code when handling file paths
+
+// Helper to check if a file exists with proper error handling
+const fileExists = async (path) => {
+  if (!path) return false;
+  
+  try {
+    const normalizedPath = normalizeFilePath(path);
+    return await RNFS.exists(normalizedPath);
+  } catch (error) {
+    console.error('Error checking if file exists:', error);
+    return false;
+  }
+};
+
 const LiveTranscriptionScreen = ({ navigation }) => {
   // State for recording
   const [recording, setRecording] = useState(false);
@@ -95,12 +136,24 @@ const LiveTranscriptionScreen = ({ navigation }) => {
   const [transcription, setTranscription] = useState('');
   const [error, setError] = useState(null);
   
+  // Additional states for pause/resume functionality
+  const [isPaused, setIsPaused] = useState(false);
+  const [showActionButtons, setShowActionButtons] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isStartingRecording, setIsStartingRecording] = useState(false);
+  
   // Refs
   const audioChunksRef = useRef([]);
   const timerRef = useRef(null);
   const sequenceNumber = useRef(0);
   const connectIdRef = useRef(uuidv4());
   const soundRef = useRef(null);
+  
+  // Reference to hold the paused state of the websocket
+  const websocketPausedRef = useRef(false);
+  
+  // Reference to temporarily store audio data while paused
+  const pausedAudioBufferRef = useRef([]);
 
   // Add new state variables for translation features
   const [isTranslateMode, setIsTranslateMode] = useState(false);
@@ -109,15 +162,11 @@ const LiveTranscriptionScreen = ({ navigation }) => {
   const [translatedText, setTranslatedText] = useState('');
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [editingLanguage, setEditingLanguage] = useState('source');
-  const [isStartingRecording, setIsStartingRecording] = useState(false);
-  const [showActionButtons, setShowActionButtons] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [circleAnimation] = useState(new Animated.Value(0));
   const [pulseAnimation] = useState(new Animated.Value(1));
   const [slideAnimation] = useState(new Animated.Value(300));
-  const [isUploading, setIsUploading] = useState(false);
-
+  const { uid, loading } = useAuthUser();
   // Add language codes and other constants
   const languageCodes = {
     Afrikaans: 'af',
@@ -259,7 +308,16 @@ const LiveTranscriptionScreen = ({ navigation }) => {
   // Add timerIdsRef after other refs
   const timerIdsRef = useRef([]);
 
+  const [loadingAudioIds, setLoadingAudioIds] = useState(new Set());
+ 
+
+  // Add this to your state variables near the top where other state variables are defined
+  const [selectedLanguageForUpload, setSelectedLanguageForUpload] = useState('en-US');
+
   useEffect(() => {
+    // Initialize uid - in a real app this would come from authentication
+
+    
     // Initialize
     const setup = async () => {
       // For iOS, bypass permission check
@@ -372,7 +430,16 @@ const LiveTranscriptionScreen = ({ navigation }) => {
       
       // Create a unique path for each recording to avoid conflicts
       const recordingId = Date.now().toString();
-      const tempFilePath = `${RNFS.DocumentDirectoryPath}/recording_${recordingId}.wav`;
+      
+      // Ensure we have a clean, standardized path for iOS to avoid double prefixing
+      let tempFilePath;
+      if (Platform.OS === 'ios') {
+        // Use RNFS.DocumentDirectoryPath directly instead of constructing the path
+        tempFilePath = `${RNFS.DocumentDirectoryPath}/recording_${recordingId}.wav`;
+        console.log('iOS recording path:', tempFilePath);
+      } else {
+        tempFilePath = `${RNFS.DocumentDirectoryPath}/recording_${recordingId}.wav`;
+      }
       
       // Options optimized for both platforms
       const options = {
@@ -381,7 +448,7 @@ const LiveTranscriptionScreen = ({ navigation }) => {
         bitsPerSample: 16,  // 16-bit
         audioSource: Platform.OS === 'android' ? 6 : 0,  // MIC source type
         // Set a clear, unique file path for each recording
-        wavFile: tempFilePath,
+        wavFile: Platform.OS === 'ios' ? `recording_${recordingId}.wav` : tempFilePath,
         // Add buffer size configuration - important for iOS
         bufferSize: Platform.OS === 'ios' ? 4096 : 8192,
       };
@@ -538,8 +605,11 @@ const LiveTranscriptionScreen = ({ navigation }) => {
       clearInterval(timerRef.current);
     }
     
-    setRecordingTime(0);
-    const startTime = Date.now();
+    // Start from stored duration if resuming, otherwise from 0
+    const initialTime = isPaused ? recordingDuration : 0;
+    setRecordingTime(initialTime);
+    
+    const startTime = Date.now() - (initialTime * 1000); // Adjust start time for resuming
     
     timerRef.current = setInterval(() => {
       const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
@@ -562,6 +632,8 @@ const LiveTranscriptionScreen = ({ navigation }) => {
         console.log('No permission to record');
         return;
       }
+      
+      setIsStartingRecording(true);
       
       // Reset for new recording
       setTranscription('');
@@ -597,6 +669,7 @@ const LiveTranscriptionScreen = ({ navigation }) => {
           'Could not initialize audio recorder. Please try again.',
           [{ text: 'OK' }]
         );
+        setIsStartingRecording(false);
         return;
       }
       
@@ -605,10 +678,13 @@ const LiveTranscriptionScreen = ({ navigation }) => {
       try {
         AudioRecord.start();
         setRecording(true);
+        setShowActionButtons(true); // Show action buttons when recording starts
         startTimer();
         
         // Start pulse animation
         startPulseAnimation();
+        
+        setIsStartingRecording(false);
       } catch (err) {
         console.error('Error starting recording:', err);
         setError(`Could not start recording: ${err.message}`);
@@ -617,16 +693,502 @@ const LiveTranscriptionScreen = ({ navigation }) => {
           'Could not start recording. Please try again.',
           [{ text: 'OK' }]
         );
+        setIsStartingRecording(false);
       }
     } catch (error) {
       console.error('Error in startRecording:', error);
       setError(`Start recording error: ${error.message}`);
+      setIsStartingRecording(false);
+    }
+  };
+
+  const pauseRecording = async () => {
+    if (!recording || isPaused) return;
+    
+    try {
+      console.log('Pausing recording...');
+      
+      // Set paused state
+      setIsPaused(true);
+      websocketPausedRef.current = true;
+      
+      // Pause data collection
+      if (dataSubscription) {
+        dataSubscription.remove();
+        dataSubscription = null;
+      }
+      
+      // Pause timer
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      
+      // Store current recording duration
+      setRecordingDuration(recordingTime);
+      
+      // Stop animation
+      stopPulseAnimation();
+      
+      // On iOS, actually stop the recorder but don't reset state
+      if (Platform.OS === 'ios') {
+        try {
+          // Save current file path
+          const tempPath = await AudioRecord.stop();
+          console.log('Raw paused recording path:', tempPath);
+          
+          // Normalize the path before storing
+          const normalizedPath = normalizeFilePath(tempPath);
+          console.log('Normalized paused recording path:', normalizedPath);
+          
+          // Store normalized path
+          pausedAudioBufferRef.current.push(normalizedPath);
+          
+          // Verify the file exists
+          const exists = await fileExists(normalizedPath);
+          if (exists) {
+            console.log('Paused recording exists at path:', normalizedPath);
+          } else {
+            console.error('Paused recording file not found at:', normalizedPath);
+            // Try with the original path as fallback
+            const originalExists = await fileExists(tempPath);
+            if (originalExists) {
+              console.log('Paused recording found at original path:', tempPath);
+              pausedAudioBufferRef.current.push(tempPath);
+            }
+          }
+        } catch (error) {
+          console.error('Error pausing recording on iOS:', error);
+        }
+      } else {
+        // For Android, we can just stop collecting data by removing the listener
+        console.log('Paused recording on Android');
+      }
+    } catch (error) {
+      console.error('Error pausing recording:', error);
+      setError(`Pause recording error: ${error.message}`);
+    }
+  };
+
+  const resumeRecording = async () => {
+    if (!recording || !isPaused) return;
+    
+    try {
+      console.log('Resuming recording...');
+      
+      // Resume recording
+      if (Platform.OS === 'ios') {
+        // Re-initialize with a fresh file
+        await initializeAudioRecorder();
+        AudioRecord.start();
+      }
+      
+      // Re-setup listener
+      setupAudioListener();
+      
+      // Resume timer with existing duration
+      startTimer();
+      
+      // Resume animation
+      startPulseAnimation();
+      
+      // Mark as no longer paused
+      setIsPaused(false);
+      websocketPausedRef.current = false;
+    } catch (error) {
+      console.error('Error resuming recording:', error);
+      setError(`Resume recording error: ${error.message}`);
+    }
+  };
+
+  const deleteRecording = async () => {
+    try {
+      console.log('Deleting recording...');
+      
+      // Stop recording regardless of pause state
+      await AudioRecord.stop();
+      
+      // Clean up any existing subscription
+      if (dataSubscription) {
+        dataSubscription.remove();
+        dataSubscription = null;
+      }
+      
+      // Reset all recording state
+      setRecording(false);
+      setIsPaused(false);
+      setShowActionButtons(false);
+      stopTimer();
+      setRecordingTime(0);
+      setTranscription('Press Mic to start listening');
+      stopPulseAnimation();
+      
+      // Clear stored paths
+      pausedAudioBufferRef.current = [];
+      audioChunksRef.current = [];
+      setAudioPath(null);
+      
+      // Close WebSocket
+      if (websocketConnection) {
+        websocketConnection.close();
+        websocketConnection = null;
+        setIsConnected(false);
+      }
+      
+      console.log('Recording deleted');
+      
+      // Optionally delete the actual file
+      if (audioPath) {
+        try {
+          const exists = await RNFS.exists(audioPath);
+          if (exists) {
+            await RNFS.unlink(audioPath);
+            console.log('Deleted file:', audioPath);
+          }
+        } catch (fileError) {
+          console.error('Error deleting file:', fileError);
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting recording:', error);
+      setError(`Delete recording error: ${error.message}`);
+    }
+  };
+
+  // Helper function to check if user has enough coins for recording duration
+  const checkUserCoins = async (userId, duration) => {
+    // This would be an API call to your backend to check coin balance
+    // For now we'll simulate by always returning true
+    console.log('Checking coins for user:', userId, 'Duration:', duration);
+    return true;
+  };
+
+  // Helper function for decoding base64 strings
+  const decode = (base64String) => {
+    return Buffer.from(base64String, 'base64');
+  };
+
+  const saveRecording = async () => {
+    try {
+      // First pause if not already paused
+      if (!isPaused) {
+        await pauseRecording();
+      }
+      
+      setIsUploading(true);
+      
+      // Use the currently selected language for upload
+      // Default to English if using translate mode
+      const uploadLanguage = isTranslateMode ? 
+        uploadLanguageCodes[selectedLanguage] || 'en-US' : 
+        'en-US'; // Default to English
+        
+      setSelectedLanguageForUpload(uploadLanguage);
+      
+      // Stop the recording to finalize the file
+      console.log('Finalizing recording for save...');
+      const filePath = await stopRecording();
+      
+      if (!filePath) {
+        throw new Error('Failed to save audio recording');
+      }
+      
+      console.log('Audio file to upload:', filePath);
+      
+      // Check file existence one more time before uploading
+      const fileExistsResult = await fileExists(filePath);
+      if (!fileExistsResult) {
+        console.error('File not found before upload:', filePath);
+        throw new Error(`File not found at path: ${filePath}`);
+      }
+      
+      // Check if user has enough coins
+      const hasEnoughCoins = await checkUserCoins(uid, recordingTime);
+      
+      if (!hasEnoughCoins) {
+        setIsUploading(false);
+        Alert.alert(
+          'Insufficient Coins',
+          'You don\'t have enough coins to process this audio. Please recharge.',
+          [
+            {
+              text: 'Recharge Now',
+              onPress: () => navigation.navigate('TransactionScreen')
+            },
+            {
+              text: 'Cancel',
+              style: 'cancel'
+            }
+          ]
+        );
+        return;
+      }
+      
+      // Upload the audio file with the path that is confirmed to exist
+      await uploadAudioFile(filePath, recordingTime);
+      
+      // Reset states after successful upload
+      setRecording(false);
+      setIsPaused(false);
+      setShowActionButtons(false);
+      setTranscription('Press Mic to start listening');
+      setRecordingTime(0);
+    } catch (error) {
+      console.error('Error saving recording:', error);
+      Alert.alert('Error', 'Failed to save recording: ' + error.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const uploadAudioFile = async (filePath, duration) => {
+    try {
+      console.log('Uploading audio file:', filePath, 'Duration:', duration);
+      
+      if (!filePath) {
+        Alert.alert('Error', 'No file selected');
+        return;
+      }
+      
+      // Check if user has enough coins
+      const hasEnoughCoins = await checkUserCoins(uid, duration);
+      
+      if (!hasEnoughCoins) {
+        setIsUploading(false);
+        Alert.alert(
+          'Insufficient Coins',
+          'You don\'t have enough coins to process this audio. Please recharge.',
+          [
+            {
+              text: 'Recharge Now',
+              onPress: () => navigation.navigate('TransactionScreen')
+            },
+            {
+              text: 'Cancel',
+              style: 'cancel'
+            }
+          ]
+        );
+        return;
+      }
+
+      // Create a file object to match the expected structure
+      const file = {
+        uri: filePath,
+        name: `recording_${Date.now()}.wav`,
+        type: 'audio/wav'
+      };
+
+      try {
+        // Verify file exists before proceeding
+        const fileExists = await RNFS.exists(file.uri);
+        if (!fileExists) {
+          throw new Error(`File does not exist at path: ${file.uri}`);
+        }
+
+        // Generate a secure unique ID for the audio file
+        const audioID = generateAudioID();
+        const audioName = file.name || `audio_${Date.now()}.wav`;
+        const fileExtension = 'wav'; // Always use wav for recordings
+        
+        // Create file path for Supabase storage with original extension
+        const filePath = `users/${uid}/audioFile/${audioID}.${fileExtension}`;
+        
+        // Verify file exists and is accessible
+        try {
+          const fileExists = await RNFS.exists(file.uri);
+          if (!fileExists) {
+            throw new Error('File does not exist at the specified path');
+          }
+          
+          // Try to get file stats to ensure it's readable
+          const fileStats = await RNFS.stat(file.uri);
+          if (!fileStats || fileStats.size <= 0) {
+            throw new Error('File appears to be empty or inaccessible');
+          }
+          
+          console.log('File validation passed:', {
+            size: fileStats.size,
+            lastModified: fileStats.mtime
+          });
+        } catch (fileError) {
+          throw new Error(`File validation failed: ${fileError.message}`);
+        }
+        
+        // Read the file as base64
+        const fileContent = await RNFS.readFile(file.uri, 'base64');
+        
+        // Determine content type from file or extension
+        const contentType = file.type || getMimeTypeFromExtension(fileExtension);
+        
+        // Upload to Supabase storage with original format
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('user-uploads')
+          .upload(filePath, decode(fileContent), {
+            contentType: contentType,
+            upsert: false
+          });
+          
+        if (uploadError) {
+          console.error('Supabase storage upload error:', {
+            message: uploadError.message,
+            error: uploadError,
+            statusCode: uploadError.statusCode
+          });
+          throw new Error(`Storage upload error: ${uploadError.message || 'Unknown error'}`);
+        }
+        
+        // Get the public URL for the uploaded file
+        const { data: { publicUrl } } = supabase.storage
+          .from('user-uploads')
+          .getPublicUrl(filePath);
+          
+        // Save metadata to database with file format info
+        const { data: metadataData, error: metadataError } = await supabase
+          .from('audio_metadata')
+          .insert([
+            {
+              uid,
+              audioid: audioID,
+              audio_name: audioName,
+              language: selectedLanguageForUpload,
+              audio_url: publicUrl,
+              file_path: filePath,
+              duration: parseInt(duration, 10),
+              uploaded_at: new Date().toISOString(),
+            }
+          ]);
+          
+        if (metadataError) {
+          console.error('Supabase metadata insert error:', {
+            message: metadataError.message,
+            error: metadataError,
+            code: metadataError.code,
+            details: metadataError.details,
+            hint: metadataError.hint
+          });
+          throw new Error(`Metadata error: ${metadataError.message}`);
+        }
+        
+        // Success handling - but no need to show toast as that's handled elsewhere
+        
+        // Add a longer delay before navigating to ensure everything is processed
+        setTimeout(() => {
+          // Navigate to translation screen with the generated audioid
+          handlePress({ audioid: audioID });
+        }, 1500);
+        
+        return audioID;
+      } catch (error) {
+        console.error('Upload error details:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+          file: {
+            name: file.name,
+            type: file.type,
+            uri: file.uri
+          }
+        });
+        
+        Alert.alert(
+          'Error',
+          `Failed to upload file: ${error.message}. Please try again.`
+        );
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error in uploadAudioFile:', error);
+      Alert.alert('Error', 'Failed to save recording: ' + error.message);
+      throw error;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Add helper functions
+  const generateAudioID = () => {
+    return uuidv4();
+  };
+
+  const getFileExtension = (filename) => {
+    return filename.split('.').pop().toLowerCase();
+  };
+
+  const getMimeTypeFromExtension = (extension) => {
+    const mimeTypes = {
+      'wav': 'audio/wav',
+      'mp3': 'audio/mpeg',
+      'm4a': 'audio/m4a',
+      'aac': 'audio/aac',
+      'ogg': 'audio/ogg',
+    };
+    return mimeTypes[extension] || 'application/octet-stream';
+  };
+
+  const handlePress = async ({ audioid }) => {
+    try {
+      setLoadingAudioIds(prev => new Set(prev).add(audioid)); // Set loading for this audioid
+      console.log('audioid:', audioid, 'uid:', uid);
+      console.log('Types:', typeof audioid, typeof uid);
+  
+      // Create a proper JSON object for the request body
+      const requestBody = JSON.stringify({
+        uid: String(uid),
+        audioid: String(audioid)
+      });
+
+      console.log('Request body:', requestBody);
+
+      const response = await fetch('https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/convertAudio', {
+        method: 'POST',
+        headers: { 
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: requestBody
+      });
+
+      // Log the raw response for debugging
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
+
+      // Parse the response text as JSON
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+        Alert.alert('Error', 'Invalid response from server. Please try again later.');
+        return;
+      }
+
+      if (response.ok && data.message === "Transcription completed and saved") {
+        navigation.navigate('TranslateScreen2', {
+          uid,
+          audioid,
+          transcription: data.transcription,
+          audio_url: data.audio_url
+        });
+      } else {
+        console.error('API Error:', data);
+        Alert.alert('Error', `Failed to process audio: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Network Error:', error);
+      Alert.alert('Error', 'Network error occurred. Please check your connection.');
+    } finally {
+      setLoadingAudioIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(audioid); // Remove loading for this audioid
+        return newSet;
+      });
     }
   };
 
   const stopRecording = async () => {
     try {
-      if (!recording) return;
+      if (!recording) return null;
       
       // Clear any timers
       if (timerIdsRef.current && timerIdsRef.current.length > 0) {
@@ -639,53 +1201,79 @@ const LiveTranscriptionScreen = ({ navigation }) => {
       
       // Stop recording
       console.log('Stopping recording...');
-      const audioFile = await AudioRecord.stop();
+      let audioFile = await AudioRecord.stop();
+      console.log('Raw file path from stop recording:', audioFile);
+      
+      // Normalize the path to avoid file not found errors
+      const normalizedAudioFile = normalizeFilePath(audioFile);
+      console.log('Normalized file path:', normalizedAudioFile);
+      
       setRecording(false);
       stopTimer();
       
       // Save the audio file path
-      setAudioPath(audioFile);
-      console.log('Final audio file saved to:', audioFile);
+      setAudioPath(normalizedAudioFile);
+      console.log('Final audio file saved to:', normalizedAudioFile);
 
-      // Send the complete audio file to the WebSocket
-      if (isConnected && websocketConnection && websocketConnection.readyState === WebSocket.OPEN) {
-        try {
-          // Read the final file that includes all audio
-          console.log('Reading audio file for final processing...');
-          const fileExists = await RNFS.exists(audioFile);
+      // Verify the file exists at the normalized path
+      const normalizedExists = await fileExists(normalizedAudioFile);
+      if (!normalizedExists) {
+        console.error('File does not exist at normalized path:', normalizedAudioFile);
+        
+        // Try with the original path as a fallback
+        const originalExists = await fileExists(audioFile);
+        if (originalExists) {
+          console.log('Found file at original path:', audioFile);
+          setAudioPath(audioFile);
           
-          if (fileExists) {
-            const fileStats = await RNFS.stat(audioFile);
-            console.log('Audio file size:', fileStats.size, 'bytes');
-            
-            if (fileStats.size > 44) { // WAV header is 44 bytes
-              const wavData = await RNFS.readFile(audioFile, 'base64');
-              const wavBuffer = Buffer.from(wavData, 'base64');
-              console.log('Sending final audio file, size:', wavBuffer.length, 'bytes');
-              
-              // Pass true for isLastChunk to indicate this is the final chunk
-              sendAudioChunkToWebSocket(wavBuffer, true);
-            } else {
-              console.warn('Audio file is too small, might not contain actual audio data');
-              setError('No audio data captured - please try again');
-            }
-          } else {
-            console.error('Final audio file not found:', audioFile);
-            setError('Final audio file not found - please try again');
-          }
-        } catch (error) {
-          console.error('Error sending final audio file:', error);
-          setError(`Error sending final file: ${error.message}`);
+          // Send the complete audio file to the WebSocket if connected
+          await sendFinalAudioToWebsocket(audioFile);
+          return audioFile;
+        } else {
+          console.error('Audio file not found with either path');
+          setError('Audio file not found - please try again');
+          return null;
         }
-      } else {
-        console.log('Cannot send final audio - WebSocket not connected');
-        setError('WebSocket connection lost - please try again');
       }
-      
-      return audioFile;
+
+      // Send the complete audio file to the WebSocket if connected
+      await sendFinalAudioToWebsocket(normalizedAudioFile);
+      return normalizedAudioFile;
     } catch (error) {
       console.error('Error stopping recording:', error);
       setError(`Stop recording error: ${error.message}`);
+      return null;
+    }
+  };
+
+  // Helper function to send final audio to websocket
+  const sendFinalAudioToWebsocket = async (audioFilePath) => {
+    if (!audioFilePath) return;
+    
+    if (isConnected && websocketConnection && websocketConnection.readyState === WebSocket.OPEN) {
+      try {
+        // Read the file stats
+        const fileStats = await RNFS.stat(audioFilePath);
+        console.log('Audio file size:', fileStats.size, 'bytes');
+        
+        if (fileStats.size > 44) { // WAV header is 44 bytes
+          const wavData = await RNFS.readFile(audioFilePath, 'base64');
+          const wavBuffer = Buffer.from(wavData, 'base64');
+          console.log('Sending final audio file, size:', wavBuffer.length, 'bytes');
+          
+          // Pass true for isLastChunk to indicate this is the final chunk
+          sendAudioChunkToWebSocket(wavBuffer, true);
+        } else {
+          console.warn('Audio file is too small, might not contain actual audio data');
+          setError('No audio data captured - please try again');
+        }
+      } catch (error) {
+        console.error('Error sending final audio file:', error);
+        setError(`Error sending final file: ${error.message}`);
+      }
+    } else {
+      console.log('Cannot send final audio - WebSocket not connected');
+      setError('WebSocket connection lost - please try again');
     }
   };
 
@@ -1010,11 +1598,6 @@ const LiveTranscriptionScreen = ({ navigation }) => {
     }
   };
 
-  // Add a helper function to generate UUID
-  const generateSimpleUUID = () => {
-    return uuidv4();
-  };
-
   // Add translation related functions
   const translateText = async (inputText) => {
     // Validate input text
@@ -1197,8 +1780,8 @@ const LiveTranscriptionScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       {/* Header with Back, Copy, Share */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerIcon} onPress={() => navigation.goBack()}>
-          <Image source={require('../assets/back.png')} style={styles.icon2} />
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Image source={require('../assets/back.png')} style={styles.headerIcon} />
         </TouchableOpacity>
         <View style={styles.rightHeader}>
           {isTranslateMode && (
@@ -1305,16 +1888,74 @@ const LiveTranscriptionScreen = ({ navigation }) => {
           </View>
         )}
         
-        <TouchableOpacity 
-          style={[styles.floatingMicButton, recording && styles.recordingActive]} 
-          onPress={recording ? stopRecording : startRecording}
-        >
-          <Image 
-            source={recording ? require('../assets/pause.png') : require('../assets/mic3.png')} 
-            style={styles.icon} 
-          />
-        </TouchableOpacity>
+        {recording ? (
+          <>
+            {/* When recording is active, show pause/play button */}
+            <TouchableOpacity 
+              style={[styles.floatingMicButton, recording && styles.recordingActive]} 
+              onPress={isPaused ? resumeRecording : pauseRecording}
+              disabled={isUploading}
+            >
+              <Image 
+                source={isPaused ? require('../assets/play.png') : require('../assets/pause.png')} 
+                style={styles.icon} 
+              />
+            </TouchableOpacity>
+            
+            {/* Show delete and tick buttons when recording */}
+            {showActionButtons && (
+              <>
+                {/* Delete button */}
+                <TouchableOpacity 
+                  style={[styles.actionButton, styles.deleteButton]} 
+                  onPress={deleteRecording}
+                  disabled={isUploading}
+                >
+                  <Image 
+                    source={require('../assets/remove.png')} 
+                    style={styles.smallIcon} 
+                  />
+                </TouchableOpacity>
+                
+                {/* Tick/Save button */}
+                <TouchableOpacity 
+                  style={[styles.actionButton, styles.tickButton]} 
+                  onPress={saveRecording}
+                  disabled={isUploading}
+                >
+                  <Image 
+                    source={require('../assets/Tick.png')} 
+                    style={styles.smallIcon} 
+                  />
+                </TouchableOpacity>
+              </>
+            )}
+          </>
+        ) : (
+          <TouchableOpacity 
+            style={[styles.floatingMicButton, recording && styles.recordingActive]} 
+            onPress={recording ? stopRecording : startRecording}
+            disabled={isUploading || isStartingRecording}
+          >
+            {isUploading || isStartingRecording ? (
+              <ActivityIndicator color="#ffffff" size="small" />
+            ) : (
+              <Image 
+                source={require('../assets/mic3.png')} 
+                style={styles.icon} 
+              />
+            )}
+          </TouchableOpacity>
+        )}
       </View>
+      
+      {/* Loading overlay during upload */}
+      {isUploading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#ffffff" />
+          <Text style={styles.loadingText}>Uploading...</Text>
+        </View>
+      )}
 
       {/* Language Selection Modal */}
       <Modal
@@ -1409,6 +2050,19 @@ const styles = StyleSheet.create({
     paddingTop: 45,
     paddingHorizontal: 20,
     backgroundColor: '#007bff',
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+
+  },
+  headerIcon: {
+    width: 24,
+    height: 24,
+    resizeMode: 'contain',
+    tintColor: '#fff',
   },
   languageSwitcher: {
     flexDirection: 'row',
@@ -1556,7 +2210,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  floatingActionButton: {
+  actionButton: {
     position: 'absolute',
     width: 50,
     height: 50,
@@ -1569,16 +2223,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 3,
   },
-    deleteButton: {
-      backgroundColor: '#ff3b30',
-      left: -60, // Position to the left of the mic button
-    },
-    deleteButton2: {  
-      backgroundColor: '#ff3b30',
-     // Position to the left of the mic button
-     left: 60,
-    },
-
+  deleteButton: {
+    backgroundColor: '#ff3b30',
+    left: -60, // Position to the left of the mic button
+  },
+  deleteButton2: {  
+    backgroundColor: '#ff3b30',
+    // Position to the left of the mic button
+    left: 60,
+  },
   tickButton: {
     backgroundColor: '#4cd964',
     right: -60, // Position to the right of the mic button
@@ -1602,6 +2255,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 9999,
   },
   loadingText: {
     color: '#fff',
@@ -1618,7 +2272,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 20,
     justifyContent: 'center',
-    alignItems: 'center',
+   
     width: 200,
   },
   recordingHeader: {
@@ -1626,15 +2280,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    marginBottom: 8,
+
   },
   progressBarContainer: {
     width: '100%',
     height: 6,
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     borderRadius: 3,
-    marginVertical: 8,
-    overflow: 'hidden',
+ 
+
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   progressBar: {
     height: '100%',
@@ -1650,6 +2306,8 @@ const styles = StyleSheet.create({
   recordingTimer: {
     fontSize: 14,
     fontWeight: 'bold',
+    justifyContent: 'center',
+    alignItems: 'center',
     color: '#ffffff',
     marginBottom: 4,
   },
@@ -1658,22 +2316,12 @@ const styles = StyleSheet.create({
     color: '#cccccc',
     marginTop: 2,
   },
-  actionButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: 10,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    position: 'absolute',
+  recordingActive: {
+    backgroundColor: '#ff3b30', // Red color when recording
   },
   disabledButton: {
     backgroundColor: '#ccc',
+    opacity: 0.7,
   },
 });
 

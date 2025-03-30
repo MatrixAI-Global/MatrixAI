@@ -869,9 +869,9 @@ const BotScreen2 = ({ navigation, route }) => {
     <SafeAreaView style={styles.container}>
       {/* Header */}  
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Image source={require('../assets/back.png')} style={styles.headerIcon} />
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Image source={require('../assets/back.png')} style={styles.headerIcon} />
+          </TouchableOpacity>
         <Image source={require('../assets/Avatar/Cat.png')} style={styles.botIcon} />
         <View style={styles.headerTextContainer}>
           <Text style={styles.botName}>MatrixAI Bot</Text>
@@ -1090,6 +1090,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginVertical: 10,
   },
+ 
+  headerIcon: {
+    width: 24,
+    height: 24,
+    resizeMode: 'contain',
+  },
   textInput: {
     flex: 1,
     padding: 10,
@@ -1119,6 +1125,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
+  backButton: {
+    padding: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
   buttonText: {
     color: '#FFF',
     fontSize: 16,

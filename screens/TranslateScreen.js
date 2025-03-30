@@ -1689,10 +1689,10 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                 <Image source={require('../assets/logo12.png')} style={styles.headerTitle} />
             </View>
                  <View style={styles.headerContainer}>
-                <TouchableOpacity style={styles.iconButton} onPress={() => navigation.goBack()}>
+                <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
                     <Image
                         source={require('../assets/back.png')}
-                        style={styles.icon}
+                        style={styles.headerIcon}
                     />
                 </TouchableOpacity>
                 <Text style={styles.header}>
@@ -2423,6 +2423,17 @@ const styles = StyleSheet.create({
        width: '100%', // Adjust width as needed
 
     },
+    backButton: {
+        padding: 8,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+      },
+      headerIcon: {
+        width: 24,
+        height: 24,
+        resizeMode: 'contain',
+      },
     waveformBox: {
         backgroundColor: '#FFFFFFFF',
         justifyContent: 'center',
