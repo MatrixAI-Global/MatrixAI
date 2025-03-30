@@ -5,11 +5,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../supabaseClient';
 import { useAuthUser } from '../../hooks/useAuthUser';
 import { useCoinsSubscription } from '../../hooks/useCoinsSubscription';
+import { useTheme } from '../../context/ThemeContext';
 const ReferralScreen = ({ navigation }) => {
   const { uid } = useAuthUser();
   const coinCount = useCoinsSubscription(uid);
   const [referralCode, setReferralCode] = useState('');
   const [loading, setLoading] = useState(true);
+  const { getThemeColors } = useTheme();
+  const colors = getThemeColors();
 
 
   useEffect(() => {
@@ -105,31 +108,31 @@ const ReferralScreen = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, {backgroundColor: colors.background}] }>
       {/* Back Button */}
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                 <Image source={require('../../assets/back.png')} style={styles.backIcon} />
               </TouchableOpacity>
 
       {/* Blue Area */}
-      <View style={styles.blueArea}>
+      <View style={[styles.blueArea, {backgroundColor: colors.primary}]}>
         <Text style={styles.header}>Refer Your Friends</Text>
         <Text style={styles.subHeader}>Get 50 coins for each Invite</Text>
       </View>
 
       {/* Coin Box Overlapping Blue and White Areas */}
       <View style={styles.coinBoxContainer}>
-        <View style={styles.coinBox}>
+        <View style={[styles.coinBox, {backgroundColor: colors.card}]}>
           <Image source={require('../../assets/coin.png')} style={styles.coinIcon} />
           <View style={styles.coinBox2}>
-          <Text style={styles.coinText}>Total Coins</Text>
-          <Text style={styles.coinAmount}>{coinCount}</Text>
+          <Text style={[styles.coinText, {color: colors.text}]}>Total Coins</Text>
+          <Text style={[styles.coinAmount, {color: colors.text}]}>{coinCount}</Text>
           </View>
         </View>
       </View>
 
       {/* White Area */}
-      <View style={styles.whiteArea}>
+      <View style={[styles.whiteArea, {backgroundColor: colors.background}]}>
         {/* Instructions Section */}
         <View style={styles.instructions}>
           <View style={styles.instructionRow}>
@@ -153,8 +156,8 @@ const ReferralScreen = ({ navigation }) => {
           {loading ? (
             <ActivityIndicator size="small" color="#003399" />
           ) : (
-            <TouchableOpacity style={styles.codeBox} onPress={copyToClipboard}>
-              <Text style={styles.code}>{referralCode}</Text>
+            <TouchableOpacity style={[styles.codeBox, {backgroundColor: colors.background2, borderColor: colors.border}]} onPress={copyToClipboard}>
+              <Text style={[styles.code, {color: colors.text}]}>{referralCode}</Text>
               <Image source={require('../../assets/copy.png')} style={styles.copyIcon} />
             </TouchableOpacity>
           )}

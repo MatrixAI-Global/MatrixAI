@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet, ActivityIndicator } from 'react-native';
 import { useCoinsSubscription } from '../hooks/useCoinsSubscription';
 import { supabase } from '../supabaseClient';
+import { useTheme } from '../context/ThemeContext';
 
 const Header2 = ({ navigation, uid, openDrawer }) => {
     console.log("Header rendering with UID:", uid);
@@ -10,6 +11,8 @@ const Header2 = ({ navigation, uid, openDrawer }) => {
     const [dpUrl, setDpUrl] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isPro, setIsPro] = useState(false);
+    const { getThemeColors } = useTheme();
+    const colors = getThemeColors();
     
     useEffect(() => {
         if (uid) {
@@ -78,7 +81,7 @@ const Header2 = ({ navigation, uid, openDrawer }) => {
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         {isPro ? (
                             <View style={styles.proContainer}>
-                                <Text style={styles.welcomeText}>
+                                <Text style={[styles.welcomeText, {color: colors.text}]}>
                                     {userName} 
                                 </Text>
                                 <View style={styles.proBadge}>
@@ -86,7 +89,7 @@ const Header2 = ({ navigation, uid, openDrawer }) => {
                                 </View>
                             </View>
                         ) : (
-                            <Text style={styles.welcomeText}>
+                            <Text style={[styles.welcomeText, {color: colors.text}]}>
                                 Welcome{userName ? ` ${userName}!`: '!'}
                             </Text>
                         )}

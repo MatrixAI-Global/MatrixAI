@@ -2,14 +2,45 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet, ActivityIndicator } from 'react-native';
 import { useCoinsSubscription } from '../hooks/useCoinsSubscription';
 import { supabase } from '../supabaseClient';
-
+import { saveProStatus, saveCoinsCount, getProStatus } from '../utils/proStatusUtils';
+import { useProStatus } from '../hooks/useProStatus';
+import { useTheme } from '../context/ThemeContext';
 const Header = ({ navigation, uid, openDrawer }) => {
     console.log("Header rendering with UID:", uid);
     const coinCount = useCoinsSubscription(uid);
     const [userName, setUserName] = useState('');
     const [dpUrl, setDpUrl] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [isPro, setIsPro] = useState(false);
+    const { isPro, checkProStatus } = useProStatus();
+    const [localIsPro, setLocalIsPro] = useState(false);
+    const { getThemeColors } = useTheme();
+    const colors = getThemeColors();
+    
+    // Initialize from stored value on mount
+    useEffect(() => {
+        const initializeFromStorage = async () => {
+            try {
+                const storedProStatus = await getProStatus();
+                setLocalIsPro(storedProStatus);
+                
+                // If stored status says user is pro but context doesn't, update context
+                if (storedProStatus && !isPro && uid) {
+                    checkProStatus(uid);
+                }
+            } catch (error) {
+                console.error('Error initializing pro status from storage:', error);
+            }
+        };
+        
+        initializeFromStorage();
+    }, [isPro, uid]);
+    
+    // Save coins count whenever it changes
+    useEffect(() => {
+        if (coinCount !== undefined && coinCount !== null) {
+            saveCoinsCount(coinCount);
+        }
+    }, [coinCount]);
     
     useEffect(() => {
         if (uid) {
@@ -41,8 +72,15 @@ const Header = ({ navigation, uid, openDrawer }) => {
                     setDpUrl(data.dp_url);
                 }
                 
-                // Set pro status
-                setIsPro(data.subscription_active || false);
+                // Set pro status and save it to utils
+                const isUserPro = data.subscription_active || false;
+                saveProStatus(isUserPro);
+                setLocalIsPro(isUserPro);
+                
+                // Update global pro status context
+                if (checkProStatus) {
+                    checkProStatus(uid);
+                }
             }
         } catch (error) {
             console.error('Error:', error);
@@ -50,6 +88,9 @@ const Header = ({ navigation, uid, openDrawer }) => {
             setLoading(false);
         }
     };
+
+    // Determine if user should be treated as pro based on both context and local state
+    const isUserPro = isPro || localIsPro;
 
     if (!uid) {
         console.log("No UID in Header");
@@ -59,16 +100,16 @@ const Header = ({ navigation, uid, openDrawer }) => {
     console.log("Current coin count:", coinCount);
 
     return (
-        <View style={styles.header}>
+        <View style={[styles.header, {backgroundColor: colors.background}]  }>
             {/* Menu Icon */}
          
 
             {/* Welcome Text with Profile Picture */}
-            <View style={styles.rowContainer}>
+            <View style={[styles.rowContainer, {backgroundColor: colors.background}]  }>
                 <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
                     <Image 
                         source={dpUrl ? { uri: dpUrl } : require('../assets/Avatar/Cat.png')} 
-                        style={styles.icon} 
+                        style={[styles.icon, {borderColor: colors.text}]} 
                     />
                 </TouchableOpacity>
                 
@@ -76,17 +117,17 @@ const Header = ({ navigation, uid, openDrawer }) => {
                     <ActivityIndicator size="small" color="#333" style={{ marginLeft: 10 }} />
                 ) : (
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        {isPro ? (
+                        {isUserPro ? (
                             <View style={styles.proContainer}>
-                                <Text style={styles.welcomeText}>
+                                <Text style={[styles.welcomeText, {color: colors.text}]}>
                                     {userName} 
                                 </Text>
                                 <View style={styles.proBadge}>
-                                    <Text style={styles.proText}>PRO</Text>
+                                    <Text style={[styles.proText, {color: colors.text}]}>PRO</Text>
                                 </View>
                             </View>
                         ) : (
-                            <Text style={styles.welcomeText}>
+                            <Text style={[styles.welcomeText, {color: colors.text}]}>
                                 Welcome{userName ? ` ${userName}!`: '!'}
                             </Text>
                         )}
@@ -96,13 +137,13 @@ const Header = ({ navigation, uid, openDrawer }) => {
 
             {/* Coin Display with Coin Icon */}
             <TouchableOpacity
-                style={styles.coinContainer}
+                style={[styles.coinContainer, {backgroundColor: colors.background2}]}
                 onPress={() =>
                     navigation.navigate('TransactionScreen', { coinCount })
                 }
             >
-                <Image source={require('../assets/coin.png')} style={styles.coinIcon} />
-                <Text style={styles.coinText}>{coinCount?.toString()}</Text>
+                <Image source={require('../assets/coin.png')} style={[styles.coinIcon]} />
+                <Text style={[styles.coinText]}>{coinCount?.toString()}</Text>
             </TouchableOpacity>
         </View>
     );

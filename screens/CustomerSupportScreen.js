@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useTheme } from '../context/ThemeContext';
 
 const FAQItem = ({ question, answer,navigation }) => {
   const [expanded, setExpanded] = useState(false);
@@ -57,6 +58,8 @@ const FAQItem = ({ question, answer,navigation }) => {
 };
 
 const CustomerSupportScreen = ({ navigation }) => {
+  const { getThemeColors } = useTheme();
+  const colors = getThemeColors();
   const faqs = [
     {
       question: 'How do I purchase coins?',
@@ -98,31 +101,31 @@ const CustomerSupportScreen = ({ navigation }) => {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+    <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
+      <View style={[styles.header, {backgroundColor: colors.background}]}>
+        <TouchableOpacity style={[styles.backButton, {borderColor: colors.border}]} onPress={() => navigation.goBack()}>
           <Image
             source={require('../assets/back.png')}
-            style={styles.headerIcon}
+            style={[styles.headerIcon, {tintColor: colors.text}]}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Help & Support</Text>
+        <Text style={[styles.headerTitle, {color: colors.text}]}>Help & Support</Text>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.supportOptionsContainer}>
+        <View style={[styles.supportOptionsContainer, {backgroundColor: colors.background2}]}>
           {supportOptions.map((option, index) => (
             <TouchableOpacity
               key={index}
               style={styles.supportOption}
               onPress={option.action}
             >
-              <View style={styles.supportOptionIcon}>
+              <View style={[styles.supportOptionIcon, {backgroundColor: colors.background2}]}>
                 <Ionicons name={option.icon} size={24} color="#007AFF" />
               </View>
               <View style={styles.supportOptionContent}>
-                <Text style={styles.supportOptionTitle}>{option.title}</Text>
-                <Text style={styles.supportOptionDescription}>
+                <Text style={[styles.supportOptionTitle, {color: colors.text}]}>{option.title}</Text>
+                <Text style={[styles.supportOptionDescription, {color: colors.text}]  }>
                   {option.description}
                 </Text>
               </View>
@@ -131,10 +134,10 @@ const CustomerSupportScreen = ({ navigation }) => {
           ))}
         </View>
 
-        <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
-        <View style={styles.faqContainer}>
+        <Text style={[styles.sectionTitle, {color: colors.text}]}>Frequently Asked Questions</Text>
+        <View style={[styles.faqContainer, {backgroundColor: colors.background2}]}>
           {faqs.map((faq, index) => (
-            <FAQItem key={index} question={faq.question} answer={faq.answer} />
+            <FAQItem key={index} question={faq.question} answer={faq.answer} navigation={navigation} colors={colors.text} />
           ))}
         </View>
 

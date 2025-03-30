@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import { getProStatus, saveProStatus } from '../utils/proStatusUtils';
 
 const ProStatusContext = createContext();
 
@@ -7,6 +8,20 @@ export const ProStatusProvider = ({ children }) => {
   const [isPro, setIsPro] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [userId, setUserId] = useState(null);
+
+  // Initialize from stored value on mount
+  useEffect(() => {
+    const initializeFromStorage = async () => {
+      try {
+        const storedProStatus = await getProStatus();
+        setIsPro(storedProStatus);
+      } catch (error) {
+        console.error('Error initializing pro status from storage:', error);
+      }
+    };
+    
+    initializeFromStorage();
+  }, []);
 
   // Check auth state on mount
   useEffect(() => {
@@ -55,13 +70,17 @@ export const ProStatusProvider = ({ children }) => {
       if (error) {
         console.error('Error fetching subscription status:', error);
         setIsPro(false);
+        saveProStatus(false);
       } else {
-        setIsPro(data?.subscription_active || false);
+        const newProStatus = data?.subscription_active || false;
+        setIsPro(newProStatus);
+        saveProStatus(newProStatus);
         setUserId(uid);
       }
     } catch (error) {
       console.error('Exception checking pro status:', error);
       setIsPro(false);
+      saveProStatus(false);
     } finally {
       setIsLoading(false);
     }

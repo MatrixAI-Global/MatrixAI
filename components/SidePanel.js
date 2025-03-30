@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../supabaseClient';
+import { clearProStatus } from '../utils/proStatusUtils';
 
 const { width } = Dimensions.get('window');
 const PANEL_WIDTH = width * 0.8;
@@ -178,11 +179,19 @@ const SidePanel = ({ isVisible, onClose, navigation }) => {
         <TouchableOpacity 
           style={styles.logoutButton}
           onPress={async () => {
-            await supabase.auth.signOut();
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'Login' }],
-            });
+            try {
+              // Clear pro status
+              await clearProStatus();
+              // Sign out from Supabase
+              await supabase.auth.signOut();
+              // Navigate to login screen
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Login' }],
+              });
+            } catch (error) {
+              console.error('Error during logout:', error);
+            }
           }}
         >
           <Text style={styles.logoutText}>Logout</Text>

@@ -11,12 +11,15 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useTheme } from '../context/ThemeContext';
 
 const HelpScreen = ({ route, navigation }) => {
+ 
   const { orderId } = route.params;
   const [issue, setIssue] = useState('');
   const [description, setDescription] = useState('');
-
+  const { getThemeColors } = useTheme();
+  const colors = getThemeColors();
   const commonIssues = [
     'Payment not reflected',
     'Coins not credited',
@@ -44,25 +47,25 @@ const HelpScreen = ({ route, navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+    <SafeAreaView style={[styles.container, {backgroundColor: colors.background}] }>
+      <View style={[styles.header, {backgroundColor: colors.background}] }>
+        <TouchableOpacity style={[styles.backButton, {borderColor: colors.border}]} onPress={() => navigation.goBack()}>
           <Image
             source={require('../assets/back.png')}
-            style={styles.headerIcon}
+            style={[styles.headerIcon, {tintColor: colors.text}]}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Get Help</Text>
+        <Text style={[styles.headerTitle, {color: colors.text}]   }>Get Help</Text>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.orderInfoCard}>
-          <Ionicons name="receipt-outline" size={24} color="#007AFF" />
-          <Text style={styles.orderInfoText}>Order #{orderId}</Text>
+        <View style={[styles.orderInfoCard, {backgroundColor: colors.background2, borderColor: colors.border}]}>
+          <Ionicons name="receipt-outline" size={24} color={colors.primary} />
+          <Text style={[styles.orderInfoText, {color: colors.text}]}>Order #{orderId}</Text>
         </View>
 
-        <Text style={styles.sectionTitle}>What issue are you facing?</Text>
-        <View style={styles.issuesContainer}>
+        <Text style={[styles.sectionTitle, {color: colors.text}]}>What issue are you facing?</Text>
+        <View style={[styles.issuesContainer, {backgroundColor: colors.background2}]}>
           {commonIssues.map((item, index) => (
             <TouchableOpacity
               key={index}
@@ -84,10 +87,10 @@ const HelpScreen = ({ route, navigation }) => {
           ))}
         </View>
 
-        <Text style={styles.sectionTitle}>Describe your issue</Text>
-        <View style={styles.textInputContainer}>
+        <Text style={[styles.sectionTitle, {color: colors.text}]}>Describe your issue</Text>
+        <View style={[styles.textInputContainer, {backgroundColor: colors.background2, borderColor: colors.border}]}>
           <TextInput
-            style={styles.textInput}
+            style={[styles.textInput, {color: colors.text}]}
             multiline
             numberOfLines={6}
             placeholder="Please provide details about your issue..."
@@ -97,8 +100,8 @@ const HelpScreen = ({ route, navigation }) => {
           />
         </View>
 
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.submitButtonText}>Submit Request</Text>
+        <TouchableOpacity style={[styles.submitButton, {backgroundColor: colors.primary}]} onPress={handleSubmit}>
+          <Text style={[styles.submitButtonText, {color: colors.text}]}>Submit Request</Text>
         </TouchableOpacity>
 
       

@@ -6,6 +6,7 @@ export const THEMES = {
     name: 'Light',
     colors: {
       background: '#FFFFFF',
+      background2: '#FFFFFF',
       text: '#333333',
       primary: '#007AFF',
       secondary: '#5856D6',
@@ -21,6 +22,7 @@ export const THEMES = {
     name: 'Dark',
     colors: {
       background: '#1C1C1E',
+      background2: '#1C1C1E',
       text: '#FFFFFF',
       primary: '#0A84FF',
       secondary: '#5E5CE6',
@@ -36,6 +38,7 @@ export const THEMES = {
     name: 'Gray',
     colors: {
       background: '#F2F2F7',
+      background2: '#F2F2F7',
       text: '#1C1C1E',
       primary: '#007AFF',
       secondary: '#5856D6',

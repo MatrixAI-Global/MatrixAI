@@ -18,17 +18,45 @@ import { clearLanguagePreference } from '../utils/languageUtils';
 import { useTheme } from '../context/ThemeContext';
 import { ThemedView, ThemedText, ThemedCard } from '../components/ThemedView';
 import { clearThemePreference } from '../utils/themeUtils';
+import { clearProStatus, getProStatus } from '../utils/proStatusUtils';
 
 const ProfileScreen = ({ navigation }) => {
     const { uid, loading } = useAuth();
     const coinCount = useCoinsSubscription(uid);
     const [isSeller, setIsSeller] = useState(false);
     const [isVerified, setIsVerified] = useState(false);
-    const { isPro } = useProStatus();
+    const { isPro, checkProStatus } = useProStatus();
+    const [localIsPro, setLocalIsPro] = useState(false);
     const { t } = useLanguage();
     const { getThemeColors } = useTheme();
     const colors = getThemeColors();
     
+    // Check if user is pro when component mounts
+    useEffect(() => {
+        const checkProStatusFromStorage = async () => {
+            try {
+                // Get pro status from AsyncStorage
+                const storedProStatus = await getProStatus();
+                
+                // Update local state with stored value
+                setLocalIsPro(storedProStatus);
+                
+                // If the user is pro according to storage but not in context, update context
+                if (storedProStatus && !isPro && uid) {
+                    checkProStatus(uid);
+                }
+                
+                console.log('ProfileScreen - Pro Status from storage:', storedProStatus);
+                console.log('ProfileScreen - Pro Status from context:', isPro);
+            } catch (error) {
+                console.error('Error checking pro status from storage:', error);
+            }
+        };
+        
+        checkProStatusFromStorage();
+    }, [isPro, uid]);
+    
+    // Check user status when uid changes
     useEffect(() => {
         if (uid) {
             checkUserStatus();
@@ -39,7 +67,7 @@ const ProfileScreen = ({ navigation }) => {
         try {
             const { data, error } = await supabase
                 .from('users')
-                .select('seller, verified')
+                .select('seller, verified, subscription_active')
                 .eq('uid', uid)
                 .single();
 
@@ -48,11 +76,23 @@ const ProfileScreen = ({ navigation }) => {
             if (data) {
                 setIsSeller(data.seller);
                 setIsVerified(data.verified);
+                
+                // If the database shows the user is pro, update local state and context
+                if (data.subscription_active && (!isPro || !localIsPro)) {
+                    setLocalIsPro(true);
+                    // Ensure the pro status context is updated
+                    if (checkProStatus) {
+                        checkProStatus(uid);
+                    }
+                }
             }
         } catch (error) {
             console.error('Error checking user status:', error.message);
         }
     };
+
+    // Determine if user should be treated as pro based on both context and local state
+    const isUserPro = isPro || localIsPro;
 
     const handleUpgradePress = () => {
         navigation.navigate('TimeScreen'); 
@@ -71,6 +111,9 @@ const ProfileScreen = ({ navigation }) => {
                         
                         // Clear theme preference
                         await clearThemePreference();
+                        
+                        // Clear pro status
+                        await clearProStatus();
                         
                         // Remove user login status from AsyncStorage
                         await AsyncStorage.multiRemove([
@@ -102,13 +145,13 @@ const ProfileScreen = ({ navigation }) => {
 
     const MenuItem = ({ iconName, label, onPress }) => (
         <TouchableOpacity 
-            style={[styles.menuItem, {backgroundColor: colors.card, borderBottomColor: colors.border}]} 
+            style={[styles.menuItem, {backgroundColor: colors.background2, borderBottomColor: colors.border}]} 
             onPress={onPress}
         >
             <View style={[styles.iconContainer, {backgroundColor: colors.primary + '20'}]}>
                 <Ionicons name={iconName} size={20} color={colors.primary} />
             </View>
-            <ThemedText style={styles.menuLabel}>{label}</ThemedText>
+            <ThemedText style={[styles.menuLabel, {color: colors.text}]}>{label}</ThemedText>
             <Ionicons name="chevron-forward" size={20} color={colors.text + '80'} />
         </TouchableOpacity>
     );
@@ -184,11 +227,11 @@ const ProfileScreen = ({ navigation }) => {
     
     return (
         <SafeAreaView style={[styles.container2, {backgroundColor: colors.background}]}>
-            <View style={[styles.header, {backgroundColor: colors.card, borderBottomColor: colors.border}]}>
-                <TouchableOpacity style={[styles.backButton, {borderColor: colors.border}]} onPress={() => navigation.goBack()}>
+            <View style={[styles.header, {backgroundColor: colors.background2, borderBottomColor: colors.border}]}>
+                <TouchableOpacity style={[styles.backButton, {borderColor: colors.text}]} onPress={() => navigation.goBack()}>
                     <Image source={require('../assets/back.png')} style={[styles.headerIcon, {tintColor: colors.text}]} />
                 </TouchableOpacity>
-                <ThemedText style={styles.headerTitle}>{t('profile')}</ThemedText>
+                <ThemedText style={[styles.headerTitle, {color: colors.text}]}>{t('profile')}</ThemedText>
             </View>
             
             <ScrollView 
@@ -200,7 +243,7 @@ const ProfileScreen = ({ navigation }) => {
                 <Header2 uid={uid} />
                 
                 {/* Conditional rendering based on Pro status */}
-                {!isPro ? (
+                {!isUserPro ? (
                     <FeatureCardWithDetails2 />
                 ) : (
                     <>
@@ -209,10 +252,10 @@ const ProfileScreen = ({ navigation }) => {
                     </>
                 )}
 
-                <ThemedText style={styles.menuTitle}>Your Information</ThemedText>
+                <ThemedText style={[styles.menuTitle, {color: colors.text}]}>Your Information</ThemedText>
                 
                 {/* Menu Items */}
-                <ThemedCard style={styles.menuContainer}>
+                <ThemedCard style={[styles.menuContainer, {backgroundColor: colors.background2}]}>
                     <MenuItem 
                         iconName="person-outline" 
                         label="Profile" 
@@ -240,13 +283,13 @@ const ProfileScreen = ({ navigation }) => {
                     />
                 </ThemedCard>
 
-                <ThemedText style={styles.menuTitle}>Support</ThemedText>
+                <ThemedText style={[styles.menuTitle, {color: colors.text}]}>Support</ThemedText>
                 
-                <ThemedCard style={styles.menuContainer}>
+                <ThemedCard style={[styles.menuContainer, {backgroundColor: colors.background2}]}>
                     <MenuItem 
                         iconName="help-circle-outline" 
                         label="Help Center" 
-                        onPress={() => navigation.navigate('HelpScreen')} 
+                        onPress={() => navigation.navigate('FeedbackScreen')} 
                     />
                     <MenuItem 
                         iconName="headset-outline" 
@@ -260,9 +303,9 @@ const ProfileScreen = ({ navigation }) => {
                     />
                 </ThemedCard>
 
-                <ThemedText style={styles.menuTitle}>Preferences</ThemedText>
+                <ThemedText style={[styles.menuTitle, {color: colors.text}]}>Preferences</ThemedText>
                 
-                <ThemedCard style={styles.menuContainer}>
+                <ThemedCard style={[styles.menuContainer, {backgroundColor: colors.background2}]}>
                     <MenuItem 
                         iconName="settings-outline" 
                         label="Settings" 
@@ -276,7 +319,7 @@ const ProfileScreen = ({ navigation }) => {
                 </ThemedCard>
                 
                 <View style={styles.footer}>
-                    <ThemedText style={styles.versionText}>Version 1.0.0</ThemedText>
+                    <ThemedText style={[styles.versionText, {color: colors.text}]}>Version 1.0.0</ThemedText>
                 </View>
             </ScrollView>
         </SafeAreaView>
@@ -289,6 +332,16 @@ const styles = StyleSheet.create({
         backgroundColor: '#F7F7F7FF',
         paddingHorizontal: 10,
         
+    },
+    footer:{
+        marginTop:20,
+        marginBottom:20,
+        alignItems:'center',
+        justifyContent:'center',
+    },
+    versionText:{
+        fontSize:12,
+        color:'#333',
     },
     menuContainer: {
         backgroundColor: '#ffff',

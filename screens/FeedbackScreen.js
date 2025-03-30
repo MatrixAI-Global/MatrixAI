@@ -11,10 +11,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useTheme } from '../context/ThemeContext';
 
 const FeedbackScreen = ({ route, navigation }) => {
   const [issue, setIssue] = useState('');
   const [description, setDescription] = useState('');
+  const { getThemeColors } = useTheme();
+  const colors = getThemeColors();
 
   const commonIssues = [
     'Great experience and helpful',
@@ -43,22 +46,22 @@ const FeedbackScreen = ({ route, navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+    <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
+      <View style={[styles.header, {backgroundColor: colors.background}]}>
+        <TouchableOpacity style={[styles.backButton, {borderColor: colors.border}]} onPress={() => navigation.goBack()}>
           <Image
             source={require('../assets/back.png')}
-            style={styles.headerIcon}
+            style={[styles.headerIcon, {tintColor: colors.text}]}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Get Help</Text>
+        <Text style={[styles.headerTitle, {color: colors.text}]}>Get Help</Text>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
        
 
-        <Text style={styles.sectionTitle}>What do you think about our app?</Text>
-        <View style={styles.issuesContainer}>
+        <Text style={[styles.sectionTitle, {color: colors.text}]}>What do you think about our app?</Text>
+        <View style={[styles.issuesContainer, {backgroundColor: colors.background2}]}>
           {commonIssues.map((item, index) => (
             <TouchableOpacity
               key={index}
@@ -80,10 +83,10 @@ const FeedbackScreen = ({ route, navigation }) => {
           ))}
         </View>
 
-        <Text style={styles.sectionTitle}>Describe your issue</Text>
-        <View style={styles.textInputContainer}>
+        <Text style={[styles.sectionTitle, {color: colors.text}]}>Describe your issue</Text>
+        <View style={[styles.textInputContainer, {backgroundColor: colors.background2}]}>
           <TextInput
-            style={styles.textInput}
+            style={[styles.textInput, {color: colors.text}]}
             multiline
             numberOfLines={6}
             placeholder="Please provide details about your issue..."
@@ -93,8 +96,8 @@ const FeedbackScreen = ({ route, navigation }) => {
           />
         </View>
 
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.submitButtonText}>Submit Request</Text>
+        <TouchableOpacity style={[styles.submitButton, {backgroundColor: colors.primary}]} onPress={handleSubmit}>
+          <Text style={[styles.submitButtonText, {color: colors.text}]}>Submit Request</Text>
         </TouchableOpacity>
 
       

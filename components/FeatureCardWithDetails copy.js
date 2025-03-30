@@ -3,62 +3,63 @@ import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-nati
 import { useNavigation } from '@react-navigation/native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-
+import { useTheme } from '../context/ThemeContext';
 const { width } = Dimensions.get('window'); // Get the screen width
 
 const FeatureCardWithDetails2 = () => {
   const navigation = useNavigation(); // Initialize navigation
-
+  const { getThemeColors } = useTheme();
+  const colors = getThemeColors();
   const handleUpgradePress = () => {
     navigation.navigate('SubscriptionScreen'); // Replace 'UpgradeScreen' with your target screen's name
   };
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.card}>
+      <TouchableOpacity style={[styles.card, {backgroundColor: colors.background2}]}>
         {/* Top section with "Matrix AI" text and "PRO" container */}
         <View style={styles.topSection}>
-          <Text style={styles.matrixAIText}>Matrix AI</Text>
+          <Text style={[styles.matrixAIText, {color: colors.text}]}>Matrix AI</Text>
           <View style={styles.proContainer}>
-            <Text style={styles.proText}>PRO</Text>
+            <Text style={[styles.proText, {color: colors.text}]}>PRO</Text>
           </View>
         </View>
 
        <View style={styles.featureList}>
           <View style={styles.featureItem}>
             <MaterialCommunityIcons name="text-recognition" size={30} color="#BDBDBDFF" style={styles.featureIcon} />
-            <Text style={styles.featureText}>High-Accuracy Speech-to-Text</Text>
+                  <Text style={[styles.featureText, {color: colors.text}]}>High-Accuracy Speech-to-Text</Text>
           </View>
           <View style={styles.featureItem}>
             <MaterialCommunityIcons name="microphone" size={30} color="#BDBDBDFF" style={styles.featureIcon} />
-            <Text style={styles.featureText}>Live Speech-to-Text</Text>
+            <Text style={[styles.featureText, {color: colors.text}]}>Live Speech-to-Text</Text>
           </View>
           <View style={styles.featureItem}>
             <MaterialIcons name="translate" size={30} color="#BDBDBDFF" style={styles.featureIcon} />
-            <Text style={styles.featureText}>Multilingual Text Translation</Text>
+                  <Text style={[styles.featureText, {color: colors.text}]}>Multilingual Text Translation</Text>
           </View>
           <View style={styles.featureItem}>
             <MaterialCommunityIcons name="robot" size={30} color="#BDBDBDFF" style={styles.featureIcon} />
-            <Text style={styles.featureText}>AI Chatbot</Text>
+            <Text style={[styles.featureText, {color: colors.text}]}>AI Chatbot</Text>
           </View>
           <View style={styles.featureItem}>
             <MaterialCommunityIcons name="file-powerpoint" size={30} color="#BDBDBDFF" style={styles.featureIcon} />
-            <Text style={styles.featureText}>One-Click PPT Generation</Text>
+              <Text style={[styles.featureText, {color: colors.text}]}>One-Click PPT Generation</Text>
           </View>
           <View style={styles.featureItem}>
             <MaterialCommunityIcons name="image" size={30} color="#BDBDBDFF" style={styles.featureIcon} />
-            <Text style={styles.featureText}>AI Chatbot with Picture Understanding</Text>
+            <Text style={[styles.featureText, {color: colors.text}]}>AI Chatbot with Picture Understanding</Text>
           </View>
           <View style={styles.featureItem}>
             <MaterialCommunityIcons name="video" size={30} color="#BDBDBDFF" style={styles.featureIcon} />
-            <Text style={styles.featureText}>Voice and Video Calls with AI</Text>
+            <Text style={[styles.featureText, {color: colors.text}]}>Voice and Video Calls with AI</Text>
           </View>
             </View>
     
 
         {/* Upgrade button */}
-        <TouchableOpacity style={styles.upgradeButton} onPress={handleUpgradePress}>
-          <Text style={styles.upgradeButtonText}>Upgrade</Text>
+        <TouchableOpacity style={[styles.upgradeButton, {backgroundColor: colors.primary}]} onPress={handleUpgradePress}>
+          <Text style={[styles.upgradeButtonText, {color: colors.text}]}>Upgrade</Text>
         </TouchableOpacity>
       </TouchableOpacity>
     </View>

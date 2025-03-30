@@ -11,10 +11,14 @@ import {
   ActivityIndicator,
   Modal,
   FlatList,
+  StatusBar,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../supabaseClient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import RNFS from 'react-native-fs';
+import { decode } from 'base-64'; // Import decode from base-64 package
 
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import * as ImagePicker from 'react-native-image-picker';
@@ -23,6 +27,16 @@ import { useLanguage } from '../context/LanguageContext';
 import { LANGUAGES } from '../utils/languageUtils';
 import { useTheme } from '../context/ThemeContext';
 import { ThemedView, ThemedText, ThemedCard } from '../components/ThemedView';
+
+// Convert base64 to byte array - React Native compatible approach
+const decodeBase64 = (base64String) => {
+  const byteCharacters = decode(base64String);
+  const byteNumbers = new Array(byteCharacters.length);
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i);
+  }
+  return new Uint8Array(byteNumbers);
+};
 
 const EditProfile = ({ navigation }) => {
   const { uid } = useAuthUser();
@@ -75,12 +89,21 @@ const EditProfile = ({ navigation }) => {
 
   useEffect(() => {
     fetchUserData();
+    // Set the status bar to dark content (black text)
+    StatusBar.setBarStyle('dark-content');
+    
+    // Cleanup when component unmounts
+    return () => {
+      // Reset to default status bar style when leaving
+      StatusBar.setBarStyle('light-content');
+    };
   }, []);
 
   const handleImagePick = async () => {
     const options = {
       mediaType: 'photo',
       quality: 1,
+      includeBase64: true, // Request base64 data
     };
 
     try {
@@ -95,29 +118,56 @@ const EditProfile = ({ navigation }) => {
         // Create file name with correct extension
         const filePath = `users/${uid}/profile-${Date.now()}.${fileExt}`;
 
-        // Fetch the image data
-        const response = await fetch(asset.uri);
-        const imageData = await response.blob();
+        // Method 1: Using base64 data directly from the picker result
+        if (asset.base64) {
+          console.log('Using base64 data directly from picker result');
+          const arrayBuffer = decodeBase64(asset.base64);
+          
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('user-uploads')
+            .upload(filePath, arrayBuffer, {
+              contentType: asset.type || 'image/jpeg',
+              cacheControl: '3600'
+            });
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('user-uploads')
-          .upload(filePath, imageData, {
-            contentType: asset.type || 'image/jpeg',
-            cacheControl: '3600'
-          });
+          if (uploadError) throw uploadError;
+        } 
+        // Method 2: Reading file from filesystem (fallback)
+        else {
+          // For iOS, we need to handle the file:// protocol
+          let imageUri = asset.uri;
+          if (Platform.OS === 'ios' && !imageUri.startsWith('file://')) {
+            imageUri = `file://${imageUri}`;
+          }
+          
+          console.log('Reading file from filesystem');
+          // Read the file as base64
+          const fileContent = await RNFS.readFile(imageUri, 'base64');
+          const arrayBuffer = decodeBase64(fileContent);
+          
+          // Upload to Supabase storage using the approach that works in other parts of the app
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('user-uploads')
+            .upload(filePath, arrayBuffer, {
+              contentType: asset.type || 'image/jpeg',
+              cacheControl: '3600'
+            });
 
-        if (uploadError) throw uploadError;
+          if (uploadError) throw uploadError;
+        }
 
+        // Get the public URL
         const { data: { publicUrl } } = supabase.storage
           .from('user-uploads')
           .getPublicUrl(filePath);
 
+        console.log('Upload successful, public URL:', publicUrl);
         setProfileData(prev => ({ ...prev, dp_url: publicUrl }));
         setIsEdited(true);
       }
     } catch (error) {
-      console.error('Error uploading image:', error);
-      Alert.alert('Error', 'Failed to upload image');
+      console.error('Error uploading image:', error.message || error);
+      Alert.alert('Error', 'Failed to upload image: ' + (error.message || 'Unknown error'));
     } finally {
       setUploading(false);
     }
@@ -177,9 +227,9 @@ const EditProfile = ({ navigation }) => {
   };
 
   const renderField = (label, value, field) => (
-    <View style={styles.fieldContainer}>
+    <View style={[styles.fieldContainer, {backgroundColor: colors.background2}]}>
       <View style={styles.fieldHeader}>
-        <ThemedText style={styles.fieldLabel}>{label}</ThemedText>
+        <ThemedText style={[styles.fieldLabel, {color: colors.text}]}>{label}</ThemedText>
         <TouchableOpacity
           style={styles.editButton}
           onPress={() => {
@@ -204,7 +254,7 @@ const EditProfile = ({ navigation }) => {
           autoFocus
         />
       ) : (
-        <ThemedText style={styles.fieldValue}>{value || t('notSet')}</ThemedText>
+        <ThemedText style={[styles.fieldValue, {color: colors.text}]}>{value || t('notSet')}</ThemedText>
       )}
     </View>
   );
@@ -213,7 +263,7 @@ const EditProfile = ({ navigation }) => {
   const renderLanguageField = () => (
     <View style={styles.fieldContainer}>
       <View style={styles.fieldHeader}>
-        <ThemedText style={styles.fieldLabel}>{t('preferredLanguage')}</ThemedText>
+        <ThemedText style={[styles.fieldLabel, {color: colors.text}]}>{t('preferredLanguage')}</ThemedText>
         <TouchableOpacity
           style={styles.editButton}
           onPress={() => setLanguageModalVisible(true)}
@@ -221,7 +271,7 @@ const EditProfile = ({ navigation }) => {
           <Ionicons name="pencil" size={20} color={colors.primary} />
         </TouchableOpacity>
       </View>
-      <ThemedText style={styles.fieldValue}>
+      <ThemedText style={[styles.fieldValue, {color: colors.text}]}>
         {profileData.preferred_language || t('notSet')}
       </ThemedText>
     </View>
@@ -231,7 +281,7 @@ const EditProfile = ({ navigation }) => {
   const renderThemeField = () => (
     <View style={styles.fieldContainer}>
       <View style={styles.fieldHeader}>
-        <ThemedText style={styles.fieldLabel}>{t('themeMode')}</ThemedText>
+        <ThemedText style={[styles.fieldLabel, {color: colors.text}]}>{t('themeMode')}</ThemedText>
         <TouchableOpacity
           style={styles.editButton}
           onPress={() => setThemeModalVisible(true)}
@@ -239,7 +289,7 @@ const EditProfile = ({ navigation }) => {
           <Ionicons name="pencil" size={20} color={colors.primary} />
         </TouchableOpacity>
       </View>
-      <ThemedText style={styles.fieldValue}>
+      <ThemedText style={[styles.fieldValue, {color: colors.text}]  }>
         {themes[profileData.preferred_theme]?.name || t('notSet')}
       </ThemedText>
     </View>
@@ -255,14 +305,15 @@ const EditProfile = ({ navigation }) => {
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
-      <View style={[styles.header, {backgroundColor: colors.card, borderBottomColor: colors.border}]}>
+      <StatusBar barStyle="dark-content" />
+      <View style={[styles.header, {backgroundColor: colors.background, borderBottomColor: colors.border}]}>
         <TouchableOpacity 
-          style={[styles.backButton, {borderColor: colors.border}]} 
+          style={[styles.backButton, {borderColor: colors.text}]} 
           onPress={() => navigation.goBack()}
         >
           <Image source={require('../assets/back.png')} style={[styles.headerIcon, {tintColor: colors.text}]} />
         </TouchableOpacity>
-        <ThemedText style={styles.headerTitle}>{t('editProfile')}</ThemedText>
+        <ThemedText style={[styles.headerTitle, {color: colors.text}]}>{t('editProfile')}</ThemedText>
       </View>
 
       <ScrollView 
@@ -292,15 +343,15 @@ const EditProfile = ({ navigation }) => {
           </View>
         </View>
 
-        <ThemedCard style={styles.card}>
+        <ThemedCard style={[styles.card, {backgroundColor: colors.background2}]}>
           {renderField(t('name'), profileData.name, 'name')}
           {renderField(t('age'), profileData.age, 'age')}
           {renderField(t('gender'), profileData.gender, 'gender')}
           {renderLanguageField()}
           {renderThemeField()}
           <View style={styles.fieldContainer}>
-            <ThemedText style={styles.fieldLabel}>{t('email')}</ThemedText>
-            <ThemedText style={styles.fieldValue}>{profileData.email}</ThemedText>
+            <ThemedText style={[styles.fieldLabel, {color: colors.text}]}>{t('email')}</ThemedText>
+            <ThemedText style={[styles.fieldValue, {color: colors.text}]}>{profileData.email}</ThemedText>
           </View>
         </ThemedCard>
 
@@ -370,7 +421,7 @@ const EditProfile = ({ navigation }) => {
         <View style={styles.modalContainer}>
           <View style={[styles.modalContent, {backgroundColor: colors.card}]}>
             <View style={[styles.modalHeader, {borderBottomColor: colors.border}]}>
-              <ThemedText style={styles.modalTitle}>{t('chooseTheme')}</ThemedText>
+              <ThemedText style={[styles.modalTitle, {color: colors.text}]}>{t('chooseTheme')}</ThemedText>
               <TouchableOpacity onPress={() => setThemeModalVisible(false)}>
                 <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
@@ -412,6 +463,7 @@ const EditProfile = ({ navigation }) => {
                     style={[
                       styles.themeText,
                       profileData.preferred_theme === item && styles.selectedThemeText,
+                      {color: colors.text}
                     ]}
                   >
                     {themes[item].name}

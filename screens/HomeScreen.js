@@ -22,6 +22,8 @@ const { width } = Dimensions.get('window'); // Get screen width
 import { useProStatus } from '../hooks/useProStatus';
 import { useCoinsSubscription } from '../hooks/useCoinsSubscription';
 import FeatureCardWithDetails2 from '../components/FeatureCardWithDetails copy';
+import { getProStatus, getCoinsCount } from '../utils/proStatusUtils';
+
 const HomeScreen = ({ navigation }) => {
   const { uid, loading } = useAuth();
   const rotateValue = useRef(new Animated.Value(0)).current;
@@ -33,7 +35,36 @@ const HomeScreen = ({ navigation }) => {
   const colors = getThemeColors();
   
   // Access the pro status
-  const { isPro } = useProStatus();
+  const { isPro, checkProStatus } = useProStatus();
+  const [localIsPro, setLocalIsPro] = useState(false);
+  
+  // Additional fallback check from storage to ensure pro status consistency
+  useEffect(() => {
+    const checkStoredProStatus = async () => {
+      try {
+        const storedProStatus = await getProStatus();
+        const storedCoinsCount = await getCoinsCount();
+        
+        console.log('HomeScreen - Stored Pro Status:', storedProStatus);
+        console.log('HomeScreen - Stored Coins Count:', storedCoinsCount);
+        
+        // Update local state with stored value
+        setLocalIsPro(storedProStatus);
+        
+        // If stored status says user is pro but context doesn't, update context
+        if (storedProStatus && !isPro && uid) {
+          checkProStatus(uid);
+        }
+      } catch (error) {
+        console.error('Error checking stored pro status:', error);
+      }
+    };
+    
+    checkStoredProStatus();
+  }, [isPro, uid]);
+  
+  // Determine if user should be treated as pro based on both context and local state
+  const isUserPro = isPro || localIsPro;
   
   // Gradient rotation animation
   useEffect(() => {
@@ -166,7 +197,7 @@ const HomeScreen = ({ navigation }) => {
           </ThemedView>
           
           {/* Conditional rendering based on Pro status */}
-          {!isPro ? (
+          {!isUserPro ? (
             <FeatureCardWithDetails2/>
           ) : (
             <>

@@ -3,25 +3,26 @@ import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-nati
 import { useNavigation } from '@react-navigation/native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-
+import { useTheme } from '../context/ThemeContext';
 const { width } = Dimensions.get('window'); // Get the screen width
 
 const FeatureCardWithDetailsPro = () => {
   const navigation = useNavigation(); // Initialize navigation
-
+  const { getThemeColors } = useTheme();
+  const colors = getThemeColors();
   const handleUpgradePress = () => {
     navigation.navigate('SubscriptionScreen'); // Replace 'UpgradeScreen' with your target screen's name
   };
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity style={styles.card}>
+    <View style={[styles.container, {backgroundColor: colors.background}]}>
+      <TouchableOpacity style={[styles.card, {backgroundColor: colors.background2}]}>
         {/* Top section with "Matrix AI" text and "PRO" container */}
-        <View style={styles.headerRow}>
+        <View style={[styles.headerRow, {backgroundColor: colors.background2}]}>
                 <View style={styles.titleContainer}>
-                    <Text style={styles.title}>Pro Features</Text>
+                    <Text style={[styles.title, {color: colors.text}]}>Pro Features</Text>
                     <View style={styles.proBadge}>
-                        <Text style={styles.proText}>ACTIVE</Text>
+                        <Text style={[styles.proText, {color: colors.text}]}>ACTIVE</Text>
                     </View>
                 </View>
             </View>
@@ -29,31 +30,31 @@ const FeatureCardWithDetailsPro = () => {
        <View style={styles.featureList}>
           <View style={styles.featureItem}>
             <MaterialCommunityIcons name="text-recognition" size={30} color="#FF6600" style={styles.featureIcon} />
-            <Text style={styles.featureText}>High-Accuracy Speech-to-Text</Text>
+            <Text style={[styles.featureText, {color: colors.text}]}>High-Accuracy Speech-to-Text</Text>
           </View>
           <View style={styles.featureItem}>
             <MaterialCommunityIcons name="microphone" size={30} color="#FF6600" style={styles.featureIcon} />
-            <Text style={styles.featureText}>Live Speech-to-Text</Text>
+            <Text style={[styles.featureText, {color: colors.text}]}>Live Speech-to-Text</Text>
           </View>
           <View style={styles.featureItem}>
             <MaterialIcons name="translate" size={30} color="#FF6600" style={styles.featureIcon} />
-            <Text style={styles.featureText}>Multilingual Text Translation</Text>
+                  <Text style={[styles.featureText, {color: colors.text}]}>Multilingual Text Translation</Text>
           </View>
           <View style={styles.featureItem}>
             <MaterialCommunityIcons name="robot" size={30} color="#FF6600" style={styles.featureIcon} />
-            <Text style={styles.featureText}>AI Chatbot</Text>
+            <Text style={[styles.featureText, {color: colors.text}]}>AI Chatbot</Text>
           </View>
           <View style={styles.featureItem}>
             <MaterialCommunityIcons name="file-powerpoint" size={30} color="#FF6600" style={styles.featureIcon} />
-            <Text style={styles.featureText}>One-Click PPT Generation</Text>
+            <Text style={[styles.featureText, {color: colors.text}]}>One-Click PPT Generation</Text>
           </View>
           <View style={styles.featureItem}>
             <MaterialCommunityIcons name="image" size={30} color="#FF6600" style={styles.featureIcon} />
-            <Text style={styles.featureText}>AI Chatbot with Picture Understanding</Text>
+            <Text style={[styles.featureText, {color: colors.text}]}>AI Chatbot with Picture Understanding</Text>
           </View>
           <View style={styles.featureItem}>
             <MaterialCommunityIcons name="video" size={30} color="#FF6600" style={styles.featureIcon} />
-            <Text style={styles.featureText}>Voice and Video Calls with AI</Text>
+            <Text style={[styles.featureText, {color: colors.text}] }>Voice and Video Calls with AI</Text>
           </View>
             </View>
        
