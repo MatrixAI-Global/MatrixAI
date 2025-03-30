@@ -71,8 +71,8 @@ export const translations = {
     'createStunningImageDesc': 'Create stunning images with MatrixAI',
     'generateVideo': 'Generate Video',
     'convertVideoDesc': 'Convert your own videos',
-    'removeBackground': 'Remove Background',
-    'removeBackgroundDesc': 'Remove background from your images',
+    'removeBackground': 'Remove Bg',
+    'removeBackgroundDesc': 'Remove Bg from your images',
     'createPPT': 'Create PPT',
     'createPPTDesc': 'Create presentations in less than a minute',
     'worldsBestAITools': 'World\'s best AI tools',
@@ -157,7 +157,7 @@ export const translations = {
     'worldsBestAITools': '世界上最好的AI工具',
     'allRightsReserved': '@MatrixAI保留所有權利',
   },
-  
+
   // Simplified Chinese
   'Simplified Chinese': {
     // Common

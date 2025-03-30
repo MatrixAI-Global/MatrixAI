@@ -11,7 +11,6 @@ import {
   ActivityIndicator,
   Modal,
   FlatList,
-  StatusBar,
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,6 +26,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { LANGUAGES } from '../utils/languageUtils';
 import { useTheme } from '../context/ThemeContext';
 import { ThemedView, ThemedText, ThemedCard } from '../components/ThemedView';
+import ThemedStatusBar from '../components/ThemedStatusBar';
 
 // Convert base64 to byte array - React Native compatible approach
 const decodeBase64 = (base64String) => {
@@ -41,7 +41,7 @@ const decodeBase64 = (base64String) => {
 const EditProfile = ({ navigation }) => {
   const { uid } = useAuthUser();
   const { t, currentLanguage, changeLanguage } = useLanguage();
-  const { currentTheme, changeTheme, themes, getThemeColors } = useTheme();
+  const { currentTheme, changeTheme, themes, getThemeColors, statusBarStyle } = useTheme();
   const colors = getThemeColors();
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -89,14 +89,7 @@ const EditProfile = ({ navigation }) => {
 
   useEffect(() => {
     fetchUserData();
-    // Set the status bar to dark content (black text)
-    StatusBar.setBarStyle('dark-content');
-    
-    // Cleanup when component unmounts
-    return () => {
-      // Reset to default status bar style when leaving
-      StatusBar.setBarStyle('light-content');
-    };
+    // No need to manually set StatusBar style as ThemedStatusBar component handles it
   }, []);
 
   const handleImagePick = async () => {
@@ -305,7 +298,7 @@ const EditProfile = ({ navigation }) => {
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
-      <StatusBar barStyle="dark-content" />
+      <ThemedStatusBar />
       <View style={[styles.header, {backgroundColor: colors.background, borderBottomColor: colors.border}]}>
         <TouchableOpacity 
           style={[styles.backButton, {borderColor: colors.text}]} 

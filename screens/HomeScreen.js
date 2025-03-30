@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, TouchableOpacity, Image, StatusBar, Dimensions, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Animated, TouchableOpacity, Image, Dimensions, ScrollView } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { Easing } from 'react-native';
 import Header from '../components/Header';
@@ -17,6 +17,7 @@ import LanguageSelector from '../components/LanguageSelector';
 import { useLanguage } from '../context/LanguageContext';
 import { ThemedView, ThemedText } from '../components/ThemedView';
 import { useTheme } from '../context/ThemeContext';
+import ThemedStatusBar from '../components/ThemedStatusBar';
 
 const { width } = Dimensions.get('window'); // Get screen width
 import { useProStatus } from '../hooks/useProStatus';
@@ -31,7 +32,7 @@ const HomeScreen = ({ navigation }) => {
   const [isSidePanelVisible, setIsSidePanelVisible] = useState(false);
   const coinCount = useCoinsSubscription(uid);
   const { t } = useLanguage();
-  const { getThemeColors } = useTheme();
+  const { getThemeColors, statusBarStyle } = useTheme();
   const colors = getThemeColors();
   
   // Access the pro status
@@ -104,7 +105,7 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <ProStatusProvider>
-     
+      <ThemedStatusBar />
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Fixed Header */}
         <View style={[styles.fixedHeader, { backgroundColor: colors.background }]}>

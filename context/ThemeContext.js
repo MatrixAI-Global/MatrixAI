@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { getPreferredTheme, setPreferredTheme, DEFAULT_THEME, THEMES } from '../utils/themeUtils';
+import { StatusBar, Platform } from 'react-native';
+import { getPreferredTheme, setPreferredTheme, DEFAULT_THEME, THEMES, getStatusBarStyle } from '../utils/themeUtils';
 
 // Create theme context
 export const ThemeContext = createContext();
@@ -24,9 +25,20 @@ export const ThemeProvider = ({ children }) => {
     loadThemePreference();
   }, []);
 
+  // Update StatusBar when theme changes
+  useEffect(() => {
+    if (!loading) {
+      // Apply the correct status bar style based on theme with no animation
+      StatusBar.setBarStyle(getStatusBarStyle(currentTheme), true);
+    }
+  }, [currentTheme, loading]);
+
   // Function to change theme
   const changeTheme = async (theme) => {
     try {
+      // Set the StatusBar style immediately before state changes
+      StatusBar.setBarStyle(getStatusBarStyle(theme), true);
+      
       await setPreferredTheme(theme);
       setCurrentTheme(theme);
       return true;
@@ -41,6 +53,11 @@ export const ThemeProvider = ({ children }) => {
     return THEMES[currentTheme].colors;
   };
 
+  // Get current status bar style based on theme
+  const getCurrentStatusBarStyle = () => {
+    return getStatusBarStyle(currentTheme);
+  };
+
   return (
     <ThemeContext.Provider
       value={{
@@ -48,7 +65,8 @@ export const ThemeProvider = ({ children }) => {
         changeTheme,
         getThemeColors,
         loading,
-        themes: THEMES
+        themes: THEMES,
+        statusBarStyle: getCurrentStatusBarStyle()
       }}
     >
       {children}

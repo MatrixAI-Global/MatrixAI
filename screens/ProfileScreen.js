@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert,  Animated, Easing, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert,  Animated, Easing, Image, Switch } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Header from '../components/Header';
 import Header2 from '../components/Header copy';
@@ -16,20 +16,21 @@ import FeatureCardWithDetailsAddon from '../components/FeatureCardWithDetailsAdd
 import { useLanguage } from '../context/LanguageContext';
 import { clearLanguagePreference } from '../utils/languageUtils';
 import { useTheme } from '../context/ThemeContext';
-import { ThemedView, ThemedText, ThemedCard } from '../components/ThemedView';
 import { clearThemePreference } from '../utils/themeUtils';
-import { clearProStatus, getProStatus } from '../utils/proStatusUtils';
+import { ThemedView, ThemedText, ThemedCard } from '../components/ThemedView';
+import FuturisticSwitch from '../components/FuturisticSwitch';
 
 const ProfileScreen = ({ navigation }) => {
     const { uid, loading } = useAuth();
+    const { getThemeColors, currentTheme, changeTheme } = useTheme();
     const coinCount = useCoinsSubscription(uid);
     const [isSeller, setIsSeller] = useState(false);
     const [isVerified, setIsVerified] = useState(false);
     const { isPro, checkProStatus } = useProStatus();
     const [localIsPro, setLocalIsPro] = useState(false);
     const { t } = useLanguage();
-    const { getThemeColors } = useTheme();
     const colors = getThemeColors();
+    const [isDarkMode, setIsDarkMode] = useState(currentTheme === 'dark');
     
     // Check if user is pro when component mounts
     useEffect(() => {
@@ -56,6 +57,21 @@ const ProfileScreen = ({ navigation }) => {
         checkProStatusFromStorage();
     }, [isPro, uid]);
     
+    const toggleTheme = () => {
+        const newTheme = !isDarkMode ? 'dark' : 'light';
+        changeTheme(newTheme);
+        setIsDarkMode(!isDarkMode);
+    };
+    
+    const checkForUpdates = () => {
+        // Simulate update check
+        Alert.alert('Update Check', 'Your app is up to date.');
+    };
+    
+    // Update isDarkMode when theme changes
+    useEffect(() => {
+        setIsDarkMode(currentTheme === 'dark');
+    }, [currentTheme]);
     // Check user status when uid changes
     useEffect(() => {
         if (uid) {
@@ -228,10 +244,20 @@ const ProfileScreen = ({ navigation }) => {
     return (
         <SafeAreaView style={[styles.container2, {backgroundColor: colors.background}]}>
             <View style={[styles.header, {backgroundColor: colors.background2, borderBottomColor: colors.border}]}>
-                <TouchableOpacity style={[styles.backButton, {borderColor: colors.text}]} onPress={() => navigation.goBack()}>
-                    <Image source={require('../assets/back.png')} style={[styles.headerIcon, {tintColor: colors.text}]} />
-                </TouchableOpacity>
-                <ThemedText style={[styles.headerTitle, {color: colors.text}]}>{t('profile')}</ThemedText>
+                <View style={styles.headerLeftSection}>
+                    <TouchableOpacity style={[styles.backButton, {borderColor: colors.text}]} onPress={() => navigation.goBack()}>
+                        <Image source={require('../assets/back.png')} style={[styles.headerIcon, {tintColor: colors.text}]} />
+                    </TouchableOpacity>
+                    <ThemedText style={[styles.headerTitle, {color: colors.text}]}>{t('profile')}</ThemedText>
+                </View>
+             
+                <View style={styles.themeSwitchContainer}>
+                    <FuturisticSwitch
+                        value={isDarkMode}
+                        onValueChange={toggleTheme}
+                        colors={colors}
+                    />
+                </View>
             </View>
             
             <ScrollView 
@@ -370,24 +396,29 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         borderBottomWidth: 1,
         borderBottomColor: '#E0E0E0',
-      },
-      backButton: {
+        justifyContent: 'space-between',
+    },
+    headerLeftSection: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    backButton: {
         padding: 8,
         borderRadius: 20,
         borderWidth: 1,
         borderColor: '#E0E0E0',
-      },
-      headerIcon: {
+    },
+    headerIcon: {
         width: 24,
         height: 24,
         resizeMode: 'contain',
-      },
-      headerTitle: {
+    },
+    headerTitle: {
         fontSize: 18,
         fontWeight: 'bold',
         marginLeft: 16,
         color: '#333',
-      },
+    },
     timeCreditsContainer: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -500,6 +531,21 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginTop: 15,
       },
+    themeSwitchContainer: {
+        marginLeft: 'auto',
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingRight: 5,
+    },
+    switchRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginLeft: 'auto',
+    },
+    label: {
+        marginRight: 8,
+        fontSize: 14,
+    },
 });
 
 export default ProfileScreen;

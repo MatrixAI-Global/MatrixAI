@@ -89,4 +89,13 @@ export const clearThemePreference = async () => {
     console.error('Error clearing theme preference:', error);
     return false;
   }
+};
+
+// Get appropriate status bar style based on theme
+export const getStatusBarStyle = (theme) => {
+  if (theme === 'dark') {
+    return 'light-content'; // Light text for dark backgrounds
+  } else {
+    return 'dark-content'; // Dark text for light backgrounds
+  }
 }; 
