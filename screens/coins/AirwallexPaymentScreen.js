@@ -694,7 +694,7 @@ const AirwallexPaymentScreen = ({ navigation, route }) => {
             <Icon name="arrow-back" size={24} color="#FFF" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Payment Method</Text>
-          <View style={styles.backButton} />
+        
         </View>
 
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollViewContent}>
@@ -731,7 +731,7 @@ const AirwallexPaymentScreen = ({ navigation, route }) => {
           </View>
 
           {/* Airwallex Badge */}
-          <View style={styles.airwallexBadge}>
+          {/* <View style={styles.airwallexBadge}>
             <Text style={styles.poweredByText}>Powered by</Text>
             <Text style={styles.airwallexText}>AIRWALLEX</Text>
             {USE_MOCK_MODE && (
@@ -740,7 +740,7 @@ const AirwallexPaymentScreen = ({ navigation, route }) => {
               </View>
             )}
             <Text style={styles.securePaymentText}>Secure Global Payments</Text>
-          </View>
+          </View> */}
 
           {/* Payment Methods Section */}
           <View style={styles.section}>
@@ -828,6 +828,8 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#FFF',
+    textAlign: 'center',
+    alignSelf: 'center',
   },
   scrollView: {
     flex: 1,

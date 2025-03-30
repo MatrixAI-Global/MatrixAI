@@ -78,7 +78,7 @@ const BUYSubscription = ({ navigation, route }) => {
         title: 'Addon Plan',
         coins: '550 coins',
         duration: 'Until subscription',
-        expiry: 'Coins will expire after your subscription expires',
+        expiry: 'Coins will expire at end of this month',
         price: price
       };
     }

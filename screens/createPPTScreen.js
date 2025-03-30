@@ -14,6 +14,7 @@ import ReactNativeBlobUtil from 'react-native-blob-util';
 import PDFView from 'react-native-pdf';
 import PPTViewer from "../components/PPTViewer";
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../context/ThemeContext';
 const { width } = Dimensions.get("window");
 
 const CreatePPTScreen = ({ route, navigation }) => {
@@ -22,7 +23,8 @@ const CreatePPTScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true); // Track loading state
   const shimmerTranslateX = new Animated.Value(-200); // For shimmer animation
   const [presentationUrl, setPresentation] = useState('');
-
+  const { getThemeColors } = useTheme();
+  const colors = getThemeColors();
   const handleTryAgain = () => {
     setLoading(true);
     setPptUrl(null); // Clear previous PPT URL
@@ -90,21 +92,21 @@ const CreatePPTScreen = ({ route, navigation }) => {
   }, []); // Empty dependency array ensures this runs only once
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
       {loading && (
         <View style={styles.uploadingOverlay}>
           <ActivityIndicator size="medium" color="#88888874" />
-          <Text style={styles.uploadingText}>Creating...</Text>
+          <Text style={[styles.uploadingText, {color: colors.text}]}>Creating...</Text>
         </View>
       )}
-      <Text style={styles.heading}>
+      <Text style={[styles.heading, {color: colors.text}]}>
         {loading ? "Generating PPT" : "PPT Generated"}
       </Text>
       <Text style={styles.subtext2}>
         {message.length > 200 ? `${message.substring(0, 200)}...` : message}
       </Text>
       {loading && (
-        <Text style={styles.subtext}>
+        <Text style={[styles.subtext, {color: colors.text}]}>
           Please don’t turn off your phone or leave this screen while the create
           PPT is starting.
         </Text>

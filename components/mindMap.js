@@ -8,8 +8,11 @@ import { XMLParser } from 'fast-xml-parser';
 import Share from 'react-native-share';
 import ViewShot from 'react-native-view-shot';
 import RNFS from 'react-native-fs';
+import { useTheme } from '../context/ThemeContext';
 
 const ForceDirectedGraph = ({ transcription, uid, audioid, xmlData }) => {
+  const { getThemeColors } = useTheme();
+  const colors = getThemeColors();
   const [graphData, setGraphData] = useState(null);
   const viewShotRef = useRef(null);
   const [loading, setLoading] = useState(false);
@@ -575,7 +578,7 @@ const handleDownload = async () => {
 };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, {backgroundColor: colors.background}]}>
       <ViewShot 
         ref={viewShotRef} 
         options={{ format: 'png', quality: 1.0 }}

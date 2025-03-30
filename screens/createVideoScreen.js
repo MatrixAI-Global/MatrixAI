@@ -12,6 +12,7 @@ import {
 import axios from "axios";
 import Video from "react-native-video"; // Add the video player component
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../context/ThemeContext';
 const { width } = Dimensions.get("window");
 
 const CreateVideoScreen = ({ route, navigation }) => {
@@ -21,7 +22,8 @@ const CreateVideoScreen = ({ route, navigation }) => {
   const [modalVisible, setModalVisible] = useState(false); // Modal visibility state
   const [videoId, setVideoId] = useState(null); // Store videoId
   const shimmerTranslateX = new Animated.Value(-200); // For shimmer animation
-
+  const { getThemeColors } = useTheme();
+  const colors = getThemeColors();
   // Function to fetch the video URL using getVideo API
 // Function to fetch the video URL using getVideo API
 const fetchVideoUrl = async (videoId, retries = 0) => {
@@ -122,22 +124,22 @@ const fetchVideoUrl = async (videoId, retries = 0) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
       {loading && (
         <View style={styles.uploadingOverlay}>
           <ActivityIndicator size="medium" color="#88888874" />
-          <Text style={styles.uploadingText}>Generating Video...</Text>
+          <Text style={[styles.uploadingText, {color: colors.text}]}>Generating Video...</Text>
         </View>
       )}
       {loading ? (
-        <Text style={styles.heading}>Generating Video</Text>
+        <Text style={[styles.heading, {color: colors.text}]}>Generating Video</Text>
       ) : (
-        <Text style={styles.heading}>Video Ready</Text>
+        <Text style={[styles.heading, {color: colors.text}]}>Video Ready</Text>
       )}
       <Text style={styles.subtext2}>{message}</Text>
 
       {loading && (
-        <Text style={styles.subtext}>
+        <Text style={[styles.subtext, {color: colors.text}]}>
           Please don't turn off your phone or leave this screen while the video is generating.
         </Text>
       )}

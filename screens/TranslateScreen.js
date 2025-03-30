@@ -41,8 +41,11 @@ import Slider from '@react-native-community/slider'; // Import the Slider compon
   import DropDownPicker from 'react-native-dropdown-picker';
   import Svg, { Path } from 'react-native-svg';
   import LinearGradient from 'react-native-linear-gradient'; // Import LinearGradient
+  import { useTheme } from '../context/ThemeContext';
 
-  const TranslateScreen = ({ route }) => {
+    const TranslateScreen = ({ route }) => {
+    const { getThemeColors } = useTheme();
+    const colors = getThemeColors();
     const graphRef = useRef(null);
       const { audioid ,uid} = route.params || {};
       const scrollY = new Animated.Value(0);
@@ -1683,19 +1686,19 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
 
     return (
         
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
             
-            <View style={styles.headerContainer2}>
-                <Image source={require('../assets/logo12.png')} style={styles.headerTitle} />
+            <View style={[styles.headerContainer2, {backgroundColor: colors.background2}]}>
+                <Image source={require('../assets/logo12.png')} style={[styles.headerTitle, {tintColor: colors.text}]       } />
             </View>
-                 <View style={styles.headerContainer}>
+                 <View style={[styles.headerContainer, {backgroundColor: colors.background2}]}>
                 <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
                     <Image
                         source={require('../assets/back.png')}
-                        style={styles.headerIcon}
+                        style={[styles.headerIcon, {tintColor: colors.text}]    }
                     />
                 </TouchableOpacity>
-                <Text style={styles.header}>
+                <Text style={[styles.header, {color: colors.text}]  }>
                     {fileName.length > 20 ? `${fileName.substring(0, 20)}...` : fileName}
                 </Text>
                 <View style={{ flexDirection: 'row' }}>
@@ -1708,7 +1711,7 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                     <TouchableOpacity style={styles.iconButton} onPress={toggleSlider}>
                         <Image
                             source={require('../assets/threeDot.png')}
-                            style={styles.icon}
+                            style={[styles.icon, {tintColor: colors.text}]}
                         />
                     </TouchableOpacity>
                 </View>
@@ -2101,13 +2104,13 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                                     />
                                 ) : (
                                     index === currentWordIndex.paraIndex && wordTimings[index]?.words ? (
-                                        <Text style={styles.paragraphText}>
+                                        <Text style={[styles.paragraphText, {color: colors.text}]}>
                                             {wordTimings[index].words.map((wordData, wordIdx) => {
                                                 const word = wordData.punctuated_word || wordData.word;
                                                 return (
                                                     <Text 
                                                         key={wordIdx} 
-                                                        style={wordIdx === currentWordIndex.wordIndex ? styles.highlightedWord : styles.word}
+                                                        style={[wordIdx === currentWordIndex.wordIndex ? styles.highlightedWord : styles.word, {color: colors.text}]}
                                                         onPress={() => {
                                                             // Jump to this word's timestamp when clicked
                                                             if (sound && wordData.start !== undefined) {

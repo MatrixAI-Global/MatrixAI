@@ -12,8 +12,11 @@ import {
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useTheme } from '../context/ThemeContext';
 
 const ImageGenerateScreen = () => {
+  const { getThemeColors } = useTheme();
+  const colors = getThemeColors();
   const [userText, setUserText] = useState('');
   const [isFinished, setIsFinished] = useState(false);
   const [transcription, setTranscription] = useState(
@@ -71,32 +74,32 @@ const ImageGenerateScreen = () => {
 
   return (
     
-<Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+<Animated.View style={[styles.container, { opacity: fadeAnim, backgroundColor: colors.background}]}>
   {/* Header Animation */}
  
-  <Animated.View style={[styles.header, { transform: [{ scale: scaleAnim }] }]}>
+  <Animated.View style={[styles.header, { transform: [{ scale: scaleAnim }], backgroundColor: colors.background2}]}>
   <TouchableOpacity 
           style={[styles.backButton]} 
           onPress={() => navigation.goBack()}
         >
-          <Image source={require('../assets/back.png')} style={[styles.headerIcon]} />
+          <Image source={require('../assets/back.png')} style={[styles.headerIcon, {tintColor: colors.text}]} />
         </TouchableOpacity>
-              <Text style={styles.headerTitle}>Matrix AI</Text>
+              <Text style={[styles.headerTitle, {color: colors.text}] }>Matrix AI</Text>
             
           </Animated.View>
           <Animated.View style={[styles.placeholderContainer, { opacity: fadeAnim }]}>
           <Image   
             source={require('../assets/matrix.png')}
-            style={{width: 120, height: 120,resizeMode:'contain',marginTop:20}}
+            style={[styles.placeholderImage, {tintColor: colors.text}]}
           />
-          <Text style={styles.placeholderText}>Hi, Welcome to Matrix AI</Text>
-          <Text style={styles.placeholderText2}>What can I generate for you today?</Text>
+          <Text style={[styles.placeholderText, {color: colors.text}]}>Hi, Welcome to Matrix AI</Text>
+          <Text style={[styles.placeholderText2, {color: colors.text}]}>What can I generate for you today?</Text>
         </Animated.View>
         <LottieView 
     source={require('../assets/image.json')}
     autoPlay
     loop
-    style={{width: '100%', height: 100}}
+    style={{width: '100%', height: 100, backgroundColor: colors.background2}}
   />
       {/* Text Input Box */}
       <KeyboardAvoidingView

@@ -29,7 +29,7 @@ import RNFS from 'react-native-fs';
 import { Buffer } from 'buffer';
 import { supabase } from '../supabaseClient';
 import Toast from 'react-native-toast-message';
-
+import { useTheme } from '../context/ThemeContext';
 import LeftNavbarBot from '../components/LeftNavbarBot';
 
 // Function to decode base64 to ArrayBuffer
@@ -38,7 +38,9 @@ const decode = (base64) => {
   return bytes;
 };
 
-const BotScreen = ({ navigation, route }) => {
+  const BotScreen = ({ navigation, route }) => {
+  const { getThemeColors } = useTheme();
+  const colors = getThemeColors();
   // Default fallback values for route params
   const { chatName, chatDescription, chatImage, chatid = Date.now().toString() } = route?.params || {};
   
@@ -1958,7 +1960,7 @@ const BotScreen = ({ navigation, route }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
       
       {/* Back Button */}
       <TouchableOpacity 
@@ -1979,11 +1981,11 @@ const BotScreen = ({ navigation, route }) => {
       </TouchableOpacity>
       
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, {backgroundColor: colors.background2}]}>
         <TouchableOpacity style={styles.backButton2} onPress={() => navigation.goBack()}>
-         <Image source={require('../assets/back.png')} style={styles.headerIcon3} />
+         <Image source={require('../assets/back.png')} style={[styles.headerIcon3, {tintColor: colors.text}]} />
         </TouchableOpacity>
-        <Image source={require('../assets/Avatar/Cat.png')} style={styles.botIcon} />
+          <Image source={require('../assets/Avatar/Cat.png')} style={styles.botIcon} />
         <View style={styles.headerTextContainer}>
         
           {currentRole && <Text style={styles.botRole}>{currentRole}</Text>|| <Text style={styles.botRole}>MatrixAI Bot</Text>}
@@ -2173,7 +2175,7 @@ const BotScreen = ({ navigation, route }) => {
           </View>
 
           {showAdditionalButtons && (
-            <View style={styles.additionalButtonsContainer}>
+            <View style={[styles.additionalButtonsContainer, {backgroundColor: colors.background2}]  }>
               <View style={styles.buttonRow}>
                 <TouchableOpacity style={styles.additionalButton2} onPress={() => handleImageOCR('camera')}>
                   <View style={styles.additionalButton}>

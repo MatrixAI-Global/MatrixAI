@@ -2,16 +2,19 @@ import React, { useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 const { width, height } = Dimensions.get('window');
+import { useTheme } from '../context/ThemeContext';
 
 const OnboardingScreen = ({ navigation,onFinish }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const scrollViewRef = useRef(null);
+    const { getThemeColors } = useTheme();
+    const colors = getThemeColors();
 
     const slides = [
         {
             title: "Welcome to Matrix AI",
             description: "Unlimited audio files (up to 500 hours)",
-            image: require('../assets/OnBoard/1.png'),
+            image: require('../assets/matrix.png'),
         },
         {
             title: "Generate with 150 Languages, AI Voices",
@@ -47,7 +50,7 @@ const OnboardingScreen = ({ navigation,onFinish }) => {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
             <ScrollView
                 horizontal
                 pagingEnabled

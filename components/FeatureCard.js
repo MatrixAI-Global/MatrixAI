@@ -1,15 +1,13 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet, Dimensions, Animated } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { ThemedCard, ThemedText } from './ThemedView';
-import { useTheme } from '../context/ThemeContext';
+
 
 const { width } = Dimensions.get('window'); // Get the screen width
 
 const FeatureCard = ({ title, description, iconSource, navigation, targetScreen }) => {
   const rotation = useRef(new Animated.Value(0)).current;
-  const { getThemeColors } = useTheme();
-  const colors = getThemeColors();
+
 
   useEffect(() => {
     // Start the rotation animation
@@ -33,7 +31,7 @@ const FeatureCard = ({ title, description, iconSource, navigation, targetScreen 
 
   return (
     <TouchableOpacity
-      style={[styles.card, { width: cardSize, height: cardSize, backgroundColor: colors.card }]}
+      style={[styles.card, { width: cardSize, height: cardSize }]}
       onPress={() => navigation.navigate(targetScreen)} // Navigate to the target screen
     >
       {/* Animated Gradient Background */}
@@ -60,8 +58,8 @@ const FeatureCard = ({ title, description, iconSource, navigation, targetScreen 
         </View>
 
         {/* Card content */}
-        <ThemedText style={styles.cardTitle}>{title}</ThemedText>
-        <ThemedText style={styles.cardDescription}>{description}</ThemedText>
+        <Text style={styles.cardTitle}>{title}</Text>
+        <Text style={styles.cardDescription}>{description}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -117,6 +115,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: '#fff',
     textAlign: 'left', // Center align the title
     width: '100%',
     marginTop: -8,
@@ -126,6 +125,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
     textAlign: 'left', // Center align the description
     width: '100%',
+    color: '#fff',
   },
 });
 

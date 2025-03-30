@@ -5,10 +5,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthUser } from '../../hooks/useAuthUser';
 import { useCoinsSubscription } from '../../hooks/useCoinsSubscription';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useTheme } from '../../context/ThemeContext';  
 
 const TransactionScreen = ({ route, navigation }) => {
   const [transactions, setTransactions] = useState([]);
-
+  const { getThemeColors } = useTheme();
+  const colors = getThemeColors();
   const [loading, setLoading] = useState(true);
   const { uid } = useAuthUser();
   const coinCount = useCoinsSubscription(uid);
@@ -58,28 +60,28 @@ const TransactionScreen = ({ route, navigation }) => {
   };
 
   const renderItem = ({ item }) => (
-    <View style={styles.transactionItem}>
+    <View style={[styles.transactionItem, {backgroundColor: colors.card}]}>
       <View style={styles.iconContainer}>
       <Icon name={getTransactionIcon(item.transaction_name)} size={30} color="#4169E1" style={styles.image} />
       </View>
       <View style={styles.transactionDetails}>
-        <Text style={styles.transactionType}>{item.transaction_name}</Text>
-        <Text style={styles.transactionSubText}>{formatDate(item.time)}</Text>
+        <Text style={[styles.transactionType, {color: colors.text}]}>{item.transaction_name}</Text>
+        <Text style={[styles.transactionSubText, {color: colors.text}]}>{formatDate(item.time)}</Text>
       </View>
       <View style={styles.coinsContainer}>
-        <Text style={[styles.coinsText, item.status === 'success' ? styles.successText : styles.pendingText]}>
+        <Text style={[styles.coinsText, {color: colors.text}, item.status === 'success' ? styles.successText : styles.pendingText]}>
           {item.coin_amount} Coins
         </Text>
-        <Text style={styles.statusText}>{item.status}</Text>
+        <Text style={[styles.statusText, {color: colors.text}]}>{item.status}</Text>
       </View>
     </View>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: colors.background}] }>
       {/* Back button */}
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-        <Image source={require('../../assets/back.png')} style={styles.headerIcon} />
+        <Image source={require('../../assets/back.png')} style={[styles.headerIcon, {tintColor: colors.text}] } />
       </TouchableOpacity>
 
       {/* Header with full background */}
@@ -119,7 +121,7 @@ const TransactionScreen = ({ route, navigation }) => {
 
       {/* Transaction List */}
       <View style={styles.transactionsHeader}>
-        <Text style={styles.subtitle}>Last Transaction</Text>
+        <Text style={[styles.subtitle, {color: colors.text}]}>Last Transaction</Text>
         <TouchableOpacity onPress={() => navigation.navigate('TransactionScreen2')}>
           <Text style={styles.viewAllText}>View All</Text>
         </TouchableOpacity>

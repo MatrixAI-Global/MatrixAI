@@ -1032,7 +1032,7 @@ const AudioVideoUploadScreen = () => {
                                 <Text style={[styles.convert, {color: colors.text}]}>
                                     Convert
                                 </Text>
-                                <Image source={Translate} style={[styles.detailIcon5, {tintColor: colors.text}]     } />
+                                <Image source={Translate} style={[styles.detailIcon5]     } />
                             </>
                         )}
                     </TouchableOpacity>
@@ -1240,14 +1240,14 @@ const AudioVideoUploadScreen = () => {
                                    />
                                </TouchableOpacity>
                 <TouchableOpacity style={styles.topButton} onPress={handleFileSelect}>
-                    <Image source={uploadIcon} style={[styles.topIcon, {tintColor: colors.text}]} />
+                    <Image source={uploadIcon} style={[styles.topIcon]} />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.topButton2}>
-                    <Image source={resizeIcon} style={[styles.topIcon, {tintColor: colors.text}]} />
+                    <Image source={resizeIcon} style={[styles.topIcon]} />
                 </TouchableOpacity>
                 <View style={styles.topHelp}>
-                    <Image source={helpIcon2} style={[styles.topHelpIcon, {tintColor: colors.text}]} />
-                    <Text style={[styles.helpText, {color: colors.text}]}>How to add voice memos to Transcribe</Text>
+                    <Image source={helpIcon2} style={[styles.topHelpIcon]} />
+                    <Text style={[styles.helpText]}>How to add voice memos to Transcribe</Text>
                 </View>
             </View>
             {/* Loading Indicator */}
@@ -1308,8 +1308,8 @@ const AudioVideoUploadScreen = () => {
                     <ActivityIndicator color="#fff" size="small" />
                 ) : (
                     <>
-                        <Image source={require('../assets/remove.png')} style={[styles.deleteIcon, {tintColor: colors.text}]} />
-                        <Text style={[styles.deleteAllButtonText, {color: colors.text}]}>Delete All</Text>
+                        <Image source={require('../assets/remove.png')} style={[styles.deleteIcon]} />
+                        <Text style={[styles.deleteAllButtonText]}>Delete All</Text>
                     </>
                 )}
             </TouchableOpacity>
@@ -1317,13 +1317,13 @@ const AudioVideoUploadScreen = () => {
             {/* Add File Floating Button */}
           
             <TouchableOpacity style={[styles.floatingButton]} onPress={handleFloatingButtonPress}>
-                <Image source={micIcon} style={[styles.floatingButtonIcon, {tintColor: colors.text}]} />
+                <Image source={micIcon} style={[styles.floatingButtonIcon]} />
             </TouchableOpacity>
     
     
             {popupVisible && (
-    <View style={[styles.popupContainer, {backgroundColor: colors.background}]}>
-        <View style={[styles.popupContent, {backgroundColor: colors.background2}]}>
+    <View style={[styles.popupContainer]}>
+        <View style={[styles.popupContent, {backgroundColor: colors.card}]}>
             <Text style={[styles.popupText, {color: colors.text}]}>Upload Audio</Text>
             
             <View style={styles.languageSelector}>
@@ -1346,14 +1346,14 @@ const AudioVideoUploadScreen = () => {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                    style={[styles.actionButton, {backgroundColor: colors.background2}]}
+                    style={[styles.actionButton]}
                     onPress={async () => {
                         await handleUpload(audioFile, duration);
                     }}
                     disabled={uploading}
                 >
-                    <Text style={[styles.convert2, {color: colors.text}]}>-{duration}</Text>
-                    <Image source={coin} style={[styles.detailIcon2, {tintColor: colors.text}]} />
+                    <Text style={[styles.convert2 ]}>{duration}</Text>
+                    <Image source={coin} style={[styles.detailIcon2]} />
 
                     {uploading ? (
                         <View style={{flexDirection: 'row', alignItems: 'center'}}>
@@ -1366,7 +1366,7 @@ const AudioVideoUploadScreen = () => {
                         <Text style={[styles.convert, {color: colors.text}]}>Convert</Text>
                     )}
 
-                    <Image source={Translate} style={[styles.detailIcon5, {tintColor: colors.text}]} />
+                    <Image source={Translate} style={[styles.detailIcon5]} />
                 </TouchableOpacity>
             </View>
             

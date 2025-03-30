@@ -22,7 +22,7 @@ const FeatureCardWithDetailsPro = () => {
                 <View style={styles.titleContainer}>
                     <Text style={[styles.title, {color: colors.text}]}>Pro Features</Text>
                     <View style={styles.proBadge}>
-                        <Text style={[styles.proText, {color: colors.text}]}>ACTIVE</Text>
+                        <Text style={[styles.proText ]}>ACTIVE</Text>
                     </View>
                 </View>
             </View>

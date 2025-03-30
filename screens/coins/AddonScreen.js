@@ -74,7 +74,7 @@ const AddonScreen = ({ navigation }) => {
 
       <View style={styles.planTextContainer}>
         <Text style={styles.planText}>
-          *These coins will be added to your existing balance. and expire with your subscription.
+          *These coins will be added to your existing balance. and expire end of this month.
         </Text>
         <TouchableOpacity style={styles.tcButton} onPress={handleTermsAndConditions}>
           <Text style={styles.tcButtonText}>T&C Applied</Text>

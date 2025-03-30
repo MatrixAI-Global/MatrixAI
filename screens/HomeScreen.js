@@ -104,10 +104,8 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <ProStatusProvider>
-      <SafeAreaView edges={['top']} style={styles.statusBarContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="#2A76F1" />
-      </SafeAreaView>
-      <SafeAreaView edges={['bottom', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
+     
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Fixed Header */}
         <View style={[styles.fixedHeader, { backgroundColor: colors.background }]}>
           <Header navigation={navigation} uid={uid} openDrawer={toggleSidePanel} />

@@ -15,6 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthUser } from '../hooks/useAuthUser';
+import { useTheme } from '../context/ThemeContext';
 const audioIcon = require('../assets/mic3.png');
 const videoIcon = require('../assets/cliper.png');
 const backIcon = require('../assets/back.png');
@@ -26,8 +27,10 @@ const micIcon = require('../assets/mic3.png');
 const clockIcon = require('../assets/clock.png');
 const calendarIcon = require('../assets/calender.png');
 
-const VideoUploadScreen = () => {
+  const VideoUploadScreen = () => {
   const navigation = useNavigation();
+  const { getThemeColors } = useTheme();
+  const colors = getThemeColors();
   const [files, setFiles] = useState([]);
   const [imageDescription, setImageDescription] = useState('');
   const [selectedImage, setSelectedImage] = useState(null);
@@ -214,17 +217,17 @@ const fetchImages = async (UID) => {
       
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
      
      <View style={styles.header3}>
-           <Image source={require('../assets/logo12.png')} style={styles.headerIcon2} />
+           <Image source={require('../assets/logo12.png')} style={[styles.headerIcon2, {tintColor: colors.text}]  } />
            </View>
           
             <View style={styles.topButtonsContainer}>
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
                                    <Image
                                        source={require('../assets/back.png')} 
-                                       style={styles.headerIcon}
+                                       style={[styles.headerIcon, {tintColor: colors.text}]}
                                    />
                                </TouchableOpacity>
                 <TouchableOpacity style={styles.topButton} onPress={handleFileSelect}>
@@ -233,7 +236,7 @@ const fetchImages = async (UID) => {
               
                 <View style={styles.topHelp}>
                     <Image source={helpIcon2} style={styles.topHelpIcon} />
-                    <Text style={styles.helpText}>How to add voice memos to Transcribe</Text>
+                    <Text style={[styles.helpText, {color: colors.text}]      }>How to add voice memos to Transcribe</Text>
                 </View>
             </View>
 
@@ -248,7 +251,7 @@ const fetchImages = async (UID) => {
           />
         </View>
         <TouchableOpacity style={styles.filterButton}>
-          <Image source={require('../assets/select-all.png')} style={styles.filterIcon} />
+          <Image source={require('../assets/select-all.png')} style={[styles.filterIcon, {tintColor: colors.text}]} />
         </TouchableOpacity>
       </View>
 

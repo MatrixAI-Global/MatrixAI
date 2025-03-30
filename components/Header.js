@@ -109,7 +109,7 @@ const Header = ({ navigation, uid, openDrawer }) => {
                 <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
                     <Image 
                         source={dpUrl ? { uri: dpUrl } : require('../assets/Avatar/Cat.png')} 
-                        style={[styles.icon, {borderColor: colors.text}]} 
+                        style={[styles.icon]} 
                     />
                 </TouchableOpacity>
                 
@@ -123,7 +123,7 @@ const Header = ({ navigation, uid, openDrawer }) => {
                                     {userName} 
                                 </Text>
                                 <View style={styles.proBadge}>
-                                    <Text style={[styles.proText, {color: colors.text}]}>PRO</Text>
+                                    <Text style={[styles.proText]}>PRO</Text>
                                 </View>
                             </View>
                         ) : (

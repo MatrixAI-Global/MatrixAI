@@ -4,12 +4,14 @@ import axios from 'axios';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useAuthUser } from '../../hooks/useAuthUser';
-
+import { useTheme } from '../../context/ThemeContext';
 const TransactionScreen2 = ({ navigation }) => {
 
   const { uid } = useAuthUser();
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { getThemeColors } = useTheme();
+  const colors = getThemeColors();
 
   useEffect(() => {
     fetchTransactions();
@@ -54,20 +56,20 @@ const TransactionScreen2 = ({ navigation }) => {
   };
 
   const renderItem = ({ item }) => (
-    <View style={styles.transactionItem}>
+    <View style={[styles.transactionItem, {backgroundColor: colors.card}]}>
       <View style={styles.iconContainer}>
         <Icon name={getTransactionIcon(item.transaction_name)} size={30} color="#4169E1" style={styles.image} />
       </View>
       <View style={styles.transactionDetails}>      
-        <Text style={styles.transactionType}>{item.transaction_name}</Text>
-        <Text style={styles.transactionSubText}>{formatDate(item.time)}</Text>
-        <Text style={styles.balanceText}>Balance: {item.remaining_coins} coins</Text>
+        <Text style={[styles.transactionType, {color: colors.text}]}>{item.transaction_name}</Text>
+        <Text style={[styles.transactionSubText, {color: colors.text}]}>{formatDate(item.time)}</Text>
+        <Text style={[styles.balanceText, {color: colors.text}]}>Balance: {item.remaining_coins} coins</Text>
       </View>
       <View style={styles.coinsContainer}>
-        <Text style={[styles.coinsText, item.status === 'success' ? styles.successText : styles.pendingText]}>
+        <Text style={[styles.coinsText, {color: colors.text}, item.status === 'success' ? styles.successText : styles.pendingText]}>
           {item.coin_amount} Coins
         </Text>
-        <Text style={[styles.statusText, item.status === 'success' ? styles.successText : styles.pendingText]}>
+        <Text style={[styles.statusText, {color: colors.text}, item.status === 'success' ? styles.successText : styles.pendingText]}>
           {item.status}
         </Text>
       </View>
@@ -75,12 +77,12 @@ const TransactionScreen2 = ({ navigation }) => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Image source={require('../../assets/back.png')} style={styles.backIcon} />
+          <Image source={require('../../assets/back.png')} style={[styles.backIcon, {tintColor: colors.text}]} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Transaction History</Text>
+        <Text style={[styles.headerTitle, {color: colors.text}]}>Transaction History</Text>
       </View>
 
       {loading ? (
