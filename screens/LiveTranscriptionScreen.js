@@ -36,7 +36,13 @@ let chunkStartTime = 0; // Track when we started collecting the current chunk
 let currentChunkBuffers = []; // Collect raw buffer chunks instead of base64 strings
 let chunkCounter = 0; // Counter for chunks
 let websocketReady = false; // Flag to indicate when WebSocket is fully ready to receive audio
-
+const generateSimpleUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
 // TextDecoder polyfill for React Native
 // Since TextDecoder is not available natively in RN environment
 const decodeUTF8 = (bytes) => {
@@ -1499,6 +1505,7 @@ const LiveTranscriptionScreen = ({ navigation }) => {
     }
   };
 
+
   const handleWebSocketMessage = (data) => {
     try {
       // Parse the binary message
@@ -1868,7 +1875,7 @@ const LiveTranscriptionScreen = ({ navigation }) => {
       {/* Sliding White Section - Only visible in translate mode */}
       <Animated.View style={[styles.bottomSection, { transform: [{ translateY: slideAnimation }] }]}>
         <ScrollView contentContainerStyle={styles.scrollView}>
-          <Text style={styles.translatedText}>{translatedText || 'Translated Text'}</Text>
+          <Text style={styles.translatedText}>{translatedText || ''}</Text>
         </ScrollView>
       </Animated.View>
 

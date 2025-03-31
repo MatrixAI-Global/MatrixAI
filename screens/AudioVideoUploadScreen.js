@@ -1387,7 +1387,7 @@ const AudioVideoUploadScreen = () => {
                     {uploading ? (
                         <View style={{flexDirection: 'row', alignItems: 'center'}}>
                             <ActivityIndicator size="small" color="#0000ff" />
-                            <Text style={[styles.convert, {marginLeft: 5}]}>
+                            <Text style={[styles.convert, {marginLeft: 5, color: colors.text}]}>
                                 Uploading...
                             </Text>
                         </View>

@@ -1,13 +1,14 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet, Dimensions, Animated } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window'); // Get the screen width
 
 const FeatureCard = ({ title, description, iconSource, navigation, targetScreen }) => {
   const rotation = useRef(new Animated.Value(0)).current;
-
+  const { getThemeColors } = useTheme();
+  const colors = getThemeColors();
 
   useEffect(() => {
     // Start the rotation animation
@@ -44,7 +45,7 @@ const FeatureCard = ({ title, description, iconSource, navigation, targetScreen 
         ]}
       >
         <LinearGradient
-          colors={['#D9D3FCFF', '#20BDFF', '#A5FECB']}
+          colors={['#D9D3FCFF', colors.primary, '#A5FECB']}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
           style={styles.gradientBackground}

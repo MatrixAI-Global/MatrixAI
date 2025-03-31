@@ -50,7 +50,7 @@ import Slider from '@react-native-community/slider'; // Import the Slider compon
       const { audioid ,uid} = route.params || {};
       const scrollY = new Animated.Value(0);
       const playerHeight = scrollY.interpolate({
-          inputRange: [0, 200],
+          inputRange: [0, 100],
           outputRange: [120, 60],
           extrapolate: 'clamp',
       });
@@ -190,12 +190,14 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
         const fetchData = async () => {
             const cachedData = await AsyncStorage.getItem(`audioData-${audioid}`);
             if (cachedData) {
-                const { transcription, paragraphs, audioUrl, keyPoints, XMLData } = JSON.parse(cachedData);
+                const { transcription, paragraphs, audioUrl, keyPoints, XMLData, duration: cachedDuration, audioDuration: cachedAudioDuration } = JSON.parse(cachedData);
                 setTranscription(transcription);
                 setParagraphs(paragraphs);
                 setAudioUrl(audioUrl);
                 setKeypoints(keyPoints);
-               
+                // Set both duration values from cache if available
+                if (cachedDuration) setDuration(cachedDuration);
+                if (cachedAudioDuration) setAudioDuration(cachedAudioDuration);
                 setIsLoading(false);
             } else {
                 fetchAudioMetadata(uid, audioid);
@@ -1138,12 +1140,15 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                                                     console.log('Successfully loaded audio from downloaded file');
                                                     localSound.setVolume(1.0);
                                                     
-                                                    // Use the duration from the API if available
-                                                    if (duration && duration > 0) {
-                                                        setAudioDuration(duration);
-                                                    } else {
-                                                        const soundDuration = localSound.getDuration();
-                                                        setAudioDuration(soundDuration > 0 ? soundDuration : 30);
+                                                    // Only update audioDuration if we don't already have a valid one
+                                                    if (!audioDuration || audioDuration <= 0) {
+                                                        // Use the duration from the API if available
+                                                        if (duration && duration > 0) {
+                                                            setAudioDuration(duration);
+                                                        } else {
+                                                            const soundDuration = localSound.getDuration();
+                                                            setAudioDuration(soundDuration > 0 ? soundDuration : 30);
+                                                        }
                                                     }
                                                     setSound(localSound);
                                                 }
@@ -1181,20 +1186,33 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                 
                         // Get duration with a delay to ensure it's properly loaded
                         setTimeout(() => {
-                const duration = newSound.getDuration();
-                            console.log('Audio duration:', duration);
-                            
-                            if (duration && duration > 0) {
-                    setAudioDuration(duration);
-                    setSound(newSound);
+                            // Only update audioDuration if we don't already have a valid one from cache
+                            if (!audioDuration || audioDuration <= 0 || audioDuration === 100) {
+                                // First try to use the API-provided duration
+                                if (duration && duration > 0) {
+                                    console.log('Using API-provided duration:', duration);
+                                    setAudioDuration(duration);
+                                } else {
+                                    // Fall back to Sound.js duration
+                                    const soundDuration = newSound.getDuration();
+                                    console.log('Using Sound.js duration:', soundDuration);
+                                    
+                                    if (soundDuration && soundDuration > 0) {
+                                        setAudioDuration(soundDuration);
+                                    } else {
+                                        // Try to get current time as fallback
+                                        newSound.getCurrentTime((seconds) => {
+                                            console.log('Current time fallback:', seconds);
+                                            setAudioDuration(seconds > 0 ? seconds : 30);
+                                        });
+                                    }
+                                }
                             } else {
-                                // Try to get current time as fallback
-                                newSound.getCurrentTime((seconds) => {
-                                    console.log('Current time fallback:', seconds);
-                                    setAudioDuration(seconds > 0 ? seconds : 30);
-                                    setSound(newSound);
-                                });
+                                console.log('Using cached duration:', audioDuration);
                             }
+                            
+                            // Always set the sound object regardless of duration source
+                            setSound(newSound);
                         }, 500);
                     });
                 } catch (e) {
@@ -1223,7 +1241,7 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                 sound.release();
             }
         };
-    }, [audioUrl, duration]);
+    }, [audioUrl, duration, audioDuration]);
 
     useEffect(() => {
         let interval;
@@ -1510,7 +1528,8 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                 setTranscription(data.transcription || '');
                 setFileName(data.audio_name || 'Untitled');
                 setFileContent(data.file_path || '');
-                setDuration(data.duration || 0);
+                const audioDur = data.duration || 0;
+                setDuration(audioDur);
 
                 // Directly use the audio_url from the response
                 setAudioUrl(data.audio_url || '');
@@ -1541,6 +1560,17 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                 // Set key points and XML data
                 setKeypoints(data.key_points || '');
                 setXMLData(data.xml_data || '');
+                
+                // Cache the data with duration included
+                await AsyncStorage.setItem(`audioData-${audioid}`, JSON.stringify({
+                    transcription: data.transcription || '',
+                    paragraphs: paragraphs || [],
+                    audioUrl: data.audio_url || '',
+                    keyPoints: data.key_points || '',
+                    XMLData: data.xml_data || '',
+                    duration: audioDur,
+                    audioDuration: audioDur
+                }));
             } else {
                 console.error('Error fetching audio metadata:', data.error);
                 Alert.alert('Error', 'Failed to load audio data');

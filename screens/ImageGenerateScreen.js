@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,12 +12,14 @@ import {
   Platform,
   ScrollView,
   Dimensions,
-  FlatList
+  FlatList,
+  ActivityIndicator
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
-
+import { useAuthUser } from '../hooks/useAuthUser';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 const { width, height } = Dimensions.get('window');
 
 const ImageGenerateScreen = () => {
@@ -34,28 +36,49 @@ const ImageGenerateScreen = () => {
   const navigation = useNavigation();
   const [historyOpen, setHistoryOpen] = useState(false);
   const historySlideAnim = useRef(new Animated.Value(width)).current;
+  const { uid, loading } = useAuthUser();
   
-  // Mock data for history
-  const [imageHistory, setImageHistory] = useState([
-    {
-      id: '1',
-      imageUrl: 'https://via.placeholder.com/150',
-      prompt: 'A beautiful sunset over mountains',
-      date: '2023-05-20',
-    },
-    {
-      id: '2',
-      imageUrl: 'https://via.placeholder.com/150',
-      prompt: 'Futuristic city with flying cars',
-      date: '2023-05-18',
-    },
-    {
-      id: '3',
-      imageUrl: 'https://via.placeholder.com/150',
-      prompt: 'Abstract digital art with vibrant colors',
-      date: '2023-05-15',
-    },
-  ]);
+  // Replace mock data with actual state
+  const [imageHistory, setImageHistory] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  
+  // Fetch image history when history panel is opened
+  useEffect(() => {
+    if (historyOpen && uid) {
+      fetchImageHistory();
+    }
+  }, [historyOpen, uid]);
+
+  const fetchImageHistory = async () => {
+    if (!uid) return;
+    
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch(
+        `https://matrix-server.vercel.app/getGeneratedImage?uid=${uid}`,
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch image history');
+      }
+      
+      const result = await response.json();
+      setImageHistory(result.data || []);
+    } catch (err) {
+      console.error('Error fetching image history:', err);
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   React.useEffect(() => {
     Animated.parallel([
@@ -114,15 +137,23 @@ const ImageGenerateScreen = () => {
 
   const renderHistoryItem = ({ item }) => (
     <View style={styles.historyItem}>
-      <Image source={{ uri: item.imageUrl }} style={styles.historyImage} />
+      <Image 
+        source={{ uri: item.image_url }} 
+        style={styles.historyImage}
+        resizeMode="cover"
+      />
       <View style={styles.historyItemContent}>
-        <Text style={styles.historyDate}>{item.date}</Text>
-        <Text style={styles.historyPrompt} numberOfLines={2}>{item.prompt}</Text>
+        <Text style={styles.historyDate}>
+          {new Date(item.created_at).toLocaleDateString()}
+        </Text>
+        <Text style={styles.historyPrompt} numberOfLines={2}>
+          {item.prompt_text}
+        </Text>
         <View style={styles.historyActions}>
-          <TouchableOpacity style={styles.historyActionButton}>
-            <Image source={require('../assets/back.png')} style={[styles.historyActionIcon, {tintColor: '#fff'}]} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.historyActionButton}>
+          <TouchableOpacity 
+            style={styles.historyActionButton}
+            onPress={() => navigation.navigate('CreateImageScreen', { message: item.prompt_text })}
+          >
             <Image source={require('../assets/send2.png')} style={[styles.historyActionIcon, {tintColor: '#fff'}]} />
           </TouchableOpacity>
         </View>
@@ -147,7 +178,7 @@ const ImageGenerateScreen = () => {
             style={[styles.historyButton]} 
             onPress={toggleHistory}
           >
-            <Image source={require('../assets/back.png')} style={[styles.headerIcon, {tintColor: colors.text, transform: [{rotate: '180deg'}]}]} />
+          <MaterialIcons name="history" size={24} color={colors.text} />
           </TouchableOpacity>
         </Animated.View>
         
@@ -249,13 +280,35 @@ const ImageGenerateScreen = () => {
             />
           </TouchableOpacity>
         </View>
-        <FlatList
-          data={imageHistory}
-          renderItem={renderHistoryItem}
-          keyExtractor={item => item.id}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.historyList}
-        />
+        
+        {isLoading ? (
+          <View style={styles.loaderContainer}>
+            <ActivityIndicator size="large" color="#007BFF" />
+            <Text style={styles.loaderText}>Loading your images...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity 
+              style={styles.retryButton}
+              onPress={fetchImageHistory}
+            >
+              <Text style={styles.retryText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : imageHistory.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No images generated yet</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={imageHistory}
+            renderItem={renderHistoryItem}
+            keyExtractor={item => item.image_id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.historyList}
+          />
+        )}
       </Animated.View>
     </View>
   );
@@ -471,6 +524,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   historyItemContent: {
     flex: 1,
@@ -499,6 +553,50 @@ const styles = StyleSheet.create({
   historyActionIcon: {
     width: 16,
     height: 16,
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loaderText: {
+    color: '#fff',
+    marginTop: 10,
+    fontSize: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    color: '#ff6b6b',
+    marginBottom: 15,
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#007BFF',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+  },
+  retryText: {
+    color: '#fff',
+    fontSize: 14,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 16,
+    textAlign: 'center',
   },
 });
 

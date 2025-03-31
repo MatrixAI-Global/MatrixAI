@@ -12,13 +12,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
+import Toast from 'react-native-toast-message';
+import { useAuth } from '../context/AuthContext';
 
 const FeedbackScreen = ({ route, navigation }) => {
   const [issue, setIssue] = useState('');
   const [description, setDescription] = useState('');
   const { getThemeColors } = useTheme();
   const colors = getThemeColors();
-
+  const { uid } = useAuth();
+console.log(uid,'user');
   const commonIssues = [
     'Great experience and helpful',
     'Good experience but could be improved',
@@ -27,22 +30,43 @@ const FeedbackScreen = ({ route, navigation }) => {
     'Other issues',
   ];
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!issue) {
       Alert.alert('Error', 'Please select an issue type');
       return;
     }
-    if (!description) {
-      Alert.alert('Error', 'Please describe your issue');
-      return;
-    }
+    
+    try {
+      const response = await fetch('https://matrix-server.vercel.app/submitFeedback', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          issue: issue,
+          description: description || '',
+          uid: uid,
+        }),
+      });
+      console.log({ issue, description, uid });
 
-    // Here you would typically make an API call to submit the help request
-    Alert.alert(
-      'Success',
-      'Your request has been submitted. Our team will get back to you shortly.',
-      [{ text: 'OK', onPress: () => navigation.goBack() }]
-    );
+      const data = await response.json();
+      
+      if (response.ok) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Feedback submitted successfully',
+        });
+        navigation.goBack();
+      } else {
+        Alert.alert('Error', data.message || 'Failed to submit feedback');
+        console.log(data,'data');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An error occurred while submitting feedback');
+      console.error(error);
+    }
   };
 
   return (

@@ -12,6 +12,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
+import Toast from 'react-native-toast-message';
+import { useAuth } from '../context/AuthContext';
 
 const HelpScreen = ({ route, navigation }) => {
  
@@ -20,6 +22,8 @@ const HelpScreen = ({ route, navigation }) => {
   const [description, setDescription] = useState('');
   const { getThemeColors } = useTheme();
   const colors = getThemeColors();
+  const { user } = useAuth();
+  
   const commonIssues = [
     'Payment not reflected',
     'Coins not credited',
@@ -28,22 +32,42 @@ const HelpScreen = ({ route, navigation }) => {
     'Other issues',
   ];
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!issue) {
       Alert.alert('Error', 'Please select an issue type');
       return;
     }
-    if (!description) {
-      Alert.alert('Error', 'Please describe your issue');
-      return;
+    
+    try {
+      const response = await fetch('https://matrix-server.vercel.app/getHelp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          issue: issue,
+          description: description || '',
+          orderId: orderId,
+          uid: user?.uid || '',
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Help request submitted successfully',
+        });
+        navigation.goBack();
+      } else {
+        Alert.alert('Error', data.message || 'Failed to submit help request');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An error occurred while submitting help request');
+      console.error(error);
     }
-
-    // Here you would typically make an API call to submit the help request
-    Alert.alert(
-      'Success',
-      'Your request has been submitted. Our team will get back to you shortly.',
-      [{ text: 'OK', onPress: () => navigation.goBack() }]
-    );
   };
 
   return (
