@@ -27,6 +27,7 @@ import { LANGUAGES } from '../utils/languageUtils';
 import { useTheme } from '../context/ThemeContext';
 import { ThemedView, ThemedText, ThemedCard } from '../components/ThemedView';
 import ThemedStatusBar from '../components/ThemedStatusBar';
+import { useProfileUpdate } from '../context/ProfileUpdateContext';
 
 // Convert base64 to byte array - React Native compatible approach
 const decodeBase64 = (base64String) => {
@@ -42,6 +43,7 @@ const EditProfile = ({ navigation }) => {
   const { uid } = useAuthUser();
   const { t, currentLanguage, changeLanguage } = useLanguage();
   const { currentTheme, changeTheme, themes, getThemeColors, statusBarStyle } = useTheme();
+  const { triggerUpdate } = useProfileUpdate();
   const colors = getThemeColors();
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -196,6 +198,9 @@ const EditProfile = ({ navigation }) => {
         if (profileData.preferred_theme !== currentTheme) {
           await changeTheme(profileData.preferred_theme);
         }
+        
+        // Trigger profile update to refresh headers
+        triggerUpdate();
         
         Alert.alert('Success', t('profileUpdated'));
         fetchUserData();

@@ -156,7 +156,7 @@ const ForceDirectedGraph = ({ transcription, uid, audioid, xmlData }) => {
   if (!graphData) {
     return (
       <View style={styles.loadingContainer}>
-        <Text>Loading graph...</Text>
+        <Text style={{color: colors.text}}>Loading graph...</Text>
       </View>
     );
   }
@@ -342,7 +342,7 @@ const downloadPDF = async () => {
             body { 
               margin: 0; 
               padding: 0; 
-              background: white;
+              background: ${colors.background};
               width: 100%;
               height: 100%;
               overflow: hidden;
@@ -393,7 +393,7 @@ const downloadPDF = async () => {
             const graphData = ${JSON.stringify(graphData)};
             
             const option = {
-              backgroundColor: '#ffffff',
+              backgroundColor: colors.background,
               tooltip: { 
                 trigger: 'item', 
                 triggerOn: 'mousemove' 
@@ -460,7 +460,7 @@ const downloadPDF = async () => {
               const base64 = myChart.getDataURL({ 
                 type: 'png', 
                 pixelRatio: 2,
-                backgroundColor: '#fff',
+                backgroundColor: colors.background,
                 excludeComponents: ['toolbox']
               });
               window.ReactNativeWebView.postMessage(base64);
@@ -490,7 +490,7 @@ const downloadPDF = async () => {
             directory: 'Documents',
             width: 1684,  // A3 width (landscape)
             height: 1190, // A3 height (landscape)
-            backgroundColor: '#ffffff',
+            backgroundColor: colors.background,
             padding: 0,
             options: {
               landscape: true,
@@ -612,7 +612,7 @@ const handleDownload = async () => {
         <View style={styles.buttonContent}>
           {loading ? (
             <>
-              <ActivityIndicator color="#fff" style={styles.loader} />
+              <ActivityIndicator color={colors.text} style={styles.loader} />
               <Text style={styles.buttonText}>Downloading...</Text>
             </>
           ) : (

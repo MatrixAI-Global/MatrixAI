@@ -243,7 +243,7 @@ const ProfileScreen = ({ navigation }) => {
     
     return (
         <SafeAreaView style={[styles.container2, {backgroundColor: colors.background}]}>
-            <View style={[styles.header, {backgroundColor: colors.background2, borderBottomColor: colors.border}]}>
+            <View style={[styles.header, {backgroundColor: colors.background2}]}>
                 <View style={styles.headerLeftSection}>
                     <TouchableOpacity style={[styles.backButton, {borderColor: colors.text}]} onPress={() => navigation.goBack()}>
                         <Image source={require('../assets/back.png')} style={[styles.headerIcon, {tintColor: colors.text}]} />
@@ -392,10 +392,9 @@ const styles = StyleSheet.create({
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 16,
+       paddingHorizontal:16,
         backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#E0E0E0',
+       
         justifyContent: 'space-between',
     },
     headerLeftSection: {

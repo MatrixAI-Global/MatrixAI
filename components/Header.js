@@ -5,6 +5,8 @@ import { supabase } from '../supabaseClient';
 import { saveProStatus, saveCoinsCount, getProStatus } from '../utils/proStatusUtils';
 import { useProStatus } from '../hooks/useProStatus';
 import { useTheme } from '../context/ThemeContext';
+import { useProfileUpdate } from '../context/ProfileUpdateContext';
+
 const Header = ({ navigation, uid, openDrawer }) => {
     console.log("Header rendering with UID:", uid);
     const coinCount = useCoinsSubscription(uid);
@@ -14,6 +16,7 @@ const Header = ({ navigation, uid, openDrawer }) => {
     const { isPro, checkProStatus } = useProStatus();
     const [localIsPro, setLocalIsPro] = useState(false);
     const { getThemeColors } = useTheme();
+    const { lastUpdate } = useProfileUpdate();
     const colors = getThemeColors();
     
     // Initialize from stored value on mount
@@ -46,7 +49,7 @@ const Header = ({ navigation, uid, openDrawer }) => {
         if (uid) {
             fetchUserData();
         }
-    }, [uid]);
+    }, [uid, lastUpdate]);
 
     const fetchUserData = async () => {
         setLoading(true);
@@ -122,7 +125,7 @@ const Header = ({ navigation, uid, openDrawer }) => {
                                 <Text style={[styles.welcomeText, {color: colors.text}]}>
                                     {userName} 
                                 </Text>
-                                <View style={styles.proBadge}>
+                                <View style={[styles.proBadge , {backgroundColor: colors.primary}]}>
                                     <Text style={[styles.proText]}>PRO</Text>
                                 </View>
                             </View>
@@ -154,8 +157,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-     
-        paddingBottom:5,
+     marginTop:-10,
+   marginBottom:10,
       
     },
     menuButton: {

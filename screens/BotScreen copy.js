@@ -1083,7 +1083,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 10,
     marginHorizontal: '5%',
-    marginBottom: 10,
+
   },
   messageImage: {
     width: 200,  // Adjust width based on your UI design
@@ -1347,7 +1347,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     width: '100%',
     paddingHorizontal: 10,
-    marginBottom: 10,
+paddingVertical:10,
+marginBottom:-10,
     backgroundColor: '#fff',
   },
   buttonRow: {

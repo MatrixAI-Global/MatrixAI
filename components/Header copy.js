@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Image, StyleSheet, ActivityIndicator } fr
 import { useCoinsSubscription } from '../hooks/useCoinsSubscription';
 import { supabase } from '../supabaseClient';
 import { useTheme } from '../context/ThemeContext';
+import { useProfileUpdate } from '../context/ProfileUpdateContext';
 
 const Header2 = ({ navigation, uid, openDrawer }) => {
     console.log("Header rendering with UID:", uid);
@@ -12,13 +13,14 @@ const Header2 = ({ navigation, uid, openDrawer }) => {
     const [loading, setLoading] = useState(true);
     const [isPro, setIsPro] = useState(false);
     const { getThemeColors } = useTheme();
+    const { lastUpdate } = useProfileUpdate();
     const colors = getThemeColors();
     
     useEffect(() => {
         if (uid) {
             fetchUserData();
         }
-    }, [uid]);
+    }, [uid, lastUpdate]);
 
     const fetchUserData = async () => {
         setLoading(true);
@@ -84,7 +86,7 @@ const Header2 = ({ navigation, uid, openDrawer }) => {
                                 <Text style={[styles.welcomeText, {color: colors.text}]}>
                                     {userName} 
                                 </Text>
-                                <View style={styles.proBadge}>
+                                <View style={[styles.proBadge , {backgroundColor: colors.primary}]}>
                                     <Text style={styles.proText}>PRO</Text>
                                 </View>
                             </View>
@@ -117,6 +119,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
      marginTop:10,
+     paddingHorizontal:10,
         paddingBottom:5,
       
     },

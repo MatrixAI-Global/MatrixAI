@@ -108,7 +108,7 @@ const HomeScreen = ({ navigation }) => {
       <ThemedStatusBar />
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Fixed Header */}
-        <View style={[styles.fixedHeader, { backgroundColor: colors.background }]}>
+        <View style={[styles.fixedHeader, { backgroundColor: colors.background}]}>
           <Header navigation={navigation} uid={uid} openDrawer={toggleSidePanel} />
         </View>
 
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     alignItems: 'start',
   },
   content: {
-    marginTop: 20,
+    marginTop: 2,
    
   },
   roundedCardContainer: {
@@ -348,8 +348,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     zIndex: 1000,
     paddingHorizontal: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+ 
   },
   languageSelector: {
     position: 'absolute',

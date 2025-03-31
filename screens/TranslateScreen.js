@@ -2431,6 +2431,7 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         borderWidth: 1,
         borderColor: '#E0E0E0',
+        zIndex:100,
       },
       headerIcon: {
         width: 24,

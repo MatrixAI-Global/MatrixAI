@@ -84,6 +84,7 @@ import { LanguageProvider } from './context/LanguageContext';
 import { getPreferredLanguage } from './utils/languageUtils';
 // Import the ThemeProvider
 import { ThemeProvider } from './context/ThemeContext';
+import { ProfileUpdateProvider } from './context/ProfileUpdateContext.js';
 
 const Stack = createStackNavigator();
 
@@ -131,6 +132,7 @@ const App = () => {
 
     return (
         <AuthProvider>
+                <ProfileUpdateProvider>
             <AuthContext.Consumer>
                 {({ uid }: AuthContextType) => (
                     <>
@@ -452,6 +454,7 @@ const App = () => {
                     </>
                 )}
             </AuthContext.Consumer>
+                </ProfileUpdateProvider>    
         </AuthProvider>
     );
 };

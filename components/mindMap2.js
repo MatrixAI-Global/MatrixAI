@@ -142,7 +142,7 @@ const ForceDirectedGraph2 = ({ transcription, uid, audioid, xmlData }) => {
   if (!graphData) {
     return (
       <View style={styles.loadingContainer}>
-        <Text>Loading graph...</Text>
+        <Text style={{color: colors.text}}>Loading graph...</Text>
       </View>
     );
   }

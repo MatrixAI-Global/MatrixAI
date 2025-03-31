@@ -10,8 +10,10 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
+import { useTheme } from '../context/ThemeContext';
 const LeftNavbarBot = ({ chats, onSelectChat, onNewChat, onClose, onDeleteChat }) => {
+  const { getThemeColors } = useTheme();
+  const colors = getThemeColors();
   // Group chats by time (Today, Yesterday, Last Week, Older)
   const groupedChats = useMemo(() => {
     const now = new Date();
@@ -93,10 +95,10 @@ const LeftNavbarBot = ({ chats, onSelectChat, onNewChat, onClose, onDeleteChat }
 
   return (
     <TouchableWithoutFeedback onPress={onClose}>
-      <SafeAreaView style={styles.sidebar}>
+      <SafeAreaView style={[styles.sidebar, { backgroundColor: colors.card }]}>
         {/* Header of Sidebar */}
         <View style={styles.header}>
-          <Text style={styles.title}>Chats</Text>
+        
           <TouchableOpacity onPress={onClose}>
             <Ionicons name="close" size={24} color="#888" />
           </TouchableOpacity>
@@ -108,12 +110,12 @@ const LeftNavbarBot = ({ chats, onSelectChat, onNewChat, onClose, onDeleteChat }
             sections={groupedChats}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
-              <View style={styles.chatItemContainer}>
+              <View style={[styles.chatItemContainer, { backgroundColor: colors.card }]}>
                 <TouchableOpacity
                   style={styles.chatContent}
                   onPress={() => onSelectChat(item.id)}
                 >
-                  <Text style={styles.chatName}>{item.name}</Text>
+                  <Text style={[styles.chatName, { color: colors.text }]}>{item.name}</Text>
                   {item.role && (
                     <Text style={styles.chatRole}>Role: {item.role}</Text>
                   )}

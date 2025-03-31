@@ -289,19 +289,22 @@ const AudioVideoUploadScreen = () => {
     const getAudioDuration = async (uri) => {
         return new Promise((resolve) => {
             try {
+                // Decode URI to handle spaces properly
+                const decodedUri = decodeURI(uri);
+                
                 // First try to estimate duration based on file size
                 // This is a fallback method that works for most audio files
                 const estimateDurationFromSize = async () => {
                     try {
                         // Check if the URI is valid and accessible
-                        const exists = await RNFS.exists(uri);
+                        const exists = await RNFS.exists(decodedUri);
                         if (!exists) {
-                            console.log('File does not exist at path:', uri);
+                            console.log('File does not exist at path:', decodedUri);
                             return 60; // Default duration if file doesn't exist
                         }
                         
                         // Get file stats to determine size
-                        const stats = await RNFS.stat(uri);
+                        const stats = await RNFS.stat(decodedUri);
                         if (stats && stats.size) {
                             // Estimate duration based on file size
                             // Assuming average bitrate of 128kbps for MP3 files
@@ -324,7 +327,7 @@ const AudioVideoUploadScreen = () => {
                     });
                     
                     const soundPromise = new Promise(resolve => {
-                        const sound = new Sound(uri, '', (error) => {
+                        const sound = new Sound(decodedUri, '', (error) => {
                             if (error) {
                                 console.log('Error loading audio with Sound:', error);
                                 resolve(null);
@@ -364,8 +367,19 @@ const AudioVideoUploadScreen = () => {
     };
 
     const isFormatSupported = (fileType) => {
-        // Check if the file type is in our supported formats list
-        return supportedFormats.includes(fileType);
+        // Check for common audio types explicitly first
+        if (fileType) {
+            // Special handling for wav files which can have multiple mime types
+            if (fileType.toLowerCase().includes('wav')) {
+                return true;
+            }
+            
+            // Check if the file type is in our supported formats list
+            return supportedFormats.some(format => fileType.toLowerCase().includes(format.split('/')[1]));
+        }
+        
+        // If fileType is undefined, we'll check by extension in the document picker
+        return true;
     };
 
     const getFileExtension = (fileName) => {
@@ -380,9 +394,11 @@ const AudioVideoUploadScreen = () => {
             'aac': 'audio/aac',
             'ogg': 'audio/ogg',
             'flac': 'audio/flac',
-            'mp4': 'audio/mp4'
+            'mp4': 'audio/mp4',
+            'wma': 'audio/x-ms-wma',
+            '3gp': 'audio/3gpp'
         };
-        return mimeTypeMap[extension] || 'audio/mpeg'; // Default to mp3 if unknown
+        return mimeTypeMap[extension.toLowerCase()] || 'audio/mpeg'; // Default to mp3 if unknown
     };
 
     const handleFileSelect = async () => {
@@ -406,8 +422,8 @@ const AudioVideoUploadScreen = () => {
                     size: file.size
                 });
                 
-                // Check if format is supported
-                if (!isFormatSupported(fileType)) {
+                // Check if format is supported by extension if mime type is not reliable
+                if (!isFormatSupported(fileType) && !['wav', 'mp3', 'm4a', 'aac', 'ogg', 'flac', 'mp4'].includes(fileExtension.toLowerCase())) {
                     Alert.alert(
                         'Unsupported Format', 
                         `The file format ${fileExtension.toUpperCase()} is not supported. Please select a different audio file.`
@@ -511,10 +527,15 @@ const AudioVideoUploadScreen = () => {
         setUploading(true);
 
         try {
+            // Decode the file URI to handle spaces properly
+            const decodedUri = decodeURI(file.uri);
+            console.log('Original URI:', file.uri);
+            console.log('Decoded URI:', decodedUri);
+
             // Verify file exists before proceeding
-            const fileExists = await RNFS.exists(file.uri);
+            const fileExists = await RNFS.exists(decodedUri);
             if (!fileExists) {
-                throw new Error(`File does not exist at path: ${file.uri}`);
+                throw new Error(`File does not exist at decoded path: ${decodedUri}`);
             }
 
             // Generate a secure unique ID for the audio file
@@ -522,18 +543,14 @@ const AudioVideoUploadScreen = () => {
             const audioName = file.name || `audio_${Date.now()}.mp3`;
             const fileExtension = getFileExtension(audioName);
             
-            // Create file path for Supabase storage with original extension
-            const filePath = `users/${uid}/audioFile/${audioID}.${fileExtension}`;
+            // Create sanitized file path for Supabase storage - remove spaces and special characters
+            const sanitizedFileName = `${audioID}.${fileExtension}`;
+            const filePath = `users/${uid}/audioFile/${sanitizedFileName}`;
             
-            // Verify file exists and is accessible
+            // Verify file exists and is accessible using decoded URI
             try {
-                const fileExists = await RNFS.exists(file.uri);
-                if (!fileExists) {
-                    throw new Error('File does not exist at the specified path');
-                }
-                
                 // Try to get file stats to ensure it's readable
-                const fileStats = await RNFS.stat(file.uri);
+                const fileStats = await RNFS.stat(decodedUri);
                 if (!fileStats || fileStats.size <= 0) {
                     throw new Error('File appears to be empty or inaccessible');
                 }
@@ -546,13 +563,13 @@ const AudioVideoUploadScreen = () => {
                 throw new Error(`File validation failed: ${fileError.message}`);
             }
             
-            // Read the file as base64
-            const fileContent = await RNFS.readFile(file.uri, 'base64');
+            // Read the file as base64 using decoded URI
+            const fileContent = await RNFS.readFile(decodedUri, 'base64');
             
             // Determine content type from file or extension
             const contentType = file.type || getMimeTypeFromExtension(fileExtension);
             
-            // Upload to Supabase storage with original format
+            // Upload to Supabase storage with sanitized filename
             const { data: uploadData, error: uploadError } = await supabase.storage
                 .from('user-uploads')
                 .upload(filePath, decode(fileContent), {
@@ -574,17 +591,17 @@ const AudioVideoUploadScreen = () => {
                 .from('user-uploads')
                 .getPublicUrl(filePath);
                 
-            // Save metadata to database with file format info
+            // Save metadata to database with file format info and original filename
             const { data: metadataData, error: metadataError } = await supabase
                 .from('audio_metadata')
                 .insert([
                     {
                         uid,
                         audioid: audioID,
-                        audio_name: audioName,
+                        audio_name: audioName,  // Keep original filename for display
                         language: selectedLanguage,
                         audio_url: publicUrl,
-                        file_path: filePath,
+                        file_path: filePath,  // Sanitized file path
                         duration: parseInt(duration, 10),
                         uploaded_at: new Date().toISOString(),
                     }
@@ -1341,8 +1358,8 @@ const AudioVideoUploadScreen = () => {
             </View>
 
             <View style={styles.popupButtons}>
-                <TouchableOpacity onPress={handleClosePopup} style={[styles.popupButton, {backgroundColor: colors.background2}]}>
-                    <Text style={[styles.popupButtonText, {color: colors.text}]}>Close</Text>
+                <TouchableOpacity onPress={handleClosePopup} style={[styles.popupButton]}>
+                    <Text style={[styles.popupButtonText]}>Close</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -1352,7 +1369,7 @@ const AudioVideoUploadScreen = () => {
                     }}
                     disabled={uploading}
                 >
-                    <Text style={[styles.convert2 ]}>{duration}</Text>
+                    <Text style={[styles.convert2, {color: colors.text}]}>{duration}</Text>
                     <Image source={coin} style={[styles.detailIcon2]} />
 
                     {uploading ? (
@@ -1370,7 +1387,7 @@ const AudioVideoUploadScreen = () => {
                 </TouchableOpacity>
             </View>
             
-            <View style={styles.formatInfo}>
+            <View style={[styles.formatInfo, {backgroundColor: colors.card}]}>
                 <Text style={[styles.formatInfoText, {color: colors.text}]}>Supported formats: WAV, MP3, M4A, AAC, OGG, FLAC</Text>
             </View>
         </View>
@@ -1753,8 +1770,9 @@ color:'#000',
     },
     helpText: {
         color: '#ffffff',
-        fontSize: 12,
+        fontSize: 10,
         flexShrink: 1,
+        lineHeight:15,
     },
     detailText: {
         color: '#B7B7B7FF',

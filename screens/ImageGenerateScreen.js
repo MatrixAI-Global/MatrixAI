@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,11 +8,17 @@ import {
   Image,
   Animated,
   Easing,
-  KeyboardAvoidingView
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Dimensions,
+  FlatList
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
+
+const { width, height } = Dimensions.get('window');
 
 const ImageGenerateScreen = () => {
   const { getThemeColors } = useTheme();
@@ -26,6 +32,30 @@ const ImageGenerateScreen = () => {
   const scaleAnim = new Animated.Value(0);
   const sendRotation = new Animated.Value(0);
   const navigation = useNavigation();
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const historySlideAnim = useRef(new Animated.Value(width)).current;
+  
+  // Mock data for history
+  const [imageHistory, setImageHistory] = useState([
+    {
+      id: '1',
+      imageUrl: 'https://via.placeholder.com/150',
+      prompt: 'A beautiful sunset over mountains',
+      date: '2023-05-20',
+    },
+    {
+      id: '2',
+      imageUrl: 'https://via.placeholder.com/150',
+      prompt: 'Futuristic city with flying cars',
+      date: '2023-05-18',
+    },
+    {
+      id: '3',
+      imageUrl: 'https://via.placeholder.com/150',
+      prompt: 'Abstract digital art with vibrant colors',
+      date: '2023-05-15',
+    },
+  ]);
   
   React.useEffect(() => {
     Animated.parallel([
@@ -50,6 +80,16 @@ const ImageGenerateScreen = () => {
       )
     ]).start();
   }, []);
+
+  const toggleHistory = () => {
+    setHistoryOpen(!historyOpen);
+    Animated.timing(historySlideAnim, {
+      toValue: historyOpen ? width : 0,
+      duration: 300,
+      easing: Easing.ease,
+      useNativeDriver: true,
+    }).start();
+  };
   
   const handleSend = () => {
     if (userText.trim().length > 0) {
@@ -72,22 +112,46 @@ const ImageGenerateScreen = () => {
     navigation.navigate('CreateImageScreen2', { message: transcription });
   };
 
+  const renderHistoryItem = ({ item }) => (
+    <View style={styles.historyItem}>
+      <Image source={{ uri: item.imageUrl }} style={styles.historyImage} />
+      <View style={styles.historyItemContent}>
+        <Text style={styles.historyDate}>{item.date}</Text>
+        <Text style={styles.historyPrompt} numberOfLines={2}>{item.prompt}</Text>
+        <View style={styles.historyActions}>
+          <TouchableOpacity style={styles.historyActionButton}>
+            <Image source={require('../assets/back.png')} style={[styles.historyActionIcon, {tintColor: '#fff'}]} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.historyActionButton}>
+            <Image source={require('../assets/send2.png')} style={[styles.historyActionIcon, {tintColor: '#fff'}]} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+
   return (
-    
-<Animated.View style={[styles.container, { opacity: fadeAnim, backgroundColor: colors.background}]}>
-  {/* Header Animation */}
- 
-  <Animated.View style={[styles.header, { transform: [{ scale: scaleAnim }], backgroundColor: colors.background2}]}>
-  <TouchableOpacity 
-          style={[styles.backButton]} 
-          onPress={() => navigation.goBack()}
-        >
-          <Image source={require('../assets/back.png')} style={[styles.headerIcon, {tintColor: colors.text}]} />
-        </TouchableOpacity>
-              <Text style={[styles.headerTitle, {color: colors.text}] }>Matrix AI</Text>
-            
-          </Animated.View>
-          <Animated.View style={[styles.placeholderContainer, { opacity: fadeAnim }]}>
+    <View style={{flex: 1}}>
+      <Animated.View style={[styles.container, { opacity: fadeAnim, backgroundColor: colors.background}]}>
+        {/* Header Animation */}
+       
+        <Animated.View style={[styles.header, { transform: [{ scale: scaleAnim }], backgroundColor: colors.background2}]}>
+          <TouchableOpacity 
+            style={[styles.backButton]} 
+            onPress={() => navigation.goBack()}
+          >
+            <Image source={require('../assets/back.png')} style={[styles.headerIcon, {tintColor: colors.text}]} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, {color: colors.text}]}>Matrix AI</Text>
+          <TouchableOpacity 
+            style={[styles.historyButton]} 
+            onPress={toggleHistory}
+          >
+            <Image source={require('../assets/back.png')} style={[styles.headerIcon, {tintColor: colors.text, transform: [{rotate: '180deg'}]}]} />
+          </TouchableOpacity>
+        </Animated.View>
+        
+        <Animated.View style={[styles.placeholderContainer, { opacity: fadeAnim }]}>
           <Image   
             source={require('../assets/matrix.png')}
             style={[styles.placeholderImage, {tintColor: colors.text}]}
@@ -95,77 +159,105 @@ const ImageGenerateScreen = () => {
           <Text style={[styles.placeholderText, {color: colors.text}]}>Hi, Welcome to Matrix AI</Text>
           <Text style={[styles.placeholderText2, {color: colors.text}]}>What can I generate for you today?</Text>
         </Animated.View>
+        
         <LottieView 
-    source={require('../assets/image.json')}
-    autoPlay
-    loop
-    style={{width: '100%', height: 100, backgroundColor: colors.background2}}
-  />
-      {/* Text Input Box */}
+          source={require('../assets/image2.json')}
+          autoPlay
+          loop
+          style={{width: '100%', height: 100, backgroundColor: 'transparent'}}
+        />
+
+        {/* Buttons */}
+        {isFinished && (
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity style={styles.generateButton2} onPress={handleGenerate2}>
+              <View style={styles.horizontalContent}>
+                <View style={styles.generateContent}>
+                  <Text style={styles.generateText}>Generate</Text>
+                  <View style={styles.horizontalContent}>
+                    <Text style={styles.coinText}>-1</Text>
+                    <Image source={require('../assets/coin.png')} style={styles.coinIcon} />
+                  </View>
+                </View>
+                <Image source={require('../assets/send2.png')} style={styles.icon} />
+              </View>
+            </TouchableOpacity>
+          
+            <TouchableOpacity style={styles.generateButton} onPress={handleGenerate}>
+              <View style={styles.horizontalContent}>
+                <View style={styles.generateContent}>
+                  <Text style={styles.generateText}>Generate IV</Text>
+                  <View style={styles.horizontalContent}>
+                    <Text style={styles.coinText}>-4</Text>
+                    <Image source={require('../assets/coin.png')} style={styles.coinIcon} />
+                  </View>
+                </View>
+                <Image source={require('../assets/send2.png')} style={styles.icon} />
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
+      </Animated.View>
+
+      {/* Input section with KeyboardAvoidingView properly implemented */}
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.keyboardAvoidingView}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+        style={styles.keyboardAvoidView}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 10}
       >
-      {!isFinished && (
-        <View style={styles.textInputContainer}>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Type your prompt here..."
-            placeholderTextColor="#999999"
-            value={userText}
-            onChangeText={(text) => {
-              setUserText(text); // Update input
-              setTranscription(text || 'Start writing to generate Images (eg: generate tree with red apples)');
-            }}
-          />
-<TouchableOpacity 
-  style={styles.sendButton} 
-  onPress={handleSend}
- >
-    <Image
-      source={require('../assets/send2.png')}
-      style={[styles.sendIcon, {tintColor: '#FFFFFF'}]}
-    />
+        {!isFinished && (
+          <View style={styles.textInputContainer}>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Type your prompt here..."
+              placeholderTextColor="#999999"
+              value={userText}
+              onChangeText={(text) => {
+                setUserText(text); // Update input
+                setTranscription(text || 'Start writing to generate Images (eg: generate tree with red apples)');
+              }}
+            />
+            <TouchableOpacity 
+              style={styles.sendButton} 
+              onPress={handleSend}
+            >
+              <Image
+                source={require('../assets/send2.png')}
+                style={[styles.sendIcon, {tintColor: '#FFFFFF'}]}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
+      </KeyboardAvoidingView>
 
-</TouchableOpacity>
+      {/* History Panel */}
+      <Animated.View 
+        style={[
+          styles.historyPanel, 
+          {
+            transform: [{ translateX: historySlideAnim }],
+            backgroundColor: colors.background2
+          }
+        ]}
+      >
+        <View style={styles.historyHeader}>
+          <Text style={styles.historyTitle}>Generation History</Text>
+          <TouchableOpacity onPress={toggleHistory}>
+            <Image 
+              source={require('../assets/back.png')} 
+              style={[styles.historyCloseIcon, {tintColor: '#fff'}]} 
+            />
+          </TouchableOpacity>
         </View>
-      )}
-</KeyboardAvoidingView>
-      {/* Buttons */}
-      {isFinished && (
-        <View style={styles.buttonContainer}>
-       
-       
-        <TouchableOpacity style={styles.generateButton2} onPress={handleGenerate2}>
-          <View style={styles.horizontalContent}>
-            <View style={styles.generateContent}>
-              <Text style={styles.generateText}>Generate</Text>
-              <View style={styles.horizontalContent}>
-              <Text style={styles.coinText}>-1</Text>
-              <Image source={require('../assets/coin.png')} style={styles.coinIcon} />
-            </View>
-            </View>
-            <Image source={require('../assets/send2.png')} style={styles.icon} />
-          </View>
-        </TouchableOpacity>
-      
-        <TouchableOpacity style={styles.generateButton} onPress={handleGenerate}>
-          <View style={styles.horizontalContent}>
-            <View style={styles.generateContent}>
-              <Text style={styles.generateText}>Generate IV</Text>
-              <View style={styles.horizontalContent}>
-              <Text style={styles.coinText}>-4</Text>
-              <Image source={require('../assets/coin.png')} style={styles.coinIcon} />
-              </View>
-            </View>
-            <Image source={require('../assets/send2.png')} style={styles.icon} />
-          </View>
-        </TouchableOpacity>
-      </View>
-   
-      )}
-    </Animated.View>
+        <FlatList
+          data={imageHistory}
+          renderItem={renderHistoryItem}
+          keyExtractor={item => item.id}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.historyList}
+        />
+      </Animated.View>
+    </View>
   );
 };
 
@@ -179,15 +271,27 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'flex-start',
+    justifyContent: 'space-between',
     alignItems: 'center',
     width: '100%',
+    paddingRight: 10,
   },
   headerTitle:{
     fontSize: 20,
     fontWeight: 'bold',
     color: '#000',
-    marginLeft: 10,
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  historyButton: {
+    padding: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
   placeholderContainer: {
     alignItems: 'center',
@@ -201,7 +305,6 @@ const styles = StyleSheet.create({
   placeholderText: {
     fontSize: 16,
     color: '#333',
-
   },
   placeholderText2: {
     fontSize: 14,
@@ -211,87 +314,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     margin: 10,
+    position: 'absolute',
+    bottom: 70,
+    alignSelf: 'center',
   },
-  tryAgainButton: {
-    padding: 10,
-    backgroundColor: '#ccc',
-    borderRadius: 5,
-    flex: 1, // Adjust to fit the available space
-    marginHorizontal: 5,
-  },
-
-  horizontalContent: {
-    flexDirection: 'row', // Align icon and text horizontally
-    alignItems: 'center', // Center-align vertically
-  },
-  icon: {
-    width: 16, // Adjust icon size as needed
-    height: 16,
-    tintColor:'#fff',
-    marginLeft:10,
- // Spacing between icon and text
-  },
-  icon2: {
-    width: 16, // Adjust icon size as needed
-    height: 16,
-    tintColor:'#333',
-    marginRight: 5, // Spacing between icon and text
-  },
-  generateContent: {
-    alignItems: 'center', // Center-align text and coin details vertically
-  },
-  generateText: {
-    fontSize: 16,
-    color: '#fff',
-  },
-  coinIcon: {
-    width: 12,
-    height: 12,
-    marginTop: 2, // Spacing between text and the coin icon
-  },
-  coinText: {
-    fontSize: 12,
-    color: '#fff',
-    marginTop: 2, // Align "-1" or "-4" below the icon
-  },
-
-  backButton: {
-    padding: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  headerIcon: {
-    width: 24,
-    height: 24,
-    resizeMode: 'contain',
-  },
-  tryAgainText: {
-    fontSize: 16,
-    color: '#000',
-  },
-  headerIcon: {
-    width: 24,
-    height: 24,
-    resizeMode: 'contain',
-  },
-  transcriptionText: {
-    marginTop: 20,
-    fontSize: 18,
-    color: '#333333',
-    textAlign: 'center',
+  keyboardAvoidView: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
   },
   textInputContainer: {
-    position: 'absolute',
-    bottom: -50,
     flexDirection: 'row',
     alignItems: 'center',
     width: '90%',
-    alignSelf:'center',
+    alignSelf: 'center',
     backgroundColor: '#F9F9F9',
     borderRadius: 25,
     paddingVertical: 10,
     paddingHorizontal: 15,
+    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -315,16 +358,43 @@ const styles = StyleSheet.create({
     tintColor: '#FFFFFF',
     resizeMode: 'contain',
   },
-  buttonContainer: {
-
-    position: 'absolute',
-    bottom: 70,
+  horizontalContent: {
     flexDirection: 'row',
     alignItems: 'center',
-  
-   
-   alignSelf: 'center',
-   
+  },
+  icon: {
+    width: 16,
+    height: 16,
+    tintColor:'#fff',
+    marginLeft:10,
+  },
+  icon2: {
+    width: 16,
+    height: 16,
+    tintColor:'#333',
+    marginRight: 5,
+  },
+  generateContent: {
+    alignItems: 'center',
+  },
+  generateText: {
+    fontSize: 16,
+    color: '#fff',
+  },
+  coinIcon: {
+    width: 12,
+    height: 12,
+    marginTop: 2,
+  },
+  coinText: {
+    fontSize: 12,
+    color: '#fff',
+    marginTop: 2,
+  },
+  headerIcon: {
+    width: 24,
+    height: 24,
+    resizeMode: 'contain',
   },
   tryAgainButton: {
     backgroundColor: '#E0E0E0',
@@ -351,9 +421,84 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     marginHorizontal: 10,
   },
-  generateText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+  // History panel styles
+  historyPanel: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
+    width: '70%',
+    height: '100%',
+    backgroundColor: '#1E1E2E',
+    borderTopLeftRadius: 20,
+    borderBottomLeftRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: -2, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 10,
+  },
+  historyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+    marginTop: 40,
+  },
+  historyTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  historyCloseIcon: {
+    width: 24,
+    height: 24,
+    transform: [{rotate: '180deg'}],
+  },
+  historyList: {
+    padding: 15,
+  },
+  historyItem: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 15,
+  },
+  historyImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+  },
+  historyItemContent: {
+    flex: 1,
+    marginLeft: 12,
+    justifyContent: 'space-between',
+  },
+  historyDate: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+  },
+  historyPrompt: {
+    color: '#fff',
+    fontSize: 14,
+    marginVertical: 4,
+  },
+  historyActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  historyActionButton: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    padding: 6,
+    borderRadius: 15,
+    marginLeft: 8,
+  },
+  historyActionIcon: {
+    width: 16,
+    height: 16,
   },
 });
 

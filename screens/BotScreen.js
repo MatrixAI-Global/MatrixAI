@@ -1991,13 +1991,13 @@ const decode = (base64) => {
           {currentRole && <Text style={styles.botRole}>{currentRole}</Text>|| <Text style={styles.botRole}>MatrixAI Bot</Text>}
         
         </View>
-        {/* <TouchableOpacity onPress={() => navigation.navigate('CallScreen')}>
+        <TouchableOpacity onPress={() => navigation.navigate('CallScreen')}>
           <MaterialIcons name="call" size={24} color="#4C8EF7" marginHorizontal={1} />
         </TouchableOpacity>
         <TouchableOpacity onPress={() => navigation.navigate('CameraScreen')}>
           <MaterialCommunityIcons name="video-outline" size={28} color="#4C8EF7" marginHorizontal={10} />
         </TouchableOpacity>
-        */}
+       
       </View>
 
       {/* Chat List */}
@@ -2100,7 +2100,7 @@ const decode = (base64) => {
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardAvoidingView}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 30}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
       >
 
 {isLoading && (
@@ -2181,21 +2181,21 @@ const decode = (base64) => {
                   <View style={styles.additionalButton}>
                     <Ionicons name="camera" size={28} color="#4C8EF7" />
                   </View>
-                  <Text>Photo</Text>
+                  <Text style={{color: colors.text}}>Photo</Text>
                 </TouchableOpacity>
                       
                 <TouchableOpacity style={styles.additionalButton2} onPress={() => handleImageOCR('gallery')}>
                   <View style={styles.additionalButton}>
                     <Ionicons name="image" size={28} color="#4C8EF7" />
                   </View>
-                  <Text>Image</Text>
+                  <Text style={{color: colors.text}}>Image</Text>
                 </TouchableOpacity>
                       
                 <TouchableOpacity style={styles.additionalButton2}>
                   <View style={styles.additionalButton}>
                     <Ionicons name="attach" size={28} color="#4C8EF7" />
                   </View>
-                  <Text>Document</Text>
+                  <Text style={{color: colors.text}}>Document</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -2274,8 +2274,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 10,
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderColor: '#E0E0E0',
+ 
   },
   headerIcon: {
     width: 30,
@@ -2294,6 +2293,7 @@ const styles = StyleSheet.create({
   keyboardAvoidingView: {
     position: 'absolute',
     bottom: 0,
+
     left: 0,
     right: 0,
     width: '100%',
@@ -2308,6 +2308,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: '95%',
     borderRadius: 25,
+    
     borderWidth: 1,
     borderColor: 'blue',
     paddingHorizontal: 10,
@@ -2584,7 +2585,7 @@ const styles = StyleSheet.create({
   },
   roleButtonText: {
     color: '#4C8EF7',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
   },
   modalOverlay: {
@@ -2684,10 +2685,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
-    marginTop: 10,
+paddingVertical:10,
     backgroundColor: '#fff',
     paddingHorizontal: 20,
-    marginBottom: 10,
+    marginBottom:-10,
+
   },
   buttonRow: {
     flexDirection: 'row',
