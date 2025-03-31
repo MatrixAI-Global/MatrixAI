@@ -117,18 +117,30 @@ const AudioVideoUploadScreen = () => {
     const { getThemeColors } = useTheme();
     const colors = getThemeColors();
     const [languages, setLanguages] = useState([
-        
-           
-            { label: 'Chinese Traditional', value: 'zh-TW' },
-            { label: 'English (UK)', value: 'en-GB' },
-            { label: 'English (US)', value: 'en-US' },
-            { label: 'French', value: 'fr' },
-            { label: 'German', value: 'de' },
-            { label: 'Hindi', value: 'hi' },
-            { label: 'Japanese', value: 'ja' },
-            
-            { label: 'Spanish', value: 'es' }
-        
+        { label: 'Chinese Traditional', value: 'zh-TW' },
+        { label: 'Danish', value: 'da' },
+        { label: 'Dutch', value: 'nl' },
+        { label: 'English', value: 'en' },
+        { label: 'English (UK)', value: 'en-GB' },
+        { label: 'English (US)', value: 'en-US' },
+        { label: 'Flemish', value: 'nl' },
+        { label: 'French', value: 'fr' },
+        { label: 'German', value: 'de' },
+        { label: 'Hindi', value: 'hi' },
+        { label: 'Italian', value: 'it' },
+        { label: 'Japanese', value: 'ja' },
+        { label: 'Korean', value: 'ko' },
+        { label: 'Norwegian', value: 'no' },
+        { label: 'Polish', value: 'pl' },
+        { label: 'Portuguese', value: 'pt' },
+        { label: 'Portuguese (Brazil)', value: 'pt-BR' },
+        { label: 'Portuguese (Portugal)', value: 'pt-PT' },
+        { label: 'Spanish', value: 'es' },
+        { label: 'Spanish (Latin America)', value: 'es-419' },
+        { label: 'Spanish (LATAM)', value: 'es-LATAM' },
+        { label: 'Swedish', value: 'sv' },
+        { label: 'Tamasheq', value: 'taq' },
+        { label: 'Tamil', value: 'ta' }
     ]);
     const [loadingAudioIds, setLoadingAudioIds] = useState(new Set()); // Track loading audio IDs
     console.log(uid,'UID');
