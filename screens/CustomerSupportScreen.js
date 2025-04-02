@@ -16,6 +16,8 @@ import { useTheme } from '../context/ThemeContext';
 const FAQItem = ({ question, answer,navigation }) => {
   const [expanded, setExpanded] = useState(false);
   const animation = new Animated.Value(expanded ? 1 : 0);
+  const { getThemeColors } = useTheme();
+  const colors = getThemeColors();
 
   const toggleExpand = () => {
     Animated.timing(animation, {
@@ -34,7 +36,7 @@ const FAQItem = ({ question, answer,navigation }) => {
   return (
     <TouchableOpacity style={styles.faqItem} onPress={toggleExpand} activeOpacity={0.7}>
       <View style={styles.faqHeader}>
-        <Text style={styles.faqQuestion}>{question}</Text>
+        <Text style={[styles.faqQuestion, {color: colors.text}]}>{question}</Text>
         <Animated.View
           style={{
             transform: [
@@ -47,11 +49,11 @@ const FAQItem = ({ question, answer,navigation }) => {
             ],
           }}
         >
-          <Ionicons name="chevron-down" size={20} color="#666" />
+          <Ionicons name="chevron-down" size={20} color={colors.text} />
         </Animated.View>
       </View>
       <Animated.View style={[styles.faqBody, { height: bodyHeight }]}>
-        <Text style={styles.faqAnswer}>{answer}</Text>
+        <Text style={[styles.faqAnswer, {color: colors.text}]}>{answer}</Text>
       </Animated.View>
     </TouchableOpacity>
   );
@@ -102,7 +104,7 @@ const CustomerSupportScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
-      <View style={[styles.header, {backgroundColor: colors.background}]}>
+      <View style={[styles.header, {backgroundColor: colors.background , borderBottomWidth: 0.8, borderColor: colors.border}]}>
         <TouchableOpacity style={[styles.backButton, {borderColor: colors.border}]} onPress={() => navigation.goBack()}>
           <Image
             source={require('../assets/back.png')}
@@ -170,8 +172,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+   
   },
   backButton: {
     padding: 8,
@@ -212,8 +213,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+  
   },
   supportOptionIcon: {
     width: 40,
@@ -230,11 +230,11 @@ const styles = StyleSheet.create({
   supportOptionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+
   },
   supportOptionDescription: {
     fontSize: 12,
-    color: '#666',
+  
     marginTop: 4,
   },
   sectionTitle: {

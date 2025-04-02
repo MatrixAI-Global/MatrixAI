@@ -69,8 +69,7 @@ const FeatureCard = ({ title, description, iconSource, navigation, targetScreen 
 const styles = StyleSheet.create({
   card: {
     borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#ccc',
+  
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,

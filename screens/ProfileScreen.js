@@ -266,7 +266,7 @@ const ProfileScreen = ({ navigation }) => {
                 showsVerticalScrollIndicator={false} 
                 bounces={false}
             >
-                <Header2 uid={uid} />
+                <Header2 navigation={navigation} uid={uid} />
                 
                 {/* Conditional rendering based on Pro status */}
                 {!isUserPro ? (
@@ -302,11 +302,7 @@ const ProfileScreen = ({ navigation }) => {
                         label="Rewards" 
                         onPress={() => navigation.navigate('AddProductScreen')}
                     />
-                    <MenuItem 
-                        iconName="card-outline" 
-                        label="Payment Management" 
-                        onPress={() => navigation.navigate('AddProductScreen')}
-                    />
+                    
                 </ThemedCard>
 
                 <ThemedText style={[styles.menuTitle, {color: colors.text}]}>Support</ThemedText>

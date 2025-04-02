@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Alert, Modal, FlatList } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Alert, Modal, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -238,151 +238,160 @@ const SignUpDetailsScreen = ({ navigation }) => {
 
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-                {/* Back Button */}
-                <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                    <View style={styles.backButtonCircle}>
-                        <Icon name="arrow-back" size={20} color="#fff" />
-                    </View>
-                </TouchableOpacity>
-
-                {/* Header */}
-                <Text style={styles.headerText}>Create Your Account</Text>
-
-                {/* Input Fields */}
-                <View style={styles.inputContainer}>
-                    <Icon name="person-outline" size={20} color="#aaa" style={styles.inputIcon} />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Enter Your Name"
-                        placeholderTextColor="#aaa"
-                        value={name}
-                        onChangeText={setName}
-                    />
-                </View>
-
-                <View style={styles.inputContainer}>
-                    <Icon name="mail-outline" size={20} color="#aaa" style={styles.inputIcon} />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Email Address"
-                        placeholderTextColor="#aaa"
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        value={inputEmail}
-                        onChangeText={setInputEmail}
-                        editable={!disableEmailInput}
-                    />
-                </View>
-
-                <View style={styles.inputContainer}>
-                    <Icon name="calendar-outline" size={20} color="#aaa" style={styles.inputIcon} />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Age (Optional)"
-                        placeholderTextColor="#aaa"
-                        keyboardType="numeric"
-                        value={age}
-                        onChangeText={setAge}
-                    />
-                </View>
-
-                {/* Gender Selection */}
-                <Text style={styles.genderLabel}>Select Gender</Text>
-                <View style={styles.genderContainer}>
-                    {['Male', 'Female', 'Others'].map((item) => (
-                        <TouchableOpacity
-                            key={item}
-                            style={[
-                                styles.genderButton,
-                                gender === item && styles.genderButtonSelected,
-                            ]}
-                            onPress={() => setGender(item)}
-                        >
-                            <Text style={{ color: gender === item ? '#fff' : '#000' }}>{item}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-
-                {/* Language Selection Button */}
-                <View style={styles.languageSection}>
-                    <Text style={styles.languageLabel}>Preferred Language</Text>
-                    <TouchableOpacity 
-                        style={styles.languageSelector}
-                        onPress={() => setLanguageModalVisible(true)}
-                    >
-                        <Text style={styles.languageText}>
-                            {LANGUAGES[preferredLanguage]?.name || preferredLanguage}
-                        </Text>
-                        <Icon name="chevron-down" size={20} color="#666" />
-                    </TouchableOpacity>
-                </View>
-
-                {/* Password Fields */}
-                <View style={styles.inputContainer}>
-                    <Icon name="lock-closed-outline" size={20} color="#aaa" style={styles.inputIcon} />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Password"
-                        placeholderTextColor="#aaa"
-                        secureTextEntry={!showPassword}
-                        value={password}
-                        onChangeText={setPassword}
-                    />
-                    <TouchableOpacity style={styles.eyeIcon} onPress={togglePasswordVisibility}>
-                        <Icon name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#aaa" />
-                    </TouchableOpacity>
-                </View>
-
-                <View style={styles.inputContainer}>
-                    <Icon name="lock-closed-outline" size={20} color="#aaa" style={styles.inputIcon} />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Confirm Password"
-                        placeholderTextColor="#aaa"
-                        secureTextEntry={!showConfirmPassword}
-                        value={confirmPassword}
-                        onChangeText={setConfirmPassword}
-                    />
-                    <TouchableOpacity style={styles.eyeIcon} onPress={toggleConfirmPasswordVisibility}>
-                        <Icon name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#aaa" />
-                    </TouchableOpacity>
-                </View>
-
-                {/* Referral Code */}
-                <View style={styles.inputContainer}>
-                    <Icon name="gift-outline" size={20} color="#aaa" style={styles.inputIcon} />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Referral Code (Optional)"
-                        placeholderTextColor="#aaa"
-                        value={referralCode}
-                        onChangeText={setReferralCode}
-                        autoCapitalize="characters"
-                    />
-                </View>
-
-                {/* Signup Button */}
-                <TouchableOpacity
-                    style={styles.signupButton}
-                    onPress={handleSignUp}
-                    disabled={loading}
+            <KeyboardAvoidingView 
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1 }}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+            >
+                <ScrollView 
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
                 >
-                    {loading ? (
-                        <ActivityIndicator color="#fff" size="small" />
-                    ) : (
-                        <Text style={styles.signupButtonText}>Sign Up</Text>
-                    )}
-                </TouchableOpacity>
-
-                {/* Login Link */}
-                <View style={styles.loginLinkContainer}>
-                    <Text style={styles.loginText}>Already have an account?</Text>
-                    <TouchableOpacity onPress={() => navigation.navigate('EmailLogin')}>
-                        <Text style={styles.loginLink}>Login</Text>
+                    {/* Back Button */}
+                    <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+                        <View style={styles.backButtonCircle}>
+                            <Icon name="arrow-back" size={20} color="#fff" />
+                        </View>
                     </TouchableOpacity>
-                </View>
-            </ScrollView>
+
+                    {/* Header */}
+                    <Text style={styles.headerText}>Create Your Account</Text>
+
+                    {/* Input Fields */}
+                    <View style={styles.inputContainer}>
+                        <Icon name="person-outline" size={20} color="#aaa" style={styles.inputIcon} />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Enter Your Name"
+                            placeholderTextColor="#aaa"
+                            value={name}
+                            onChangeText={setName}
+                        />
+                    </View>
+
+                    <View style={styles.inputContainer}>
+                        <Icon name="mail-outline" size={20} color="#aaa" style={styles.inputIcon} />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Email Address"
+                            placeholderTextColor="#aaa"
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                            value={inputEmail}
+                            onChangeText={setInputEmail}
+                            editable={!disableEmailInput}
+                        />
+                    </View>
+
+                    <View style={styles.inputContainer}>
+                        <Icon name="calendar-outline" size={20} color="#aaa" style={styles.inputIcon} />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Age (Optional)"
+                            placeholderTextColor="#aaa"
+                            keyboardType="numeric"
+                            value={age}
+                            onChangeText={setAge}
+                        />
+                    </View>
+
+                    {/* Gender Selection */}
+                    <Text style={styles.genderLabel}>Select Gender</Text>
+                    <View style={styles.genderContainer}>
+                        {['Male', 'Female', 'Others'].map((item) => (
+                            <TouchableOpacity
+                                key={item}
+                                style={[
+                                    styles.genderButton,
+                                    gender === item && styles.genderButtonSelected,
+                                ]}
+                                onPress={() => setGender(item)}
+                            >
+                                <Text style={{ color: gender === item ? '#fff' : '#000' }}>{item}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+
+                    {/* Language Selection Button */}
+                    <View style={styles.languageSection}>
+                        <Text style={styles.languageLabel}>Preferred Language</Text>
+                        <TouchableOpacity 
+                            style={styles.languageSelector}
+                            onPress={() => setLanguageModalVisible(true)}
+                        >
+                            <Text style={styles.languageText}>
+                                {LANGUAGES[preferredLanguage]?.name || preferredLanguage}
+                            </Text>
+                            <Icon name="chevron-down" size={20} color="#666" />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Password Fields */}
+                    <View style={styles.inputContainer}>
+                        <Icon name="lock-closed-outline" size={20} color="#aaa" style={styles.inputIcon} />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Password"
+                            placeholderTextColor="#aaa"
+                            secureTextEntry={!showPassword}
+                            value={password}
+                            onChangeText={setPassword}
+                        />
+                        <TouchableOpacity style={styles.eyeIcon} onPress={togglePasswordVisibility}>
+                            <Icon name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#aaa" />
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.inputContainer}>
+                        <Icon name="lock-closed-outline" size={20} color="#aaa" style={styles.inputIcon} />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Confirm Password"
+                            placeholderTextColor="#aaa"
+                            secureTextEntry={!showConfirmPassword}
+                            value={confirmPassword}
+                            onChangeText={setConfirmPassword}
+                        />
+                        <TouchableOpacity style={styles.eyeIcon} onPress={toggleConfirmPasswordVisibility}>
+                            <Icon name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#aaa" />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Referral Code */}
+                    <View style={styles.inputContainer}>
+                        <Icon name="gift-outline" size={20} color="#aaa" style={styles.inputIcon} />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Referral Code (Optional)"
+                            placeholderTextColor="#aaa"
+                            value={referralCode}
+                            onChangeText={setReferralCode}
+                            autoCapitalize="characters"
+                        />
+                    </View>
+
+                    {/* Signup Button */}
+                    <TouchableOpacity
+                        style={styles.signupButton}
+                        onPress={handleSignUp}
+                        disabled={loading}
+                    >
+                        {loading ? (
+                            <ActivityIndicator color="#fff" size="small" />
+                        ) : (
+                            <Text style={styles.signupButtonText}>Sign Up</Text>
+                        )}
+                    </TouchableOpacity>
+
+                    {/* Login Link */}
+                    <View style={styles.loginLinkContainer}>
+                        <Text style={styles.loginText}>Already have an account?</Text>
+                        <TouchableOpacity onPress={() => navigation.navigate('EmailLogin')}>
+                            <Text style={styles.loginLink}>Login</Text>
+                        </TouchableOpacity>
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
 
             {/* Language Selection Modal */}
             <Modal

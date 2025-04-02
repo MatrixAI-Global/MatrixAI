@@ -8,6 +8,8 @@ import {
   Image,
   TextInput,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -82,54 +84,62 @@ const HelpScreen = ({ route, navigation }) => {
         <Text style={[styles.headerTitle, {color: colors.text}]   }>Get Help</Text>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={[styles.orderInfoCard, {backgroundColor: colors.background2, borderColor: colors.border}]}>
-          <Ionicons name="receipt-outline" size={24} color={colors.primary} />
-          <Text style={[styles.orderInfoText, {color: colors.text}]}>Order #{orderId}</Text>
-        </View>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 70}
+      >
+        <ScrollView 
+          style={styles.content} 
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={[styles.orderInfoCard, {backgroundColor: colors.background2, borderColor: colors.border}]}>
+            <Ionicons name="receipt-outline" size={24} color={colors.primary} />
+            <Text style={[styles.orderInfoText, {color: colors.text}]}>Order #{orderId}</Text>
+          </View>
 
-        <Text style={[styles.sectionTitle, {color: colors.text}]}>What issue are you facing?</Text>
-        <View style={[styles.issuesContainer, {backgroundColor: colors.background2}]}>
-          {commonIssues.map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.issueButton,
-                issue === item && styles.issueButtonSelected,
-              ]}
-              onPress={() => setIssue(item)}
-            >
-              <Text
+          <Text style={[styles.sectionTitle, {color: colors.text}]}>What issue are you facing?</Text>
+          <View style={[styles.issuesContainer, {backgroundColor: colors.background2}]}>
+            {commonIssues.map((item, index) => (
+              <TouchableOpacity
+                key={index}
                 style={[
-                  styles.issueButtonText,
-                  issue === item && styles.issueButtonTextSelected,
+                  styles.issueButton,
+                  issue === item && styles.issueButtonSelected,
                 ]}
+                onPress={() => setIssue(item)}
               >
-                {item}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+                <Text
+                  style={[
+                    styles.issueButtonText,
+                    issue === item && styles.issueButtonTextSelected,
+                  ]}
+                >
+                  {item}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
-        <Text style={[styles.sectionTitle, {color: colors.text}]}>Describe your issue</Text>
-        <View style={[styles.textInputContainer, {backgroundColor: colors.background2, borderColor: colors.border}]}>
-          <TextInput
-            style={[styles.textInput, {color: colors.text}]}
-            multiline
-            numberOfLines={6}
-            placeholder="Please provide details about your issue..."
-            value={description}
-            onChangeText={setDescription}
-            textAlignVertical="top"
-          />
-        </View>
+          <Text style={[styles.sectionTitle, {color: colors.text}]}>Describe your issue</Text>
+          <View style={[styles.textInputContainer, {backgroundColor: colors.background2, borderColor: colors.border}]}>
+            <TextInput
+              style={[styles.textInput, {color: colors.text}]}
+              multiline
+              numberOfLines={6}
+              placeholder="Please provide details about your issue..."
+              value={description}
+              onChangeText={setDescription}
+              textAlignVertical="top"
+            />
+          </View>
 
-        <TouchableOpacity style={[styles.submitButton, {backgroundColor: colors.primary}]} onPress={handleSubmit}>
-          <Text style={[styles.submitButtonText, {color: colors.text}]}>Submit Request</Text>
-        </TouchableOpacity>
-
-      
-      </ScrollView>
+          <TouchableOpacity style={[styles.submitButton, {backgroundColor: colors.primary}]} onPress={handleSubmit}>
+            <Text style={[styles.submitButtonText, {color: colors.text}]}>Submit Request</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };

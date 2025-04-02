@@ -27,6 +27,7 @@ const formatTime = (seconds) => {
 import { PDFDocument, rgb, PNGImage } from 'react-native-pdf-lib';
 import LottieView from 'lottie-react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { svg2png } from 'svg-png-converter';
 import RNFS from 'react-native-fs';
 import { Alert } from 'react-native';
@@ -1723,25 +1724,19 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
             </View>
                  <View style={[styles.headerContainer, {backgroundColor: colors.background2}]}>
                 <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                    <Image
-                        source={require('../assets/back.png')}
-                        style={[styles.headerIcon, {tintColor: colors.text}]    }
-                    />
+                    <MaterialIcons name="arrow-back-ios-new" size={24} color={colors.primary} />
                 </TouchableOpacity>
                 <Text style={[styles.header, {color: colors.text}]  }>
-                    {fileName.length > 20 ? `${fileName.substring(0, 20)}...` : fileName}
+                    {fileName.length > 13 ? `${fileName.substring(0, 12)}...` : fileName}
                 </Text>
                 <View style={{ flexDirection: 'row' }}>
                     <TouchableOpacity style={styles.iconButton} onPress={handleShare}>
-                        <Image
-                            source={require('../assets/share.png')}
-                            style={styles.icon}
-                        />
+                        <MaterialIcons name="ios-share" size={24} color={colors.primary} />
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.iconButton} onPress={toggleSlider}>
-                        <Image
-                            source={require('../assets/threeDot.png')}
-                            style={[styles.icon, {tintColor: colors.text}]}
+                       <Image
+                            source={require('../assets/more.png')}
+                            style={[styles.icon, {tintColor: colors.primary}]}
                         />
                     </TouchableOpacity>
                 </View>
@@ -2459,8 +2454,7 @@ const styles = StyleSheet.create({
     backButton: {
         padding: 8,
         borderRadius: 20,
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
+       
         zIndex:100,
       },
       headerIcon: {
@@ -2552,8 +2546,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#ccc',
+       
         backgroundColor:'#fff',
     },
     headerContainer2: {
@@ -2618,7 +2611,7 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     word: {
-        color: '#333',
+        color: '#fff',
         fontSize: 16,
         lineHeight: 24,
     },
@@ -2699,11 +2692,7 @@ flexDirection:'row',
         marginTop: -10,
         marginBottom:10,
       },
-      icon: {
-        width: 30,
-        height: 30,
-        tintColor: '#007bff',
-      },
+    
       icon2: {
         width: 30,
         height: 30,
@@ -2897,6 +2886,7 @@ zIndex:101,
         width: 24,
         height: 24,
         resizeMode: 'contain',
+        zIndex:101,
     },
     languageInput: {
         fontSize: 16,
@@ -3189,10 +3179,11 @@ zIndex:101,
     },
     gradientButton: {
        width:'100%',
-       height:32,
+       height:30,
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius:10,
+        marginTop:3,
     },
     squareModal: {
         width: 100,

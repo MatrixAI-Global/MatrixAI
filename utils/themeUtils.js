@@ -53,7 +53,7 @@ export const THEMES = {
 };
 
 // Default theme
-export const DEFAULT_THEME = 'light';
+export const DEFAULT_THEME = 'dark';
 
 // Key for storing theme preference in AsyncStorage
 const THEME_STORAGE_KEY = 'preferred_theme';

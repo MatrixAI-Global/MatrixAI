@@ -17,6 +17,9 @@ import DocumentPicker from 'react-native-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import RNFS from 'react-native-fs';  // Import react-native-fs to read files
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import Feather from 'react-native-vector-icons/Feather';
+import Octicons from 'react-native-vector-icons/Octicons';
 import axios from 'axios';
 import { Buffer } from 'buffer';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler'; 
@@ -30,18 +33,15 @@ import { useAuthUser } from '../hooks/useAuthUser';
 import { useTheme } from '../context/ThemeContext';
 
 const audioIcon = require('../assets/mic3.png');
-const videoIcon = require('../assets/cliper.png');
-const backIcon = require('../assets/back.png');
+
 const uploadIcon = require('../assets/Import.png');
 const resizeIcon = require('../assets/cliper.png');
-const helpIcon = require('../assets/threeDot.png');
+
 const helpIcon2 = require('../assets/mic2.png');
 const Translate = require('../assets/right-up.png');
 const coin = require('../assets/coin.png');
 const micIcon = require('../assets/mic3.png');
-const micIcon2 = require('../assets/Translate.png');
-const clockIcon = require('../assets/clock.png');
-const calendarIcon = require('../assets/calender.png');
+
 const emptyIcon = require('../assets/empty.png');
 
 // Custom Toast Component
@@ -117,28 +117,60 @@ const AudioVideoUploadScreen = () => {
     const { getThemeColors } = useTheme();
     const colors = getThemeColors();
     const [languages, setLanguages] = useState([
-        { label: 'Chinese Traditional', value: 'zh-TW' },
+        { label: 'Bulgarian', value: 'bg' },
+        { label: 'Catalan', value: 'ca' },
+        { label: 'Chinese (Cantonese, Traditional)', value: 'zh-HK' },
+        { label: 'Chinese (Mandarin, Simplified)', value: 'zh' },
+        { label: 'Chinese (Mandarin, Simplified)', value: 'zh-CN' },
+        { label: 'Chinese (Mandarin, Simplified)', value: 'zh-Hans' },
+        { label: 'Chinese (Mandarin, Traditional)', value: 'zh-TW' },
+        { label: 'Chinese (Mandarin, Traditional)', value: 'zh-Hant' },
+        { label: 'Czech', value: 'cs' },
         { label: 'Danish', value: 'da' },
+        { label: 'Danish', value: 'da-DK' },
         { label: 'Dutch', value: 'nl' },
         { label: 'English', value: 'en' },
-        { label: 'English (UK)', value: 'en-GB' },
+        { label: 'English (AU)', value: 'en-AU' },
+        { label: 'English (GB)', value: 'en-GB' },
+        { label: 'English (IN)', value: 'en-IN' },
+        { label: 'English (NZ)', value: 'en-NZ' },
         { label: 'English (US)', value: 'en-US' },
+        { label: 'Estonian', value: 'et' },
+        { label: 'Finnish', value: 'fi' },
         { label: 'Flemish', value: 'nl' },
+        { label: 'Flemish', value: 'nl-BE' },
         { label: 'French', value: 'fr' },
+        { label: 'French (Canada)', value: 'fr-CA' },
         { label: 'German', value: 'de' },
+        { label: 'German (Switzerland)', value: 'de-CH' },
+        { label: 'Greek', value: 'el' },
         { label: 'Hindi', value: 'hi' },
+        { label: 'Hungarian', value: 'hu' },
+        { label: 'Indonesian', value: 'id' },
         { label: 'Italian', value: 'it' },
         { label: 'Japanese', value: 'ja' },
         { label: 'Korean', value: 'ko' },
+        { label: 'Korean', value: 'ko-KR' },
+        { label: 'Latvian', value: 'lv' },
+        { label: 'Lithuanian', value: 'lt' },
+        { label: 'Malay', value: 'ms' },
         { label: 'Norwegian', value: 'no' },
         { label: 'Polish', value: 'pl' },
         { label: 'Portuguese', value: 'pt' },
         { label: 'Portuguese (Brazil)', value: 'pt-BR' },
         { label: 'Portuguese (Portugal)', value: 'pt-PT' },
+        { label: 'Romanian', value: 'ro' },
+        { label: 'Russian', value: 'ru' },
+        { label: 'Slovak', value: 'sk' },
         { label: 'Spanish', value: 'es' },
         { label: 'Spanish (Latin America)', value: 'es-419' },
         { label: 'Spanish (LATAM)', value: 'es-LATAM' },
         { label: 'Swedish', value: 'sv' },
+        { label: 'Swedish', value: 'sv-SE' },
+        { label: 'Thai', value: 'th' },
+        { label: 'Turkish', value: 'tr' },
+        { label: 'Ukrainian', value: 'uk' },
+        { label: 'Vietnamese', value: 'vi' },
         { label: 'Tamasheq', value: 'taq' },
         { label: 'Tamil', value: 'ta' }
     ]);
@@ -965,10 +997,7 @@ const AudioVideoUploadScreen = () => {
             }}
             style={[styles.actionButton1]}
         >
-            <Image
-                source={require('../assets/pencil2.png')}
-                style={[styles.actionIcon]}
-            />
+          <Feather name="edit-3" size={20} color="white" />
         </TouchableOpacity>
 
         {/* Share Button */}
@@ -980,10 +1009,7 @@ const AudioVideoUploadScreen = () => {
             {isSharing ? (
                 <ActivityIndicator color="#fff" size="small" />
             ) : (
-                <Image
-                        source={require('../assets/send.png')}
-                        style={[styles.actionIcon]}
-                />
+              <MaterialIcons name="ios-share" size={20} color="white" />
             )}
         </TouchableOpacity>
 
@@ -992,11 +1018,8 @@ const AudioVideoUploadScreen = () => {
             onPress={() => handleRemoveFile(item.audioid)}
             style={[styles.actionButton3]}
         >
-            <Image
-                source={require('../assets/remove.png')}
-                style={[styles.actionIcon]}
-            />
-        </TouchableOpacity>
+            <MaterialIcons name="delete" size={20} color="white" />
+            </TouchableOpacity>
         </View>
     );
     const renderFileItem = ({ item }) => {
@@ -1012,7 +1035,7 @@ const AudioVideoUploadScreen = () => {
                     style={[
                         styles.fileItem,
                         isSelected && styles.selectedFileItem,
-                        {backgroundColor: colors.background2}
+                        {backgroundColor: colors.background2, borderWidth: 0.8, borderColor: colors.border}
                     ]}
                     onPress={() => {
                         if (isFilterMode) {
@@ -1031,14 +1054,14 @@ const AudioVideoUploadScreen = () => {
                     />
                 <View style={styles.detailsRow}>
     <Text style={[styles.fileName, {color: colors.text}]} numberOfLines={1}>
-        {item.audio_name?.length > 17 ? `${item.audio_name.substring(0, 15)}...` : item.audio_name || 'Unknown File'}
+        {item.audio_name?.length > 13 ? `${item.audio_name.substring(0, 12)}...` : item.audio_name || 'Unknown File'}
     </Text>
     <View style={styles.fileDetails}>
-        <Image source={clockIcon} style={[styles.detailIcon, {tintColor: colors.text}]} />
+        <MaterialIcons name="access-time" size={14} color={'#C3C3C3FF'} marginRight={2}/>
         <Text style={[styles.detailText, {color: colors.text}]}>
         {formatDuration(item.duration)}
       </Text>
-        <Image source={calendarIcon} style={[styles.detailIcon, {tintColor: colors.text}]} />
+        <MaterialIcons name="calendar-month" size={14} color={'#C3C3C3FF'} marginRight={2}/>
         <Text style={[styles.detailText, {color: colors.text}]}>
             {item.uploaded_at ? 
                 `${item.uploaded_at.split('T')[0].split('-')[2]}/${item.uploaded_at.split('T')[0].split('-')[1]} ${item.uploaded_at.split('T')[1].substring(0, 5)}` 
@@ -1263,10 +1286,7 @@ const AudioVideoUploadScreen = () => {
           
             <View style={styles.topButtonsContainer}>
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                                   <Image
-                                       source={require('../assets/back.png')} 
-                                        style={[styles.headerIcon, {tintColor: colors.text}]}
-                                   />
+            <MaterialIcons name="arrow-back-ios-new" size={24} color="white" />
                                </TouchableOpacity>
                 <TouchableOpacity style={styles.topButton} onPress={handleFileSelect}>
                     <Image source={uploadIcon} style={[styles.topIcon]} />
@@ -1276,7 +1296,7 @@ const AudioVideoUploadScreen = () => {
                 </TouchableOpacity>
                 <View style={styles.topHelp}>
                     <Image source={helpIcon2} style={[styles.topHelpIcon]} />
-                    <Text style={[styles.helpText]}>How to add voice memos to Transcribe</Text>
+                    <Text style={[styles.helpText]}>Voice Memo Transcription Tutorial</Text>
                 </View>
             </View>
             {/* Loading Indicator */}
@@ -1290,16 +1310,17 @@ const AudioVideoUploadScreen = () => {
             {/* Search Bar */}
             <View style={styles.searchBox2}>
             <View style={styles.searchBox}>
-                <Image source={require('../assets/search.png')} style={[styles.searchIcon]} />
+              <MaterialIcons name="search" size={24} color={'#ccc'} />
                 <TextInput
                     placeholder="Search"
-                    style={[styles.textInput]}
+                    placeholderTextColor={'#ccc'}
+                    style={[styles.textInput, {color: colors.border}]}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
                 />
             </View>
             <TouchableOpacity onPress={toggleFilterMode} style={[styles.filterButton, {backgroundColor: colors.background2}]}>
-        <Image source={require('../assets/select-all.png')} style={[styles.filterIcon, {tintColor: colors.text}]} />
+        <Octicons name="multi-select" size={20} color={'#ccc'} style={styles.filterIcon}/>
 </TouchableOpacity>
 
 </View>
@@ -1337,7 +1358,7 @@ const AudioVideoUploadScreen = () => {
                     <ActivityIndicator color="#fff" size="small" />
                 ) : (
                     <>
-                        <Image source={require('../assets/remove.png')} style={[styles.deleteIcon]} />
+                        <MaterialIcons name="delete" size={24} color={'#fff'} style={styles.deleteIcon}/>
                         <Text style={[styles.deleteAllButtonText]}>Delete All</Text>
                     </>
                 )}
@@ -1370,23 +1391,23 @@ const AudioVideoUploadScreen = () => {
             </View>
 
             <View style={styles.popupButtons}>
-                <TouchableOpacity onPress={handleClosePopup} style={[styles.popupButton]}>
+                <TouchableOpacity onPress={handleClosePopup} style={[styles.popupButton, {backgroundColor: colors.primary}]}>
                     <Text style={[styles.popupButtonText]}>Close</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                    style={[styles.actionButton]}
+                    style={[styles.actionButton, {borderColor: colors.primary}]}
                     onPress={async () => {
                         await handleUpload(audioFile, duration);
                     }}
                     disabled={uploading}
                 >
-                    <Text style={[styles.convert2, {color: colors.text}]}>{duration}</Text>
+                    <Text style={[styles.convert2, {color: colors.text }]}>{duration}</Text>
                     <Image source={coin} style={[styles.detailIcon2]} />
 
                     {uploading ? (
                         <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                            <ActivityIndicator size="small" color="#0000ff" />
+                            <ActivityIndicator size="small" color={colors.primary} />
                             <Text style={[styles.convert, {marginLeft: 5, color: colors.text}]}>
                                 Uploading...
                             </Text>
@@ -1541,7 +1562,7 @@ const styles = StyleSheet.create({
         position: 'absolute', // Makes the button position absolute
         right: 5, // Distance from the right edge of the screen
      // Distance from the bottom edge of the screen
-        backgroundColor: '#57575710',
+       borderWidth: 0.8,
         borderRadius: 20,
         padding: 8, // Adjust padding for better touch area
         flexDirection: 'row',
@@ -1589,8 +1610,8 @@ color:'#000',
     backButton: {
         padding: 8,
         borderRadius: 20,
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
+        backgroundColor: '#007bff',
+       
         marginRight:10,
       },
       headerIcon: {
@@ -1666,11 +1687,14 @@ color:'#000',
         marginLeft: 5,
     },
     filterButton: {
-        marginLeft: 1,
-    },
-    filterIcon: {
+        marginLeft: 4,
+        justifyContent:'center',
+        alignItems:'center',
         width: 30,
         height: 30,
+    },
+    filterIcon: {
+       
         resizeMode: 'contain',
     },
   

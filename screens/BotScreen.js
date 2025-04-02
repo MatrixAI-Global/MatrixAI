@@ -2293,7 +2293,7 @@ const styles = StyleSheet.create({
   keyboardAvoidingView: {
     position: 'absolute',
     bottom: 0,
-
+    marginBottom: 15,
     left: 0,
     right: 0,
     width: '100%',

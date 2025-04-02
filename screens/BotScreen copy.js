@@ -12,6 +12,7 @@ import {
   Dimensions,
   Linking,
   KeyboardAvoidingView,
+  ScrollView,
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import * as Animatable from 'react-native-animatable';
@@ -40,18 +41,13 @@ const BotScreen2 = ({ navigation, route }) => {
   const { transcription, XMLData, uid, audioid } = route.params || {};
   const [isCameraVisible, setIsCameraVisible] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false); // Track if data is loaded
+  const [isInitialLoading, setIsInitialLoading] = useState(true); // New state for initial loading
   const [showSummaryPrompt, setShowSummaryPrompt] = useState(true); // New state for summary prompt
   const isMounted = useRef(true);
   const { getThemeColors } = useTheme();
   const colors = getThemeColors();  
-  // Initialize messages state first
-  const [messages, setMessages] = useState([
-    {
-      id: '1',
-      text: "Hello.👋 I'm your new friend, MatrixAI Bot. You can ask me any questions.",
-      sender: 'bot',
-    },
-  ]);
+  // Initialize messages state with an empty array instead of default message
+  const [messages, setMessages] = useState([]);
 
   // New state variables for image preview modal
   const [selectedImage, setSelectedImage] = useState(null);
@@ -362,6 +358,7 @@ const BotScreen2 = ({ navigation, route }) => {
   useEffect(() => {
     const fetchChatHistory = async () => {
       try {
+        setIsInitialLoading(true);
         const response = await axios.post('https://matrix-server.vercel.app/getChat', {
           uid,
           chatid: audioid, // Using audioid as chatid
@@ -372,21 +369,21 @@ const BotScreen2 = ({ navigation, route }) => {
 
         if (hasChatHistory) {
           // If we have chat history, update messages with fetched messages
-          setMessages((prev) => [
-            ...prev,
-            ...fetchedMessages.map(msg => ({
-              ...msg,
-              image: msg.imageUrl || msg.image,
-              text: msg.text.replace(/(\*\*|\#\#)/g, ""),
-            }))
-          ]);
+          setMessages(fetchedMessages.map(msg => ({
+            ...msg,
+            image: msg.imageUrl || msg.image,
+            text: msg.text.replace(/(\*\*|\#\#)/g, ""),
+          })));
         } else {
-          // If no chat history, save the initial greeting message to database
+          // If no chat history, create and save the initial greeting message
           const initialMessage = {
             id: '1',
             text: "Hello.👋 I'm your new friend, MatrixAI Bot. You can ask me any questions.",
             sender: 'bot',
           };
+          
+          // Set the initial message in state
+          setMessages([initialMessage]);
           
           // Save initial message to database
           await saveChatHistory(initialMessage.text, initialMessage.sender);
@@ -395,7 +392,16 @@ const BotScreen2 = ({ navigation, route }) => {
         setDataLoaded(true);
       } catch (error) {
         console.error('Error fetching chat history:', error);
+        // Handle 404 or other errors by setting the initial greeting message
+        const initialMessage = {
+          id: '1',
+          text: "Hello.👋 I'm your new friend, MatrixAI Bot. You can ask me any questions.",
+          sender: 'bot',
+        };
+        setMessages([initialMessage]);
         setDataLoaded(true);
+      } finally {
+        setIsInitialLoading(false);
       }
     };
 
@@ -869,7 +875,7 @@ const BotScreen2 = ({ navigation, route }) => {
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
       {/* Header */}  
-      <View style={[styles.header, {backgroundColor: colors.background2}]}>
+      <View style={[styles.header, {backgroundColor: colors.background2 , borderColor: colors.border}]}>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <Image source={require('../assets/back.png')} style={[styles.headerIcon, {tintColor: colors.text}]} />
           </TouchableOpacity>
@@ -880,17 +886,18 @@ const BotScreen2 = ({ navigation, route }) => {
         </View>
       </View>
 
-      {/* Chat List or Animation */}
-      {messages.length === 1 || isApiLoading ? (
-        <View style={styles.animationContainer}>
+      {/* Loading State */}
+      {isInitialLoading ? (
+        <View style={styles.loadingFullScreenContainer}>
           <LottieView
             source={require('../assets/loading.json')}
             autoPlay
             loop
-            style={styles.animation}
+            style={styles.loadingFullScreenAnimation}
           />
         </View>
       ) : (
+        // Chat List or No Messages View
         <FlatList
           data={messages}
           keyExtractor={(item) => item.id}
@@ -900,7 +907,13 @@ const BotScreen2 = ({ navigation, route }) => {
           onLayout={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
           ref={flatListRef}
           style={{ marginBottom: showAdditionalButtons ? 200 : 100 }}
-         
+          ListEmptyComponent={
+            !isInitialLoading && (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No messages yet. Start a conversation!</Text>
+              </View>
+            )
+          }
         />
       )}
         <KeyboardAvoidingView
@@ -910,7 +923,12 @@ const BotScreen2 = ({ navigation, route }) => {
       >
       {/* Loading Animation */}
       {isLoading && (
-        <View style={styles.loadingContainer}>
+        <View style={[styles.loadingContainer, { 
+          bottom: showAdditionalButtons && selectedImage ? 120 : 
+                 showAdditionalButtons ? 50 : 
+                 selectedImage ? 20 : 
+                 -50 
+        }]}>
           <LottieView
             source={require('../assets/dot.json')}
             autoPlay
@@ -938,6 +956,7 @@ const BotScreen2 = ({ navigation, route }) => {
       )}
 
       {/* Quick Action Buttons */}
+      <ScrollView horizontal>
       <View style={styles.quickActionContainer}>
         <TouchableOpacity 
           style={styles.quickActionButton}
@@ -958,6 +977,7 @@ const BotScreen2 = ({ navigation, route }) => {
           <Text style={styles.quickActionText}>Solution</Text>
         </TouchableOpacity>
       </View>
+      </ScrollView>
 
       {/* Chat Input Box */}
       <View style={styles.chatBoxContainer}>
@@ -990,21 +1010,21 @@ const BotScreen2 = ({ navigation, route }) => {
                         <View style={styles.additionalButton}>
                             <Ionicons name="camera" size={28} color="#4C8EF7" />
                         </View>
-                        <Text>Photo</Text>
+                        <Text style={{color: colors.text}}>Photo</Text>
                     </TouchableOpacity>
                     
                     <TouchableOpacity style={styles.additionalButton2} onPress={() => handleImageOCR('gallery')}>
                         <View style={styles.additionalButton}>
                             <Ionicons name="image" size={28} color="#4C8EF7" />
                         </View>
-                        <Text>Image</Text>
+                        <Text style={{color: colors.text}}>Image</Text>
                     </TouchableOpacity>
                     
                     <TouchableOpacity style={styles.additionalButton2}>
                         <View style={styles.additionalButton}>
                             <Ionicons name="attach" size={28} color="#4C8EF7" />
                         </View>
-                        <Text>Document</Text>
+                        <Text style={{color: colors.text}}>Document</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -1699,9 +1719,32 @@ marginBottom:-10,
   keyboardAvoidingView: {
     width: '100%',
     position: 'absolute',
+    marginBottom: 15,
     bottom: 0,
     left: 0,
     right: 0,
+  },
+  loadingFullScreenContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  loadingFullScreenAnimation: {
+    width: 200,
+    height: 200,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    marginTop: 100,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#888',
+    textAlign: 'center',
   },
 });
 

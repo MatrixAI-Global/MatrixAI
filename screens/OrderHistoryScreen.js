@@ -67,7 +67,7 @@ console.log(orders);
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}] }>
-      <View style={[styles.header, {backgroundColor: colors.background}]  }>
+      <View style={[styles.header, {backgroundColor: colors.background , borderBottomWidth: 0.8, borderColor: colors.border}]  }>
         <TouchableOpacity style={[styles.backButton, {borderColor: colors.text}]} onPress={() => navigation.goBack()}>
           <Image
             source={require('../assets/back.png')}
@@ -146,8 +146,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+  
   },
   backButton: {
     padding: 8,

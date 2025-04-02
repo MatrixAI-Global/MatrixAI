@@ -21,6 +21,7 @@ import { Buffer } from 'buffer';
 import AudioRecord from 'react-native-audio-record';
 import Sound from 'react-native-sound';
 import LottieView from 'lottie-react-native';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { v4 as uuidv4 } from 'uuid';
 import pako from 'pako';
 import RNFS from 'react-native-fs';
@@ -29,6 +30,7 @@ import axios from 'axios';
 import { PERMISSIONS, request, check, RESULTS, openSettings } from 'react-native-permissions';
 import { supabase } from '../supabaseClient';
 import { useAuthUser } from '../hooks/useAuthUser';
+import { useTheme } from '../context/ThemeContext';
 // Global refs
 let dataSubscription = null;
 let websocketConnection = null;
@@ -147,7 +149,8 @@ const LiveTranscriptionScreen = ({ navigation }) => {
   const [showActionButtons, setShowActionButtons] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isStartingRecording, setIsStartingRecording] = useState(false);
-  
+  const { getThemeColors } = useTheme();
+  const colors = getThemeColors();
   // Refs
   const audioChunksRef = useRef([]);
   const timerRef = useRef(null);
@@ -1788,16 +1791,16 @@ const LiveTranscriptionScreen = ({ navigation }) => {
       {/* Header with Back, Copy, Share */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Image source={require('../assets/back.png')} style={styles.headerIcon} />
-        </TouchableOpacity>
+            <MaterialIcons name="arrow-back-ios-new" size={24} color={'#fff'} style={styles.headerIcon} />
+          </TouchableOpacity>
         <View style={styles.rightHeader}>
           {isTranslateMode && (
             <>
-              <TouchableOpacity onPress={handleCopyText}>
-                <Image source={require('../assets/copy.png')} style={styles.icon3} />
+                <TouchableOpacity onPress={handleCopyText}>
+                  <MaterialIcons name="content-copy" size={24} color={'#fff'} style={styles.icon3}/>
               </TouchableOpacity>
               <TouchableOpacity onPress={handleShareText}>
-                <Image source={require('../assets/share.png')} style={styles.icon3} />
+              <MaterialIcons name="ios-share" size={24} color={'#fff'} style={styles.icon3}/>
               </TouchableOpacity>
             </>
           )}
@@ -1966,37 +1969,38 @@ const LiveTranscriptionScreen = ({ navigation }) => {
 
       {/* Language Selection Modal */}
       <Modal
-        animationType="slide"
-        transparent={true}
-        visible={languageModalVisible}
-        onRequestClose={() => setLanguageModalVisible(false)}
+  animationType="slide"
+  transparent={true}
+  visible={languageModalVisible}
+  onRequestClose={() => setLanguageModalVisible(false)}
+>
+  <View style={styles.modalContainer}>
+    <View style={styles.modalContent}>
+      <FlatList
+        data={Object.keys(languageCodes)}
+        keyExtractor={(item) => item}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={styles.languageOption}
+            onPress={() => {
+              updateLanguage(item, editingLanguage === 'source');
+              setLanguageModalVisible(false);
+            }}
+          >
+            <Text style={styles.languageOptionText}>{item}</Text>
+          </TouchableOpacity>
+        )}
+      />
+      <TouchableOpacity 
+        style={styles.closeButton} 
+        onPress={() => setLanguageModalVisible(false)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <FlatList
-              data={Object.keys(languageCodes)}
-              keyExtractor={(item) => item}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.languageOption}
-                  onPress={() => {
-                    updateLanguage(item, editingLanguage === 'source');
-                    setLanguageModalVisible(false);
-                  }}
-                >
-                  <Text style={styles.languageOptionText}>{item}</Text>
-                </TouchableOpacity>
-              )}
-            />
-            <TouchableOpacity 
-              style={styles.closeButton} 
-              onPress={() => setLanguageModalVisible(false)}
-            >
-              <Text style={styles.closeButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        <Text style={styles.closeButtonText}>Close</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
+
     </SafeAreaView>
   );
 };
@@ -2076,15 +2080,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#fff',
     borderRadius: 25,
-    padding: 8,
+  
     width: '80%',
-    height:50,
+   height:50,
     position: 'relative', // Required for absolute positioning of the swap button
   },
   languageButton: {
     paddingHorizontal: 26,
+   width: '100%',
+   height: '100%',
+   paddingVertical: 16,
     flex: 1, // Allow buttons to take equal space
     alignItems: 'center', // Center text horizontally
+    justifyContent: 'center', // Center text vertically
   },
   languageText: {
     fontSize: 16,
@@ -2100,7 +2108,7 @@ const styles = StyleSheet.create({
     position: 'absolute', // Position the swap button absolutely
     left: '50%', // Move to the horizontal center
     top: '50%', // Move to the vertical center
-    transform: [{ translateX: -10 }, { translateY: -10 }], // Adjust for button size
+    transform: [{ translateX: -20 }, { translateY: -19 }], // Adjust for button size
   },
   container2: {
     flex: 1,
@@ -2149,7 +2157,7 @@ const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  
   },
   modalContent: {
     backgroundColor: '#fff',

@@ -26,9 +26,9 @@ const TransactionScreen = ({ route, navigation }) => {
       });
       
       if (response.data.success) {
-        setTransactions(response.data.data);
-        // Set total coins from the latest transaction's remaining_coins
-        
+        // Sort transactions by date in descending order
+        const sortedTransactions = response.data.data.sort((a, b) => new Date(b.time) - new Date(a.time));
+        setTransactions(sortedTransactions);
       }
     } catch (error) {
       console.error('Error fetching transactions:', error);

@@ -8,6 +8,8 @@ import {
   Image,
   TextInput,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -71,7 +73,7 @@ console.log(uid,'user');
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
-      <View style={[styles.header, {backgroundColor: colors.background}]}>
+      <View style={[styles.header, {backgroundColor: colors.background , borderBottomWidth: 0.8, borderColor: colors.border}]}>
         <TouchableOpacity style={[styles.backButton, {borderColor: colors.border}]} onPress={() => navigation.goBack()}>
           <Image
             source={require('../assets/back.png')}
@@ -80,7 +82,11 @@ console.log(uid,'user');
         </TouchableOpacity>
         <Text style={[styles.headerTitle, {color: colors.text}]}>Get Help</Text>
       </View>
-
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 70}
+      >
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
        
 
@@ -126,6 +132,7 @@ console.log(uid,'user');
 
       
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -140,8 +147,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+
   },
   backButton: {
     padding: 8,

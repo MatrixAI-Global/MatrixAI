@@ -140,7 +140,7 @@ const Header = ({ navigation, uid, openDrawer }) => {
 
             {/* Coin Display with Coin Icon */}
             <TouchableOpacity
-                style={[styles.coinContainer, {backgroundColor: colors.background2}]}
+                style={[styles.coinContainer, {backgroundColor: colors.background2, borderWidth: 0.8, borderColor: colors.border}]}
                 onPress={() =>
                     navigation.navigate('TransactionScreen', { coinCount })
                 }
@@ -176,8 +176,7 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         marginRight: 3,
-        borderWidth: 0.8,
-        borderColor: '#C9C9C9',
+       
         borderRadius: 17.5, // Make the image circular
     },
     welcomeText: {
