@@ -1,14 +1,13 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet, Dimensions, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, Image, StyleSheet, useWindowDimensions, Animated } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
-
-const { width } = Dimensions.get('window'); // Get the screen width
 
 const FeatureCard = ({ title, description, iconSource, navigation, targetScreen }) => {
   const rotation = useRef(new Animated.Value(0)).current;
   const { getThemeColors } = useTheme();
   const colors = getThemeColors();
+  const { width } = useWindowDimensions(); // More responsive to orientation changes
 
   useEffect(() => {
     // Start the rotation animation
@@ -27,8 +26,9 @@ const FeatureCard = ({ title, description, iconSource, navigation, targetScreen 
     outputRange: ['0deg', '360deg'],
   });
 
-  // Calculate card size to be consistent
-  const cardSize = width * 0.42; // Consistent width for all cards
+  // Calculate card size to be responsive and square
+  // Subtract total horizontal padding/margin and divide by 2 for two cards per row
+  const cardSize = (width - 60) / 2; 
 
   return (
     <TouchableOpacity
@@ -59,8 +59,8 @@ const FeatureCard = ({ title, description, iconSource, navigation, targetScreen 
         </View>
 
         {/* Card content */}
-        <Text style={styles.cardTitle}>{title}</Text>
-        <Text style={styles.cardDescription}>{description}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1} ellipsizeMode="tail">{title}</Text>
+        <Text style={styles.cardDescription} numberOfLines={3} ellipsizeMode="tail">{description}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -69,18 +69,17 @@ const FeatureCard = ({ title, description, iconSource, navigation, targetScreen 
 const styles = StyleSheet.create({
   card: {
     borderRadius: 10,
-  
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 5, // For Android shadow
     overflow: 'hidden', // Ensures gradient stays inside card
-    margin: 10,
+    marginBottom: 10, // Reduced margin for better spacing
   },
   contentContainer: {
     flex: 1,
-    padding: 15,
+    padding: 12,
     justifyContent: 'flex-start',
     alignItems: 'flex-start',
   },
@@ -97,35 +96,36 @@ const styles = StyleSheet.create({
     borderRadius: 175, // Match the container
   },
   circleContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25, // Circle shape
+    width: 40,
+    height: 40,
+    borderRadius: 20, // Circle shape
     backgroundColor: '#FF6600',
     borderColor: '#FF6600', // Orange color border
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   icon: {
-    width: 25,
-    height: 25,
+    width: 20,
+    height: 20,
     resizeMode: 'contain',
     tintColor: '#fff',
   },
   cardTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#fff',
-    textAlign: 'left', // Center align the title
+    textAlign: 'left',
     width: '100%',
-    marginTop: -8,
+    marginTop: -4,
   },
   cardDescription: {
-    fontSize: 14,
-    marginTop: 5,
-    textAlign: 'left', // Center align the description
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: 'left',
     width: '100%',
     color: '#fff',
+    flexShrink: 1,
   },
 });
 

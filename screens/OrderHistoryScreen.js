@@ -16,6 +16,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { LinearGradient } from 'react-native-linear-gradient';
 import { useAuthUser } from '../hooks/useAuthUser';
 import { useTheme } from '../context/ThemeContext';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 const OrderHistoryScreen = ({ navigation }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -68,12 +69,9 @@ console.log(orders);
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}] }>
       <View style={[styles.header, {backgroundColor: colors.background , borderBottomWidth: 0.8, borderColor: colors.border}]  }>
-        <TouchableOpacity style={[styles.backButton, {borderColor: colors.text}]} onPress={() => navigation.goBack()}>
-          <Image
-            source={require('../assets/back.png')}
-            style={[styles.headerIcon, {tintColor: colors.text}]}
-          />
-        </TouchableOpacity>
+      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <MaterialIcons name="arrow-back-ios-new" size={24} color="white" />
+                               </TouchableOpacity>
         <Text style={[styles.headerTitle, {color: colors.text}]}>Order History</Text>
       </View>
 
@@ -151,8 +149,9 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+    backgroundColor: '#007bff',
+   
+    marginRight:10,
   },
   headerIcon: {
     width: 24,

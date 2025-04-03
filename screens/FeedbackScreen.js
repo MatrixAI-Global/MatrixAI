@@ -16,7 +16,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '../context/AuthContext';
-
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 const FeedbackScreen = ({ route, navigation }) => {
   const [issue, setIssue] = useState('');
   const [description, setDescription] = useState('');
@@ -34,7 +34,7 @@ console.log(uid,'user');
 
   const handleSubmit = async () => {
     if (!issue) {
-      Alert.alert('Error', 'Please select an issue type');
+      Alert.alert('', 'Please select an issue type');
       return;
     }
     
@@ -74,12 +74,9 @@ console.log(uid,'user');
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
       <View style={[styles.header, {backgroundColor: colors.background , borderBottomWidth: 0.8, borderColor: colors.border}]}>
-        <TouchableOpacity style={[styles.backButton, {borderColor: colors.border}]} onPress={() => navigation.goBack()}>
-          <Image
-            source={require('../assets/back.png')}
-            style={[styles.headerIcon, {tintColor: colors.text}]}
-          />
-        </TouchableOpacity>
+      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <MaterialIcons name="arrow-back-ios-new" size={24} color="white" />
+                               </TouchableOpacity>
         <Text style={[styles.headerTitle, {color: colors.text}]}>Get Help</Text>
       </View>
       <KeyboardAvoidingView 
@@ -152,8 +149,9 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+    backgroundColor: '#007bff',
+   
+    marginRight:10,
   },
   headerIcon: {
     width: 24,

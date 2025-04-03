@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useAuthUser } from '../../hooks/useAuthUser';
 import { useTheme } from '../../context/ThemeContext';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 const TransactionScreen2 = ({ navigation }) => {
 
   const { uid } = useAuthUser();
@@ -12,12 +13,14 @@ const TransactionScreen2 = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const { getThemeColors } = useTheme();
   const colors = getThemeColors();
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetchTransactions();
   }, []);
 
   const fetchTransactions = async () => {
+    setRefreshing(true);
     try {
       const response = await axios.post('https://matrix-server.vercel.app/AllTransactions', {
         uid: uid
@@ -32,6 +35,7 @@ const TransactionScreen2 = ({ navigation }) => {
       console.error('Error fetching transactions:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -81,9 +85,9 @@ const TransactionScreen2 = ({ navigation }) => {
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Image source={require('../../assets/back.png')} style={[styles.backIcon, {tintColor: colors.text}]} />
-        </TouchableOpacity>
+      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <MaterialIcons name="arrow-back-ios-new" size={24} color="white" />
+                               </TouchableOpacity>
         <Text style={[styles.headerTitle, {color: colors.text}]}>Transaction History</Text>
       </View>
 
@@ -97,6 +101,8 @@ const TransactionScreen2 = ({ navigation }) => {
           style={styles.transactionList}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
+          refreshing={refreshing}
+          onRefresh={fetchTransactions}
         />
       )}
     </SafeAreaView>
@@ -121,10 +127,11 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   backButton: {
-    padding: 5,
+    padding: 8,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+    backgroundColor: '#007bff',
+   
+    marginRight:10,
   },
   backIcon: {
     width: 24,

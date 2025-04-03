@@ -188,24 +188,33 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
       const isMounted = useRef(true);
   
     useEffect(() => {
-        const fetchData = async () => {
-            const cachedData = await AsyncStorage.getItem(`audioData-${audioid}`);
-            if (cachedData) {
-                const { transcription, paragraphs, audioUrl, keyPoints, XMLData, duration: cachedDuration, audioDuration: cachedAudioDuration } = JSON.parse(cachedData);
-                setTranscription(transcription);
-                setParagraphs(paragraphs);
-                setAudioUrl(audioUrl);
-                setKeypoints(keyPoints);
-                // Set both duration values from cache if available
-                if (cachedDuration) setDuration(cachedDuration);
-                if (cachedAudioDuration) setAudioDuration(cachedAudioDuration);
-                setIsLoading(false);
-            } else {
-                fetchAudioMetadata(uid, audioid);
+        // Set isMounted to true when component mounts
+        isMounted.current = true;
+        
+        // Fetch data on mount
+        fetchAudioMetadata(uid, audioid);
+        
+        // Clean up function
+        return () => {
+            isMounted.current = false;
+            
+            // Release sound resources
+            if (sound) {
+                sound.release();
+            }
+            
+            // Clear any pending timeouts
+            if (userScrollTimeoutRef.current) {
+                clearTimeout(userScrollTimeoutRef.current);
+                userScrollTimeoutRef.current = null;
+            }
+            
+            // Clear speed timer
+            if (speedTimerRef.current) {
+                clearInterval(speedTimerRef.current);
+                speedTimerRef.current = null;
             }
         };
-
-        fetchData();
     }, [uid, audioid]);
 
     const togglePlaybackSpeed = (selectedSpeed) => {
@@ -498,15 +507,23 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
         }
         
         // STEP 2: Auto-scroll to keep current paragraph at the top
-        // Only scroll if we have a valid paragraph and user is not manually scrolling
-        // For seeking operations, we want to scroll even if the paragraph hasn't changed
+        // Only auto-scroll if:
+        // 1. We're not in user scrolling mode, OR
+        // 2. We're forcing a scroll due to seeking (jump to position)
+        // This ensures we don't interrupt the user's manual scrolling
         const shouldForceScroll = isSeeking || Math.abs(currentTime - audioPosition) > 1;
         
-        if (currentParaIndex !== -1 && scrollViewRef.current && 
-            (!isUserScrolling || shouldForceScroll)) {
+        if (currentParaIndex !== -1 && scrollViewRef.current) {
+            // Check if we should perform auto-scrolling:
+            // - Not in user scrolling mode OR
+            // - This is a forcing scroll operation (seeking/word click)
+            const shouldAutoScroll = !isUserScrolling || shouldForceScroll;
             
-            // Always scroll when the paragraph changes or after seeking
-            if (currentParaIndex !== lastScrolledPara || shouldForceScroll) {
+            // Only scroll when:
+            // 1. The paragraph changes OR
+            // 2. After seeking OR
+            // 3. We're forcing a scroll
+            if (shouldAutoScroll && (currentParaIndex !== lastScrolledPara || shouldForceScroll)) {
                 setLastScrolledPara(currentParaIndex);
                 
                 // Get the paragraph element's position using the paragraph refs
@@ -515,6 +532,10 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                     paragraphRefs.current[currentParaIndex].measureLayout(
                         scrollViewRef.current,
                         (x, y) => {
+                            // Extra check to ensure we don't scroll during user scrolling
+                            // unless it's a forced scroll operation
+                            if (isUserScrolling && !shouldForceScroll) return;
+                            
                             // Scroll to position with a small offset (20) for better visibility
                             scrollViewRef.current.scrollTo({
                                 y: y - 20, // Small offset from the top
@@ -523,6 +544,9 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                         },
                         () => {
                             // Fallback if measurement fails - use approximate position
+                            // Also respect the user's scrolling state
+                            if (isUserScrolling && !shouldForceScroll) return;
+                            
                             console.log('Failed to measure paragraph position, using fallback');
                             scrollViewRef.current.scrollTo({
                                 y: currentParaIndex * 200, // Approximate height per paragraph
@@ -532,6 +556,9 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                     );
                 } else {
                     // Fallback if ref is not available
+                    // Also respect the user's scrolling state
+                    if (isUserScrolling && !shouldForceScroll) return;
+                    
                     console.log('Paragraph ref not available, using fallback');
                     scrollViewRef.current.scrollTo({
                         y: currentParaIndex * 200, // Approximate height per paragraph
@@ -1406,8 +1433,14 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
             // End seeking state
             setIsSeeking(false);
             
-            // Temporarily disable user scrolling state to allow auto-scrolling
+            // For explicit user actions on media controls, we force auto-scroll
+            // by temporarily disabling the user scrolling state
             setIsUserScrolling(false);
+            
+            // Cancel any pending reset of user scrolling state
+            if (userScrollTimeoutRef.current) {
+                clearTimeout(userScrollTimeoutRef.current);
+            }
         }, 100);
     };
 
@@ -1437,8 +1470,14 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
         // Set seeking state to true to indicate we're performing a seek operation
         setIsSeeking(true);
         
-        // Temporarily disable user scrolling state to allow auto-scrolling
+        // For explicit user actions on media controls, we force auto-scroll
+        // by temporarily disabling the user scrolling state
         setIsUserScrolling(false);
+        
+        // Cancel any pending reset of user scrolling state
+        if (userScrollTimeoutRef.current) {
+            clearTimeout(userScrollTimeoutRef.current);
+        }
         
         // Trigger progress update to update highlighted paragraph and scroll to it
         setTimeout(() => {
@@ -1676,36 +1715,6 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
         return { paragraphs, words };
     };
 
-    // Update the useEffect for component lifecycle
-    useEffect(() => {
-        // Set isMounted to true when component mounts
-        isMounted.current = true;
-        
-        // Fetch data on mount
-        fetchAudioMetadata(uid, audioid);
-        
-        // Clean up function
-        return () => {
-            isMounted.current = false;
-            
-            // Release sound resources
-            if (sound) {
-                sound.release();
-            }
-            
-            // Clear any pending timeouts
-            if (userScrollTimeoutRef.current) {
-                clearTimeout(userScrollTimeoutRef.current);
-            }
-            
-            // Clear speed timer
-            if (speedTimerRef.current) {
-                clearInterval(speedTimerRef.current);
-                speedTimerRef.current = null;
-            }
-        };
-    }, [uid, audioid]);
-
     const toggleTranscriptionVisibility = () => {
         setTranscriptionVisible(!isTranscriptionVisible);
         
@@ -1723,9 +1732,9 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                 <Image source={require('../assets/logo12.png')} style={[styles.headerTitle, {tintColor: colors.text}]       } />
             </View>
                  <View style={[styles.headerContainer, {backgroundColor: colors.background2}]}>
-                <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                    <MaterialIcons name="arrow-back-ios-new" size={24} color={colors.primary} />
-                </TouchableOpacity>
+                 <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <MaterialIcons name="arrow-back-ios-new" size={24} color="white" />
+                               </TouchableOpacity>
                 <Text style={[styles.header, {color: colors.text}]  }>
                     {fileName.length > 13 ? `${fileName.substring(0, 12)}...` : fileName}
                 </Text>
@@ -1817,7 +1826,6 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                   maximumTrackTintColor="transparent"
                   thumbTintColor="orange" // Hide the default thumb
                 />
-               
               
                 </View>
   
@@ -2060,7 +2068,7 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
 
 
 {isTranscriptionEmpty && (
-    <Text style={styles.generatingText}>Generating Transcription May take some time...</Text>
+    <Text style={[styles.generatingText, {color: colors.text}]}>Generating Transcription May take some time...</Text>
 )}
 
             {selectedButton === 'transcription' && (
@@ -2070,6 +2078,19 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                     onScroll={(event) => {
                         const offsetY = event.nativeEvent.contentOffset.y;
                         scrollY.setValue(offsetY);
+                        // Keep track that user is actively scrolling 
+                        setIsUserScrolling(true);
+                        
+                        // Cancel any pending reset of user scrolling state
+                        if (userScrollTimeoutRef.current) {
+                            clearTimeout(userScrollTimeoutRef.current);
+                        }
+                        
+                        // Set a new timeout - after 5 seconds of no scrolling, 
+                        // re-enable auto-scrolling
+                        userScrollTimeoutRef.current = setTimeout(() => {
+                            setIsUserScrolling(false);
+                        }, 5000);
                     }}
                     onScrollBeginDrag={() => {
                         setIsUserScrolling(true);
@@ -2083,17 +2104,19 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                         if (userScrollTimeoutRef.current) {
                             clearTimeout(userScrollTimeoutRef.current);
                         }
-                        userScrollTimeoutRef.current = setTimeout(() => setIsUserScrolling(false), 3000);
+                        // Keep scrolling enabled for 5 seconds after user stops dragging
+                        userScrollTimeoutRef.current = setTimeout(() => setIsUserScrolling(false), 5000);
                     }}
                     onMomentumScrollEnd={() => {
                         // Set a timeout to reset the user scrolling state
                         if (userScrollTimeoutRef.current) {
                             clearTimeout(userScrollTimeoutRef.current);
                         }
-                        userScrollTimeoutRef.current = setTimeout(() => setIsUserScrolling(false), 3000);
+                        // Keep scrolling enabled for 5 seconds after momentum scrolling ends
+                        userScrollTimeoutRef.current = setTimeout(() => setIsUserScrolling(false), 5000);
                     }}
-                    showsVerticalScrollIndicator={false}
-                    bounces={false}
+                    showsVerticalScrollIndicator={true}
+                    bounces={true}
                     scrollEventThrottle={16}
                 >
                     
@@ -2148,11 +2171,28 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                                                                     waveAnimationRef.current.play();
                                                                 }
                                                                 
+                                                                // For explicit word clicking, we force auto-scroll
+                                                                // by temporarily disabling the user scrolling state
+                                                                setIsUserScrolling(false);
+                                                                
+                                                                // Cancel any pending reset of user scrolling state
+                                                                if (userScrollTimeoutRef.current) {
+                                                                    clearTimeout(userScrollTimeoutRef.current);
+                                                                }
+                                                                
+                                                                // Force seeking state for immediate scroll
+                                                                setIsSeeking(true);
+                                                                
                                                                 // Trigger progress update to update highlighted paragraph
                                                                 onAudioProgress({
                                                                     currentTime: newPosition,
                                                                     duration: audioDuration
                                                                 });
+                                                                
+                                                                // Reset seeking state after a short delay
+                                                                setTimeout(() => {
+                                                                    setIsSeeking(false);
+                                                                }, 100);
                                                             }
                                                         }}
                                                     >
@@ -2454,6 +2494,9 @@ const styles = StyleSheet.create({
     backButton: {
         padding: 8,
         borderRadius: 20,
+        backgroundColor: '#007bff',
+       
+        marginRight:10,
        
         zIndex:100,
       },

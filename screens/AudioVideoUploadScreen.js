@@ -119,12 +119,9 @@ const AudioVideoUploadScreen = () => {
     const [languages, setLanguages] = useState([
         { label: 'Bulgarian', value: 'bg' },
         { label: 'Catalan', value: 'ca' },
-        { label: 'Chinese (Cantonese, Traditional)', value: 'zh-HK' },
-        { label: 'Chinese (Mandarin, Simplified)', value: 'zh' },
-        { label: 'Chinese (Mandarin, Simplified)', value: 'zh-CN' },
-        { label: 'Chinese (Mandarin, Simplified)', value: 'zh-Hans' },
-        { label: 'Chinese (Mandarin, Traditional)', value: 'zh-TW' },
-        { label: 'Chinese (Mandarin, Traditional)', value: 'zh-Hant' },
+      
+        { label: 'Chinese Simplified', value: 'zh' },
+      
         { label: 'Czech', value: 'cs' },
         { label: 'Danish', value: 'da' },
         { label: 'Danish', value: 'da-DK' },
@@ -1054,7 +1051,7 @@ const AudioVideoUploadScreen = () => {
                     />
                 <View style={styles.detailsRow}>
     <Text style={[styles.fileName, {color: colors.text}]} numberOfLines={1}>
-        {item.audio_name?.length > 13 ? `${item.audio_name.substring(0, 12)}...` : item.audio_name || 'Unknown File'}
+        {item.audio_name ? (item.audio_name.length > 10 ? `${item.audio_name.substring(0, 10)}...` : item.audio_name) : 'Unknown File'}
     </Text>
     <View style={styles.fileDetails}>
         <MaterialIcons name="access-time" size={14} color={'#C3C3C3FF'} marginRight={2}/>
@@ -1076,7 +1073,7 @@ const AudioVideoUploadScreen = () => {
                     >
                          {isLoading ? ( // Show loading indicator if this audioid is loading
                             <>
-                                <ActivityIndicator size="small" color="#000" />
+                                <ActivityIndicator size="small" color={colors.primary} />
                                 <Text style={[styles.convert, {color: colors.text}]}>Loading...</Text>
                             </>
                         ) : (
@@ -1332,6 +1329,8 @@ const AudioVideoUploadScreen = () => {
                 keyExtractor={(item) => item.audioid}
                 renderItem={renderFileItem}
                 showsVerticalScrollIndicator={false}
+                onRefresh={() => loadFiles(true)}
+                refreshing={isLoading}
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         {isLoading ? (

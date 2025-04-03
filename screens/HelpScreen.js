@@ -15,8 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
 import Toast from 'react-native-toast-message';
-import { useAuth } from '../context/AuthContext';
-
+import { useAuthUser } from '../hooks/useAuthUser';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 const HelpScreen = ({ route, navigation }) => {
  
   const { orderId } = route.params;
@@ -24,7 +24,7 @@ const HelpScreen = ({ route, navigation }) => {
   const [description, setDescription] = useState('');
   const { getThemeColors } = useTheme();
   const colors = getThemeColors();
-  const { user } = useAuth();
+  const { uid } = useAuthUser();
   
   const commonIssues = [
     'Payment not reflected',
@@ -36,7 +36,12 @@ const HelpScreen = ({ route, navigation }) => {
 
   const handleSubmit = async () => {
     if (!issue) {
-      Alert.alert('Error', 'Please select an issue type');
+      Alert.alert('', 'Please select an issue type');
+      return;
+    }
+    
+    if (!uid) {
+      Alert.alert('Error', 'User ID is not available. Please sign in again.');
       return;
     }
     
@@ -50,7 +55,7 @@ const HelpScreen = ({ route, navigation }) => {
           issue: issue,
           description: description || '',
           orderId: orderId,
-          uid: user?.uid || '',
+          uid: uid,
         }),
       });
       
@@ -64,23 +69,28 @@ const HelpScreen = ({ route, navigation }) => {
         });
         navigation.goBack();
       } else {
-        Alert.alert('Error', data.message || 'Failed to submit help request');
+        console.log('API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData: data
+        });
+        Alert.alert('Error', data.message || `Failed to submit help request (Status: ${response.status})`);
       }
     } catch (error) {
-      Alert.alert('Error', 'An error occurred while submitting help request');
-      console.error(error);
+      console.log('Network Error:', {
+        message: error.message || 'Unknown error'
+      });
+      Alert.alert('Error', `An error occurred: ${error.message || 'Unknown error'}`);
+      console.error('Help request error:', error);
     }
   };
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}] }>
-      <View style={[styles.header, {backgroundColor: colors.background}] }>
-        <TouchableOpacity style={[styles.backButton, {borderColor: colors.border}]} onPress={() => navigation.goBack()}>
-          <Image
-            source={require('../assets/back.png')}
-            style={[styles.headerIcon, {tintColor: colors.text}]}
-          />
-        </TouchableOpacity>
+      <View style={[styles.header, {backgroundColor: colors.background , borderBottomWidth: 0.8, borderColor: colors.border}] }>
+      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <MaterialIcons name="arrow-back-ios-new" size={24} color="white" />
+                               </TouchableOpacity>
         <Text style={[styles.headerTitle, {color: colors.text}]   }>Get Help</Text>
       </View>
 
@@ -153,15 +163,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+   
   },
   backButton: {
     padding: 8,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+    backgroundColor: '#007bff',
+   
+    marginRight:10,
   },
   headerIcon: {
     width: 24,

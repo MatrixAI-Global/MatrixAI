@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, TouchableOpacity, Image, Dimensions, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Animated, TouchableOpacity, Image, useWindowDimensions, ScrollView } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { Easing } from 'react-native';
 import Header from '../components/Header';
@@ -19,13 +19,13 @@ import { ThemedView, ThemedText } from '../components/ThemedView';
 import { useTheme } from '../context/ThemeContext';
 import ThemedStatusBar from '../components/ThemedStatusBar';
 
-const { width } = Dimensions.get('window'); // Get screen width
 import { useProStatus } from '../hooks/useProStatus';
 import { useCoinsSubscription } from '../hooks/useCoinsSubscription';
 import FeatureCardWithDetails2 from '../components/FeatureCardWithDetails copy';
 import { getProStatus, getCoinsCount } from '../utils/proStatusUtils';
 
 const HomeScreen = ({ navigation }) => {
+  const { width } = useWindowDimensions(); // More responsive to orientation changes
   const { uid, loading } = useAuth();
   const rotateValue = useRef(new Animated.Value(0)).current;
   const [isRotatingFast, setIsRotatingFast] = useState(false);
@@ -85,7 +85,7 @@ const HomeScreen = ({ navigation }) => {
     outputRange: ['0deg', '360deg'],
   });
 
-  const circleRadius = width * 2; // 60% of screen width
+  const circleRadius = width * 2; // Responsive to screen width
 
   const handleButtonPress = () => {
     setIsRotatingFast(true);
@@ -336,13 +336,15 @@ const styles = StyleSheet.create({
   
   featureRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 5,
+
+    width: '100%',
+  
   },
   scrollViewContent: {
-  
     paddingBottom: 20,
+    paddingHorizontal: 5,
   },
   fixedHeader: {
     backgroundColor: '#FFFFFF',

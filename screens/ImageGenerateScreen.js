@@ -13,13 +13,16 @@ import {
   ScrollView,
   Dimensions,
   FlatList,
-  ActivityIndicator
+  ActivityIndicator,
+  Alert
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { useAuthUser } from '../hooks/useAuthUser';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import RNFS from 'react-native-fs';
+import Share from 'react-native-share';
 const { width, height } = Dimensions.get('window');
 
 const ImageGenerateScreen = () => {
@@ -152,14 +155,102 @@ const ImageGenerateScreen = () => {
         <View style={styles.historyActions}>
           <TouchableOpacity 
             style={styles.historyActionButton}
-            onPress={() => navigation.navigate('CreateImageScreen', { message: item.prompt_text })}
+            onPress={() => handleDownloadImage(item.image_url)}
           >
-            <Image source={require('../assets/send2.png')} style={[styles.historyActionIcon, {tintColor: '#fff'}]} />
+            <MaterialIcons name="file-download" size={20} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.historyActionButton}
+            onPress={() => handleShareImage(item.image_url)}
+          >
+            <MaterialIcons name="ios-share" size={20} color="#fff" />
           </TouchableOpacity>
         </View>
       </View>
     </View>
   );
+
+  const handleDownloadImage = async (imageUrl) => {
+    try {
+      // Create a path to save the image
+      const filename = imageUrl.substring(imageUrl.lastIndexOf('/') + 1);
+      const extension = filename.split('.').pop() || 'jpg';
+      const newFilename = `matrix_ai_image_${Date.now()}.${extension}`;
+      
+      // Get the appropriate directory path for iOS
+      const dirs = Platform.OS === 'ios' ? RNFS.DocumentDirectoryPath : RNFS.DownloadDirectoryPath;
+      const filePath = `${dirs}/${newFilename}`;
+      
+      // Download the file
+      const download = RNFS.downloadFile({
+        fromUrl: imageUrl,
+        toFile: filePath,
+        background: true,
+        discretionary: true,
+      });
+      
+      // Wait for the download to complete
+      const result = await download.promise;
+      
+      if (result.statusCode === 200) {
+        Alert.alert(
+          'Download Complete',
+          'Image has been saved to your device.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        throw new Error('Download failed with status code: ' + result.statusCode);
+      }
+    } catch (error) {
+      console.error('Error downloading image:', error);
+      Alert.alert('Error', 'Failed to download the image. Please try again.');
+    }
+  };
+  
+  const handleShareImage = async (imageUrl) => {
+    try {
+      // Create a temporary path to save the image for sharing
+      const filename = imageUrl.substring(imageUrl.lastIndexOf('/') + 1);
+      const extension = filename.split('.').pop() || 'jpg';
+      const tempFilename = `matrix_ai_image_${Date.now()}.${extension}`;
+      const tempFilePath = `${RNFS.TemporaryDirectoryPath}/${tempFilename}`;
+      
+      // Download the file to temporary location
+      const download = RNFS.downloadFile({
+        fromUrl: imageUrl,
+        toFile: tempFilePath,
+      });
+      
+      // Wait for download to complete
+      const result = await download.promise;
+      
+      if (result.statusCode === 200) {
+        // Share the image
+        const shareOptions = {
+          title: 'Share Image',
+          url: `file://${tempFilePath}`,
+          type: `image/${extension}`,
+          failOnCancel: false,
+        };
+        
+        await Share.open(shareOptions);
+        
+        // Clean up the temporary file
+        try {
+          await RNFS.unlink(tempFilePath);
+        } catch (cleanupError) {
+          console.error('Error cleaning up temp file:', cleanupError);
+        }
+      } else {
+        throw new Error('Download failed with status code: ' + result.statusCode);
+      }
+    } catch (error) {
+      console.error('Error sharing image:', error);
+      if (error.message !== 'User did not share') {
+        Alert.alert('Error', 'Failed to share the image. Please try again.');
+      }
+    }
+  };
 
   return (
     <View style={{flex: 1}}>
@@ -201,7 +292,7 @@ const ImageGenerateScreen = () => {
         {/* Buttons */}
         {isFinished && (
           <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.generateButton2} onPress={handleGenerate2}>
+            <TouchableOpacity style={styles.generateButton2} onPress={handleGenerate}>
               <View style={styles.horizontalContent}>
                 <View style={styles.generateContent}>
                   <Text style={styles.generateText}>Generate</Text>
@@ -214,7 +305,7 @@ const ImageGenerateScreen = () => {
               </View>
             </TouchableOpacity>
           
-            <TouchableOpacity style={styles.generateButton} onPress={handleGenerate}>
+            <TouchableOpacity style={styles.generateButton} onPress={handleGenerate2}>
               <View style={styles.horizontalContent}>
                 <View style={styles.generateContent}>
                   <Text style={styles.generateText}>Generate IV</Text>
@@ -543,12 +634,17 @@ const styles = StyleSheet.create({
   historyActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
+    marginTop: 5,
   },
   historyActionButton: {
     backgroundColor: 'rgba(255,255,255,0.15)',
-    padding: 6,
-    borderRadius: 15,
+    padding: 8,
+    borderRadius: 20,
     marginLeft: 8,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   historyActionIcon: {
     width: 16,

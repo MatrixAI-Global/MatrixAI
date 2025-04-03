@@ -16,6 +16,8 @@ import {
   Platform,
   Keyboard,
   BackHandler,
+  Linking,
+  Share,
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import * as Animatable from 'react-native-animatable';
@@ -31,6 +33,7 @@ import { supabase } from '../supabaseClient';
 import Toast from 'react-native-toast-message';
 import { useTheme } from '../context/ThemeContext';
 import LeftNavbarBot from '../components/LeftNavbarBot';
+import Clipboard from '@react-native-clipboard/clipboard';
 
 // Function to decode base64 to ArrayBuffer
 const decode = (base64) => {
@@ -719,31 +722,85 @@ const decode = (base64) => {
       ? `${item.text.substring(0, 100)}...`
       : item.text;
 
+    // Handle copy text function
+    const handleCopyText = () => {
+      if (item.text) {
+        Clipboard.setString(item.text);
+        Toast.show({
+          type: 'success',
+          text1: 'Text copied to clipboard',
+          position: 'bottom',
+          visibilityTime: 2000,
+        });
+      }
+    };
+
+    // Handle share function
+    const handleShareMessage = async () => {
+      try {
+        await Share.share({
+          message: item.text || '',
+        });
+      } catch (error) {
+        console.error('Error sharing:', error);
+        Alert.alert('Error', 'Failed to share message');
+      }
+    };
+
     // Check if the message has an image
     if (item.image) {
       return (
-        <Animatable.View
-          animation="fadeInUp"
-          duration={800}
-          style={[
-            styles.messageContainer,
-            isBot ? styles.botMessageContainer : styles.userMessageContainer,
-          ]}
-        >
-          <TouchableOpacity onPress={() => handleImageTap(item.image)}>
-            <Image
-              source={{ uri: item.image }}
-              style={styles.chatImage}
-              resizeMode="cover"
-            />
-          </TouchableOpacity>
-          {item.text && (
-            <Text style={isBot ? styles.botText : styles.userText}>
-              {item.text}
-            </Text>
-          )}
-          <View style={isBot ? styles.botTail : styles.userTail} />
-        </Animatable.View>
+        <View style={[styles.messageWrapperOuter, isBot ? {alignSelf: 'flex-start'} : {alignSelf: 'flex-end'}]}>
+          <Animatable.View
+            animation="fadeInUp"
+            duration={800}
+            style={[
+              styles.messageContainer,
+              isBot ? styles.botMessageContainer : styles.userMessageContainer,
+            ]}
+          >
+            <TouchableOpacity onPress={() => handleImageTap(item.image)}>
+              <Image
+                source={{ uri: item.image }}
+                style={styles.chatImage}
+                resizeMode="cover"
+              />
+            </TouchableOpacity>
+            {item.text && (
+              <Text style={isBot ? styles.botText : styles.userText}>
+                {item.text}
+              </Text>
+            )}
+            <View style={isBot ? styles.botTail : styles.userTail} />
+          </Animatable.View>
+          
+          {/* Message action buttons - outside the bubble */}
+          <View style={[
+            styles.messageActionButtons,
+            isBot ? styles.botMessageActions : styles.userMessageActions
+          ]}>
+            <TouchableOpacity 
+              style={styles.actionButton} 
+              onPress={handleCopyText}
+            >
+              <Ionicons 
+                name="copy-outline" 
+                size={18} 
+                color="#666" 
+              />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.actionButton} 
+              onPress={handleShareMessage}
+            >
+              <Ionicons 
+                name="share-social-outline" 
+                size={18} 
+                color="#666" 
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
       );
     }
   
@@ -969,23 +1026,15 @@ const decode = (base64) => {
     };
   
     return (
-      <Animatable.View
-        animation="fadeInUp"
-        duration={800}
-        style={[
-          styles.messageContainer,
-          isBot ? styles.botMessageContainer : styles.userMessageContainer,
-        ]}
-      >
-        {item.image ? ( // Check if the message has an image
-          <TouchableOpacity onPress={() => handleImageTap(item.image)}>
-            <Image
-              source={{ uri: item.image }}
-              style={styles.chatImage}
-              resizeMode="cover"
-            />
-          </TouchableOpacity>
-        ) : (
+      <View style={[styles.messageWrapperOuter, isBot ? {alignSelf: 'flex-start'} : {alignSelf: 'flex-end'}]}>
+        <Animatable.View
+          animation="fadeInUp"
+          duration={800}
+          style={[
+            styles.messageContainer,
+            isBot ? styles.botMessageContainer : styles.userMessageContainer,
+          ]}
+        >
           <View style={isBot ? styles.botTextContainer : styles.userTextContainer}>
             {formatMessageText(displayText).map((line, index) => {
               // Handle LaTeX formula
@@ -1089,19 +1138,46 @@ const decode = (base64) => {
               }
             })}
           </View>
-        )}
-        {shouldTruncate && (
-          <TouchableOpacity
-            style={styles.viewMoreButton}
-            onPress={() => toggleMessageExpansion(item.id)}
+          {shouldTruncate && (
+            <TouchableOpacity
+              style={styles.viewMoreButton}
+              onPress={() => toggleMessageExpansion(item.id)}
+            >
+              <Text style={styles.viewMoreText}>
+                {isExpanded ? 'View less' : 'View more'}
+              </Text>
+            </TouchableOpacity>
+          )}
+          <View style={isBot ? styles.botTail : styles.userTail} />
+        </Animatable.View>
+        
+        {/* Message action buttons - outside the bubble */}
+        <View style={[
+          styles.messageActionButtons,
+          isBot ? styles.botMessageActions : styles.userMessageActions
+        ]}>
+          <TouchableOpacity 
+            style={styles.actionButton} 
+            onPress={handleCopyText}
           >
-            <Text style={styles.viewMoreText}>
-              {isExpanded ? 'View less' : 'View more'}
-            </Text>
+            <Ionicons 
+              name="copy-outline" 
+              size={18} 
+              color="#666" 
+            />
           </TouchableOpacity>
-        )}
-   
-      </Animatable.View>
+          <TouchableOpacity 
+            style={styles.actionButton} 
+            onPress={handleShareMessage}
+          >
+            <Ionicons 
+              name="share-social-outline" 
+              size={18} 
+              color="#666" 
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
     );
   }, [dataLoaded, messages, expandedMessages]);
 
@@ -1981,10 +2057,10 @@ const decode = (base64) => {
       </TouchableOpacity>
       
       {/* Header */}
-      <View style={[styles.header, {backgroundColor: colors.background2}]}>
-        <TouchableOpacity style={styles.backButton2} onPress={() => navigation.goBack()}>
-         <Image source={require('../assets/back.png')} style={[styles.headerIcon3, {tintColor: colors.text}]} />
-        </TouchableOpacity>
+      <View style={[styles.header, {backgroundColor: colors.background2 , borderColor: colors.border ,borderBottomWidth: 1}]}>
+      <TouchableOpacity style={styles.backButton2} onPress={() => navigation.goBack()}>
+            <MaterialIcons name="arrow-back-ios-new" size={24} color="white" />
+                               </TouchableOpacity>
           <Image source={require('../assets/Avatar/Cat.png')} style={styles.botIcon} />
         <View style={styles.headerTextContainer}>
         
@@ -2008,12 +2084,12 @@ const decode = (base64) => {
         {messages.length === 0 && dataLoaded && (
           <View style={styles.placeholderContainer}>
             <Image source={require('../assets/matrix.png')} style={styles.placeholderImage} />
-            <Text style={styles.placeholderText}>Hi, I'm MatrixAI Bot.</Text>
-            <Text style={styles.placeholderText2}>How can I help you today?</Text>
+            <Text style={[styles.placeholderText , {color: colors.text}]}>Hi, I'm MatrixAI Bot.</Text>
+            <Text style={[styles.placeholderText2 , {color: colors.text}]}>How can I help you today?</Text>
             
             {/* New role selection UI */}
-            <Text style={styles.placeholderText3}>You can ask me any question or you</Text>
-            <Text style={styles.placeholderText4}>can select the below role:</Text>
+            <Text style={[styles.placeholderText3 , {color: colors.text}]}>You can ask me any question or you</Text>
+            <Text style={[styles.placeholderText4 , {color: colors.text}]}>can select the below role:</Text>
             <View style={styles.roleButtonsContainer}>
               <View style={styles.roleButtonRow}>
                 <TouchableOpacity 
@@ -2253,11 +2329,13 @@ const styles = StyleSheet.create({
     alignItems:'center',
     borderRadius:15,
   },
+
+
   backButton2: {
     padding: 8,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+    backgroundColor: '#007bff',
+   
     marginRight:10,
   },
   backIcon: {
@@ -2283,7 +2361,7 @@ const styles = StyleSheet.create({
    
   },
   headerIcon2: {
-    marginHorizontal: 5,
+
   },
   headerIcon3: {
     width: 24,
@@ -2309,8 +2387,8 @@ const styles = StyleSheet.create({
     width: '95%',
     borderRadius: 25,
     
-    borderWidth: 1,
-    borderColor: 'blue',
+    borderWidth: 2,
+    borderColor: '#007bff',
     paddingHorizontal: 10,
     marginHorizontal: '5%',
     backgroundColor: '#fff',
@@ -2421,7 +2499,8 @@ const styles = StyleSheet.create({
     elevation: 2,
     flexDirection: 'column',
     flexShrink: 1,
-    overflow: 'hidden',
+    overflow: 'visible', // Changed from 'hidden' to show tails
+    position: 'relative',
   },
   botMessageContainer: {
     alignSelf: 'flex-start',
@@ -2520,7 +2599,7 @@ const styles = StyleSheet.create({
   },
   placeholderContainer: {
     position: 'absolute',
-    top: '50%',
+    top: '40%',
     left: '50%',
     transform: [{ translateX: '-50%' }, { translateY: '-50%' }],
     alignItems: 'center',
@@ -3021,6 +3100,27 @@ paddingVertical:10,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  messageActionButtons: {
+    flexDirection: 'row',
+    marginTop: 2,
+    padding: 2,
+  },
+  botMessageActions: {
+    alignSelf: 'flex-start',
+    marginLeft: 15,
+  },
+  userMessageActions: {
+    alignSelf: 'flex-end',
+    marginRight: 15,
+  },
+  actionButton: {
+    padding: 5,
+    marginHorizontal: 3,
+  },
+  messageWrapperOuter: {
+    maxWidth: '85%',
+    marginVertical: 4,
   },
 });
 

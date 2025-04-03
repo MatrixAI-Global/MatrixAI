@@ -16,7 +16,7 @@ const FeatureCardWithDetailsPro = () => {
 
   return (
     <View style={[styles.container, {backgroundColor: colors.background }]}>
-      <TouchableOpacity style={[styles.card, {backgroundColor: colors.background2, borderWidth: 0.8, borderColor: colors.border}]}>
+      <TouchableOpacity style={[styles.card, {backgroundColor: colors.background2, borderWidth: 0.8, borderColor: '#8BB9FFFF'}]}>
         {/* Top section with "Matrix AI" text and "PRO" container */}
         <View style={[styles.headerRow, {backgroundColor: colors.background2}]}>
                 <View style={styles.titleContainer}>

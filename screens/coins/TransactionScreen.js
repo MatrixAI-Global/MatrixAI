@@ -6,12 +6,14 @@ import { useAuthUser } from '../../hooks/useAuthUser';
 import { useCoinsSubscription } from '../../hooks/useCoinsSubscription';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../../context/ThemeContext';  
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 const TransactionScreen = ({ route, navigation }) => {
   const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const { getThemeColors } = useTheme();
   const colors = getThemeColors();
-  const [loading, setLoading] = useState(true);
   const { uid } = useAuthUser();
   const coinCount = useCoinsSubscription(uid);
 
@@ -20,13 +22,13 @@ const TransactionScreen = ({ route, navigation }) => {
   }, []);
 
   const fetchTransactions = async () => {
+    setLoading(true);
     try {
       const response = await axios.post('https://matrix-server.vercel.app/AllTransactions', {
         uid: uid
       });
       
       if (response.data.success) {
-        // Sort transactions by date in descending order
         const sortedTransactions = response.data.data.sort((a, b) => new Date(b.time) - new Date(a.time));
         setTransactions(sortedTransactions);
       }
@@ -34,7 +36,13 @@ const TransactionScreen = ({ route, navigation }) => {
       console.error('Error fetching transactions:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchTransactions();
   };
 
   const getTransactionIcon = (transactionName) => {
@@ -81,8 +89,8 @@ const TransactionScreen = ({ route, navigation }) => {
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}] }>
       {/* Back button */}
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-        <Image source={require('../../assets/back.png')} style={[styles.headerIcon, {tintColor: colors.text}] } />
-      </TouchableOpacity>
+            <MaterialIcons name="arrow-back-ios-new" size={24} color="white" />
+                               </TouchableOpacity>
 
       {/* Header with full background */}
       <TouchableOpacity style={styles.header} onPress={() => navigation.navigate('AddonScreen')}>
@@ -136,6 +144,8 @@ const TransactionScreen = ({ route, navigation }) => {
           keyExtractor={(item) => item.id.toString()}
           style={styles.transactionList}
           showsVerticalScrollIndicator={false}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
         />
       )}
     </SafeAreaView>
@@ -158,9 +168,11 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    borderWidth: 1,
+    backgroundColor: '#007bff',
+   
+    marginRight:10,
     zIndex: 1,
-    borderColor: '#E0E0E0',
+  
   },
   headerIcon: {
     width: 24,

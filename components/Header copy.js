@@ -101,7 +101,7 @@ const Header2 = ({ navigation, uid, openDrawer }) => {
 
             {/* Coin Display with Coin Icon */}
             <TouchableOpacity
-                style={[styles.coinContainer, {backgroundColor: colors.background2, borderWidth: 0.8, borderColor: colors.border}]}
+                style={[styles.coinContainer, {backgroundColor: colors.background2, borderWidth: 0.8, borderColor: colors.primary}]}
                 onPress={() =>
                     navigation.navigate('TransactionScreen', { coinCount })
                 }

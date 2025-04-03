@@ -2089,7 +2089,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 26,
    width: '100%',
    height: '100%',
-   paddingVertical: 16,
+   paddingVertical: 13,
     flex: 1, // Allow buttons to take equal space
     alignItems: 'center', // Center text horizontally
     justifyContent: 'center', // Center text vertically

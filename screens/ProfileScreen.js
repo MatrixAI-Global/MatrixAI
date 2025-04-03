@@ -19,7 +19,7 @@ import { useTheme } from '../context/ThemeContext';
 import { clearThemePreference } from '../utils/themeUtils';
 import { ThemedView, ThemedText, ThemedCard } from '../components/ThemedView';
 import FuturisticSwitch from '../components/FuturisticSwitch';
-
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 const ProfileScreen = ({ navigation }) => {
     const { uid, loading } = useAuth();
     const { getThemeColors, currentTheme, changeTheme } = useTheme();
@@ -161,10 +161,10 @@ const ProfileScreen = ({ navigation }) => {
 
     const MenuItem = ({ iconName, label, onPress }) => (
         <TouchableOpacity 
-            style={[styles.menuItem, {backgroundColor: colors.background2, borderBottomColor: colors.border}]} 
+            style={[styles.menuItem, {backgroundColor: colors.card, borderBottomColor: colors.border}]} 
             onPress={onPress}
         >
-            <View style={[styles.iconContainer, {backgroundColor: colors.primary + '20'}]}>
+            <View style={[styles.iconContainer]}>
                 <Ionicons name={iconName} size={20} color={colors.primary} />
             </View>
             <ThemedText style={[styles.menuLabel, {color: colors.text}]}>{label}</ThemedText>
@@ -243,11 +243,11 @@ const ProfileScreen = ({ navigation }) => {
     
     return (
         <SafeAreaView style={[styles.container2, {backgroundColor: colors.background}]}>
-            <View style={[styles.header, {backgroundColor: colors.background2}]}>
+            <View style={[styles.header, {backgroundColor: colors.background , borderBottomWidth: 0.8, borderColor: colors.border}]}>
                 <View style={styles.headerLeftSection}>
-                    <TouchableOpacity style={[styles.backButton, {borderColor: colors.text}]} onPress={() => navigation.goBack()}>
-                        <Image source={require('../assets/back.png')} style={[styles.headerIcon, {tintColor: colors.text}]} />
-                    </TouchableOpacity>
+                <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <MaterialIcons name="arrow-back-ios-new" size={24} color="white" />
+                               </TouchableOpacity>
                     <ThemedText style={[styles.headerTitle, {color: colors.text}]}>{t('profile')}</ThemedText>
                 </View>
              
@@ -281,7 +281,7 @@ const ProfileScreen = ({ navigation }) => {
                 <ThemedText style={[styles.menuTitle, {color: colors.text}]}>Your Information</ThemedText>
                 
                 {/* Menu Items */}
-                <ThemedCard style={[styles.menuContainer, {backgroundColor: colors.background2}]}>
+                <ThemedCard style={[styles.menuContainer, {backgroundColor: colors.card , borderWidth: 0.8, borderColor: colors.border}]}>
                     <MenuItem 
                         iconName="person-outline" 
                         label="Profile" 
@@ -307,7 +307,7 @@ const ProfileScreen = ({ navigation }) => {
 
                 <ThemedText style={[styles.menuTitle, {color: colors.text}]}>Support</ThemedText>
                 
-                <ThemedCard style={[styles.menuContainer, {backgroundColor: colors.background2}]}>
+                <ThemedCard style={[styles.menuContainer, {backgroundColor: colors.card , borderWidth: 0.8, borderColor: colors.border}]}>
                     <MenuItem 
                         iconName="help-circle-outline" 
                         label="Help Center" 
@@ -327,7 +327,7 @@ const ProfileScreen = ({ navigation }) => {
 
                 <ThemedText style={[styles.menuTitle, {color: colors.text}]}>Preferences</ThemedText>
                 
-                <ThemedCard style={[styles.menuContainer, {backgroundColor: colors.background2}]}>
+                <ThemedCard style={[styles.menuContainer, {backgroundColor: colors.card , borderWidth: 0.8, borderColor: colors.border   }]}>
                     <MenuItem 
                         iconName="settings-outline" 
                         label="Settings" 
@@ -369,8 +369,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#ffff',
         padding: 10,
         borderRadius: 20,
-        borderWidth: 1, // Gray border for the card
-        borderColor: '#ccc',
+       
       
         justifyContent: 'center', // Center content inside card
         alignItems: 'center',
@@ -400,9 +399,10 @@ const styles = StyleSheet.create({
     backButton: {
         padding: 8,
         borderRadius: 20,
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-    },
+        backgroundColor: '#007bff',
+       
+        marginRight:10,
+      },
     headerIcon: {
         width: 24,
         height: 24,

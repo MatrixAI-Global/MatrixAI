@@ -13,8 +13,10 @@ import {
   Linking,
   KeyboardAvoidingView,
   ScrollView,
+  Share,
 } from 'react-native';
 import LottieView from 'lottie-react-native';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import * as Animatable from 'react-native-animatable';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,6 +29,8 @@ import RNFS from 'react-native-fs';
 import { Buffer } from 'buffer';
 import { supabase } from '../supabaseClient';
 import { useTheme } from '../context/ThemeContext';
+import Clipboard from '@react-native-clipboard/clipboard';
+
 // Function to decode base64 to ArrayBuffer
 const decode = (base64) => {
   const bytes = Buffer.from(base64, 'base64');
@@ -477,30 +481,82 @@ const BotScreen2 = ({ navigation, route }) => {
     const isBot = item.sender === 'bot';
     const isUser = item.sender === 'user';
     const isExpanded = expandedMessages[item.id];
+    const shouldTruncate = item.text && item.text.length > 100 && !isExpanded;
   
-    // Function to detect if the text contains a URL
-    const containsUrl = (text) => {
-      const urlRegex = /(https?:\/\/[^\s]+)/g;
-      return text && urlRegex.test(text);
+    // Function to handle long press
+    const handleLongPress = () => {
+      Alert.alert(
+        'Message Options',
+        '',
+        [
+          {
+            text: 'Copy Text',
+            onPress: () => {
+              Clipboard.setString(item.text);
+              Alert.alert('Success', 'Text copied to clipboard');
+            }
+          },
+          {
+            text: 'Share',
+            onPress: async () => {
+              try {
+                await Share.share({
+                  message: item.text,
+                });
+              } catch (error) {
+                console.error('Error sharing:', error);
+                Alert.alert('Error', 'Failed to share message');
+              }
+            }
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          }
+        ]
+      );
     };
-  
+
+    // Handle copy text function
+    const handleCopyText = () => {
+      if (item.text) {
+        Clipboard.setString(item.text);
+        Alert.alert('Success', 'Text copied to clipboard');
+      }
+    };
+
+    // Handle share function
+    const handleShareMessage = async () => {
+      try {
+        await Share.share({
+          message: item.text || '',
+        });
+      } catch (error) {
+        console.error('Error sharing:', error);
+        Alert.alert('Error', 'Failed to share message');
+      }
+    };
+
     // Function to process and format the message text
     const formatMessageText = (text) => {
       if (!text) return [];
       
       const lines = text.split('\n');
       return lines.map(line => {
-        // Check for heading (starts with number and dot, or has : at the end)
-        const isHeading = /^\d+\.\s+.+/.test(line) || /.*:$/.test(line);
-        // Check for subheading (starts with - or • or *)
-        const isSubheading = /^[-•*]\s+.+/.test(line);
-        // Check for mathematical expressions using our new function
+        // Check for Chinese heading (starts with # or number and dot)
+        const isChineseHeading = /^#\s+.+/.test(line) || /^\d+\.\s+.+/.test(line);
+        // Check for Chinese subheading (starts with •⁠ or -)
+        const isChineseSubheading = /^[•⁠-]\s+.+/.test(line);
+        // Check for Chinese sub-subheading (starts with - and has indentation)
+        const isChineseSubSubheading = /^\s+-\s+.+/.test(line);
+        // Check for mathematical expressions
         const hasMathExpression = isMathExpression(line);
         
         return {
           text: line,
-          isHeading,
-          isSubheading,
+          isChineseHeading,
+          isChineseSubheading,
+          isChineseSubSubheading,
           hasMathExpression
         };
       });
@@ -795,74 +851,125 @@ const BotScreen2 = ({ navigation, route }) => {
   
     return (
       <GestureHandlerRootView>
-      <Swipeable
-        ref={(ref) => {
-          if (ref) {
-            swipeableRefs.current[item.id] = ref;
-          }
-        }}
-        renderLeftActions={isBot ? renderLeftActions : null}
-        leftThreshold={40}
-        rightThreshold={40}
-        overshootLeft={false}
-        overshootRight={false}
-        enabled={isBot}
-      >
-        <View style={{ flexDirection: isBot ? 'row' : 'row-reverse', alignItems: 'center' }}>
-          <Animatable.View
-            animation={isBot ? "fadeInUp" : undefined}
-            duration={100}
-            style={[
-              styles.messageContainer,
-              isBot ? styles.botMessageContainer : styles.userMessageContainer,
-            ]}
-          >
-            {item.image ? (
-              <TouchableOpacity onPress={() => handleImageTap(item.image)}>
-                <Image
-                  source={{ uri: item.image }}
-                  style={{ width: 200, height: 200, borderRadius: 10 }}
-                />
-              </TouchableOpacity>
-            ) : (
-              <View style={isBot ? styles.botTextContainer : styles.userTextContainer}>
-                {formatMessageText(item.text).map((line, index) => {
-                  if (line.isLatexFormula) {
-                    return renderLatexFormula(line.text, index);
-                  }
-                  
-                  if (line.isChineseMath) {
-                    if (line.isChineseHeading) {
-                      return (
-                        <Text key={`chinese-heading-${index}`} style={styles.chineseMathHeading}>
-                          {line.text}
-                        </Text>
-                      );
-                    }
-                    
-                    if (line.isChineseSubheading) {
-                      return (
-                        <Text key={`chinese-subheading-${index}`} style={styles.chineseMathSubheading}>
-                          {line.text}
-                        </Text>
-                      );
-                    }
-                    
-                    return (
-                      <Text key={`chinese-math-text-${index}`} style={styles.chineseMathText}>
-                        {line.text}
+        <Swipeable
+          ref={(ref) => {
+            if (ref) {
+              swipeableRefs.current[item.id] = ref;
+            }
+          }}
+          renderLeftActions={isBot ? renderLeftActions : null}
+          leftThreshold={40}
+          rightThreshold={40}
+          overshootLeft={false}
+          overshootRight={false}
+          enabled={isBot}
+        >
+          <View style={{ flexDirection: isBot ? 'row' : 'row-reverse', alignItems: 'flex-start' }}>
+            <View style={[styles.messageWrapperOuter, isBot ? {alignSelf: 'flex-start'} : {alignSelf: 'flex-end'}]}>
+              <TouchableOpacity
+                onLongPress={handleLongPress}
+                delayLongPress={500}
+                activeOpacity={1}
+              >
+                <Animatable.View
+                  animation={isBot ? "fadeInUp" : undefined}
+                  duration={100}
+                  style={[
+                    styles.messageContainer,
+                    isBot ? styles.botMessageContainer : styles.userMessageContainer,
+                  ]}
+                >
+                  {item.image ? (
+                    <TouchableOpacity onPress={() => handleImageTap(item.image)}>
+                      <Image
+                        source={{ uri: item.image }}
+                        style={{ width: 200, height: 200, borderRadius: 10 }}
+                      />
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={isBot ? styles.botTextContainer : styles.userTextContainer}>
+                      {formatMessageText(item.text).map((line, index) => {
+                        if (line.isChineseHeading) {
+                          return (
+                            <View key={`chinese-heading-${index}`} style={styles.chineseHeadingContainer}>
+                              <Text style={styles.chineseHeadingText}>
+                                {line.text.replace(/^#\s+|\d+\.\s+/, '')}
+                              </Text>
+                            </View>
+                          );
+                        } else if (line.isChineseSubheading) {
+                          return (
+                            <View key={`chinese-subheading-${index}`} style={styles.chineseSubheadingContainer}>
+                              <Text style={styles.chineseSubheadingPointer}>•</Text>
+                              <Text style={styles.chineseSubheadingText}>
+                                {line.text.replace(/^[•⁠-]\s+/, '')}
+                              </Text>
+                            </View>
+                          );
+                        } else if (line.isChineseSubSubheading) {
+                          return (
+                            <View key={`chinese-subsubheading-${index}`} style={styles.chineseSubSubheadingContainer}>
+                              <Text style={styles.chineseSubSubheadingPointer}>-</Text>
+                              <Text style={styles.chineseSubSubheadingText}>
+                                {line.text.trim()}
+                              </Text>
+                            </View>
+                          );
+                        } else if (line.hasMathExpression) {
+                          return renderTextWithMath(line, index);
+                        } else {
+                          return (
+                            <Text key={`text-${index}`} style={isBot ? styles.botText : styles.userText}>
+                              {line.text}
+                            </Text>
+                          );
+                        }
+                      })}
+                    </View>
+                  )}
+                  {shouldTruncate && (
+                    <TouchableOpacity
+                      style={styles.viewMoreButton}
+                      onPress={() => toggleMessageExpansion(item.id)}
+                    >
+                      <Text style={styles.viewMoreText}>
+                        {isExpanded ? 'View less' : 'View more'}
                       </Text>
-                    );
-                  }
-                  
-                  return renderTextWithMath(line, index);
-                })}
+                    </TouchableOpacity>
+                  )}
+                  <View style={isBot ? styles.botTail : styles.userTail} />
+                </Animatable.View>
+              </TouchableOpacity>
+              
+              {/* Message action buttons - now outside the bubble */}
+              <View style={[
+                styles.messageActionButtons,
+                isBot ? styles.botMessageActions : styles.userMessageActions
+              ]}>
+                <TouchableOpacity 
+                  style={styles.actionButton} 
+                  onPress={handleCopyText}
+                >
+                  <Ionicons 
+                    name="copy-outline" 
+                    size={18} 
+                    color="#666" 
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.actionButton} 
+                  onPress={handleShareMessage}
+                >
+                  <Ionicons 
+                    name="share-social-outline" 
+                    size={18} 
+                    color="#666" 
+                  />
+                </TouchableOpacity>
               </View>
-            )}
-            <View style={isBot ? styles.botTail : styles.userTail} />
-          </Animatable.View>
-        </View>
-      </Swipeable>
+            </View>
+          </View>
+        </Swipeable>
       </GestureHandlerRootView>
     );
   };
@@ -876,9 +983,9 @@ const BotScreen2 = ({ navigation, route }) => {
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
       {/* Header */}  
       <View style={[styles.header, {backgroundColor: colors.background2 , borderColor: colors.border}]}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Image source={require('../assets/back.png')} style={[styles.headerIcon, {tintColor: colors.text}]} />
-          </TouchableOpacity>
+      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <MaterialIcons name="arrow-back-ios-new" size={24} color="white" />
+                               </TouchableOpacity>
         <Image source={require('../assets/Avatar/Cat.png')} style={styles.botIcon} />
         <View style={styles.headerTextContainer}>
           <Text style={[styles.botName, {color: colors.text}]}>MatrixAI Bot</Text>
@@ -906,7 +1013,7 @@ const BotScreen2 = ({ navigation, route }) => {
           onContentSizeChange={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
           onLayout={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
           ref={flatListRef}
-          style={{ marginBottom: showAdditionalButtons ? 200 : 100 }}
+          style={{ marginBottom: showAdditionalButtons ? 220 : 120 }}
           ListEmptyComponent={
             !isInitialLoading && (
               <View style={styles.emptyContainer}>
@@ -924,10 +1031,10 @@ const BotScreen2 = ({ navigation, route }) => {
       {/* Loading Animation */}
       {isLoading && (
         <View style={[styles.loadingContainer, { 
-          bottom: showAdditionalButtons && selectedImage ? 120 : 
-                 showAdditionalButtons ? 50 : 
-                 selectedImage ? 20 : 
-                 -50 
+          bottom: showAdditionalButtons && selectedImage ? 130 : 
+                 showAdditionalButtons ? 60 : 
+                 selectedImage ? 30 : 
+                 -40 
         }]}>
           <LottieView
             source={require('../assets/dot.json')}
@@ -956,28 +1063,7 @@ const BotScreen2 = ({ navigation, route }) => {
       )}
 
       {/* Quick Action Buttons */}
-      <ScrollView horizontal>
-      <View style={styles.quickActionContainer}>
-        <TouchableOpacity 
-          style={styles.quickActionButton}
-          onPress={() => transcription && fetchDeepSeekResponse(`Please provide a summary of this text in very structured format in the original language of the transcription: ${transcription}`)}
-        >
-          <Text style={styles.quickActionText}>Quick Summary</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.quickActionButton}
-          onPress={() => transcription && fetchDeepSeekResponse(`Please extract and list the key points from this text in a structured format in the original language of the transcription: ${transcription}`)}
-        >
-          <Text style={styles.quickActionText}>Key Points</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.quickActionButton}
-          onPress={() => transcription && fetchDeepSeekResponse(`Please analyze this text and provide potential solutions or recommendations for any problems or challenges mentioned and in the original language of the transcription: ${transcription}`)}
-        >
-          <Text style={styles.quickActionText}>Solution</Text>
-        </TouchableOpacity>
-      </View>
-      </ScrollView>
+    
 
       {/* Chat Input Box */}
       <View style={styles.chatBoxContainer}>
@@ -1002,7 +1088,28 @@ const BotScreen2 = ({ navigation, route }) => {
           <Ionicons name="send" size={24} color="#4C8EF7" />
         </TouchableOpacity>
       </View>
-
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <View style={[styles.quickActionContainer , {backgroundColor: colors.background2}]}>
+        <TouchableOpacity 
+          style={[styles.quickActionButton , {backgroundColor: colors.background2}]}
+          onPress={() => transcription && fetchDeepSeekResponse(`Please provide a summary of this text in very structured format in the original language of the transcription: ${transcription}`)}
+        >
+          <Text style={styles.quickActionText}>Quick Summary</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.quickActionButton , {backgroundColor: colors.background2}]}
+          onPress={() => transcription && fetchDeepSeekResponse(`Please extract and list the key points from this text in a structured format in the original language of the transcription: ${transcription}`)}
+        >
+          <Text style={styles.quickActionText}>Key Points</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.quickActionButton , {backgroundColor: colors.background2}]}
+          onPress={() => transcription && fetchDeepSeekResponse(`Please analyze this text and provide potential solutions or recommendations for any problems or challenges mentioned and in the original language of the transcription: ${transcription}`)}
+        >
+          <Text style={styles.quickActionText}>Solution</Text>
+        </TouchableOpacity>
+      </View>
+      </ScrollView>
       {showAdditionalButtons && (
              <View style={[styles.additionalButtonsContainer, {backgroundColor: colors.background2}]  }>
                 <View style={styles.buttonRow}>
@@ -1098,8 +1205,8 @@ const styles = StyleSheet.create({
     alignSelf:'center',
     width: '95%',
     borderRadius: 25,
-    borderWidth: 1,
-    borderColor: 'blue',
+    borderWidth: 2,
+    borderColor: '#007bff',
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 10,
     marginHorizontal: '5%',
@@ -1149,8 +1256,9 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+    backgroundColor: '#007bff',
+   
+    marginRight:10,
   },
   buttonText: {
     color: '#FFF',
@@ -1162,24 +1270,26 @@ const styles = StyleSheet.create({
     marginVertical: 5,
     padding: 10,
     borderRadius: 10,
+    position: 'relative',
+    overflow: 'visible',
   },
 
   botMessageContainer: {
     alignSelf: 'flex-start',
     backgroundColor: '#E0E0E0',
-    marginLeft: 15, // Add margin to accommodate the tail
+    marginLeft: 15,
   },
   userMessageContainer: {
     alignSelf: 'flex-end',
     backgroundColor: '#4C8EF7',
-    marginRight: 15, // Add margin to accommodate the tail
+    marginRight: 15,
   },
   botTail: {
     position: 'absolute',
-    left: -10, // Adjust based on the tail image size
+    left: -10,
     bottom: 0,
-    width: 15, // Adjust based on the tail image size
-    height: 15, // Adjust based on the tail image size
+    width: 0,
+    height: 0,
     borderLeftWidth: 10,
     borderRightWidth: 10,
     borderBottomWidth: 10,
@@ -1187,14 +1297,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderBottomColor: '#E0E0E0', // Match bot message background color
+    borderBottomColor: '#E0E0E0',
   },
   userTail: {
     position: 'absolute',
-    right: -10, // Adjust based on the tail image size
+    right: -10,
     bottom: 0,
-    width: 15, // Adjust based on the tail image size
-    height: 15, // Adjust based on the tail image size
+    width: 0,
+    height: 0,
     borderLeftWidth: 10,
     borderRightWidth: 10,
     borderBottomWidth: 10,
@@ -1202,7 +1312,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderBottomColor: '#4C8EF7', // Match user message background color
+    borderBottomColor: '#4C8EF7',
   },
 
 
@@ -1430,7 +1540,7 @@ marginBottom:-10,
     justifyContent: 'flex-start',
     width: '100%',
     paddingHorizontal: 10,
-    marginBottom: 10,
+  paddingVertical:10,
   },
   quickActionButton: {
 
@@ -1496,11 +1606,11 @@ marginBottom:-10,
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: 8,
- width:'80%',
+    width: '100%',
     padding: 8,
     borderRadius: 8,
     borderWidth: 1,
-  
+    borderColor: '#E0E0E0',
   },
   headingPointer: {
     fontWeight: 'bold',
@@ -1511,14 +1621,14 @@ marginBottom:-10,
   headingText: {
     fontWeight: 'bold',
     fontSize: 18,
-    color: '#1976D2',
     flex: 1,
   },
   subheadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-   
-  width:'80%',
+    width: '100%',
+    marginVertical: 4,
+    paddingLeft: 16,
   },
   subheadingPointer: {
     fontWeight: 'bold',
@@ -1528,8 +1638,7 @@ marginBottom:-10,
   },
   subheadingText: {
     fontWeight: 'bold',
-    fontSize: 12,
-    color: '#2196F3',
+    fontSize: 14,
     flex: 1,
   },
   linkText: {
@@ -1745,6 +1854,74 @@ marginBottom:-10,
     fontSize: 16,
     color: '#888',
     textAlign: 'center',
+  },
+  chineseHeadingContainer: {
+    marginVertical: 12,
+    padding: 8,
+    backgroundColor: '#E3F2FD',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#BBDEFB',
+  },
+  chineseHeadingText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1976D2',
+  },
+  chineseSubheadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 6,
+    paddingLeft: 16,
+  },
+  chineseSubheadingPointer: {
+    fontSize: 16,
+    marginRight: 8,
+    color: '#2196F3',
+  },
+  chineseSubheadingText: {
+    fontSize: 16,
+    color: '#333',
+    flex: 1,
+  },
+  chineseSubSubheadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 4,
+    paddingLeft: 32,
+  },
+  chineseSubSubheadingPointer: {
+    fontSize: 14,
+    marginRight: 8,
+    color: '#666',
+  },
+  chineseSubSubheadingText: {
+    fontSize: 14,
+    color: '#666',
+    flex: 1,
+  },
+  messageWrapperOuter: {
+    maxWidth: '80%',
+    marginVertical: 5,
+  },
+  messageActionButtons: {
+    flexDirection: 'row',
+    marginTop: 2,
+    padding: 2,
+    marginBottom: 3,
+  },
+  botMessageActions: {
+    alignSelf: 'flex-start',
+    marginLeft: 15,
+  },
+  userMessageActions: {
+    alignSelf: 'flex-end',
+    marginRight: 10,
+  },
+  actionButton: {
+    padding: 5,
+    marginHorizontal: 3,
+    backgroundColor: 'transparent',
   },
 });
 
