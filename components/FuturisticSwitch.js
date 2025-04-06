@@ -8,7 +8,6 @@ const FuturisticSwitch = ({ value, onValueChange, colors }) => {
   const translateX = new Animated.Value(value ? 1 : 0);
   const bgInterpolation = new Animated.Value(value ? 1 : 0);
   const glowAnimation = new Animated.Value(0);
-  const pulseAnimation = new Animated.Value(0);
   
   // Run animation when value changes
   useEffect(() => {
@@ -45,27 +44,8 @@ const FuturisticSwitch = ({ value, onValueChange, colors }) => {
           }),
         ])
       ).start();
-      
-      // Pulse animation for the label
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnimation, {
-            toValue: 1,
-            duration: 2000,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: false,
-          }),
-          Animated.timing(pulseAnimation, {
-            toValue: 0.7,
-            duration: 2000,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: false,
-          }),
-        ])
-      ).start();
     } else {
       glowAnimation.setValue(0);
-      pulseAnimation.setValue(0.7);
     }
   }, [value]);
 
@@ -89,20 +69,9 @@ const FuturisticSwitch = ({ value, onValueChange, colors }) => {
     inputRange: [0, 0.5, 1],
     outputRange: [0, 0.3, 0],
   });
-  
-  const labelOpacity = pulseAnimation.interpolate({
-    inputRange: [0.7, 1],
-    outputRange: [0.7, 1],
-  });
 
   return (
     <View style={styles.container}>
-      <Animated.View style={[styles.labelContainer, { opacity: labelOpacity }]}>
-        <ThemedText style={[styles.modeLabel, { color: value ? colors.primary : colors.text + '80' }]}>
-          {value ? 'DARK' : 'LIGHT'}
-        </ThemedText>
-      </Animated.View>
-      
       <TouchableOpacity 
         activeOpacity={0.8}
         onPress={() => onValueChange(!value)}
@@ -140,14 +109,14 @@ const FuturisticSwitch = ({ value, onValueChange, colors }) => {
               }
             ]}
           >
-            {value && (
-              <Ionicons 
-                name="power" 
-                size={13}
-                color={colors.primary} 
-                style={styles.iconStyle} 
-              />
-            )}
+            <ThemedText 
+              style={[
+                styles.thumbText, 
+                { color: value ? colors.primary : colors.text }
+              ]}
+            >
+              {value ? 'D' : 'L'}
+            </ThemedText>
           </Animated.View>
 
           {/* Futuristic track elements */}
@@ -189,15 +158,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  labelContainer: {
-    marginBottom: 2,
-    alignItems: 'center',
-  },
-  modeLabel: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-  },
   touchableArea: {
     padding: 8,
   },
@@ -223,6 +183,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 3,
+  },
+  thumbText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
   iconStyle: {
     opacity: 0.8,

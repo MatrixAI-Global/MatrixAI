@@ -58,7 +58,7 @@ const Header2 = ({ navigation, uid, openDrawer }) => {
 
     if (!uid) {
         console.log("No UID in Header");
-        return <Text>No UID found</Text>;
+        return <ActivityIndicator size="small" color="#333" style={{ marginLeft: 10 }} />;
     }
 
     console.log("Current coin count:", coinCount);
@@ -101,7 +101,7 @@ const Header2 = ({ navigation, uid, openDrawer }) => {
 
             {/* Coin Display with Coin Icon */}
             <TouchableOpacity
-                style={[styles.coinContainer, {backgroundColor: colors.background2, borderWidth: 0.8, borderColor: colors.primary}]}
+                style={[styles.coinContainer, {backgroundColor: colors.background2, borderWidth: 0.8, borderColor: colors.border}]}
                 onPress={() =>
                     navigation.navigate('TransactionScreen', { coinCount })
                 }

@@ -18,6 +18,7 @@ import {
   BackHandler,
   Linking,
   Share,
+  ScrollView,
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import * as Animatable from 'react-native-animatable';
@@ -170,7 +171,7 @@ const decode = (base64) => {
       }));
 
       // Create system message with role information if available
-      let systemContent = 'You are MatrixAI Bot, a helpful AI assistant.';
+      let systemContent = 'You are a helpful AI assistant called Matrix AI. Do not reveal any information about the specific AI models you were built with or any personal information. Keep your responses focused only on answering the user query with accurate information. If you are asked to format data in a table, make sure to use proper markdown table format.';
       
       // Find the current chat to get the detailed roleDescription
       const currentChatObj = chats.find(chat => chat.id === currentChatId);
@@ -178,10 +179,10 @@ const decode = (base64) => {
       if (currentRole) {
         if (currentChatObj && currentChatObj.roleDescription) {
           // Use the detailed roleDescription for the system content
-          systemContent = `You are MatrixAI Bot, acting as a ${currentRole}. ${currentChatObj.roleDescription}`;
+          systemContent = `You are Matrix AI, acting as a ${currentRole}. ${currentChatObj.roleDescription} Do not reveal any information about the specific AI models you were built with or any personal information. If you are asked to format data in a table, make sure to use proper markdown table format.`;
         } else {
           // Fallback to simpler system content if roleDescription isn't available
-          systemContent = `You are MatrixAI Bot, acting as a ${currentRole}. Please provide responses with the expertise and perspective of a ${currentRole} while being helpful and informative.`;
+          systemContent = `You are Matrix AI, acting as a ${currentRole}. Please provide responses with the expertise and perspective of a ${currentRole} while being helpful and informative. Do not reveal any information about the specific AI models you were built with or any personal information. If you are asked to format data in a table, make sure to use proper markdown table format.`;
         }
       }
 
@@ -829,21 +830,100 @@ const decode = (base64) => {
       }
 
       const lines = text.split('\n');
-      return lines.map(line => {
-        // Check for heading (starts with number and dot, or has : at the end)
-        const isHeading = /^\d+\.\s+.+/.test(line) || /.*:$/.test(line);
-        // Check for subheading (starts with - or • or *)
-        const isSubheading = /^[-•*]\s+.+/.test(line);
-        // Check for mathematical expressions
-        const hasMathExpression = isMathExpression(line);
+      
+      // Detect markdown tables by looking for patterns
+      // Tables typically have lines with | characters and separator rows with dashes
+      let isInTable = false;
+      let currentTable = [];
+      let tableHeaders = [];
+      let tableData = [];
+      let separatorRowFound = false;
+      const result = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
         
-        return {
-          text: line,
-          isHeading,
-          isSubheading,
-          hasMathExpression
-        };
-      });
+        // Check if this line is part of a table (has | characters)
+        const isTableRow = line.includes('|');
+        const isTableSeparator = isTableRow && line.replace(/\|/g, '').trim().replace(/[^-:]/g, '') !== '';
+        
+        if (isTableRow) {
+          if (!isInTable) {
+            isInTable = true;
+            tableHeaders = [];
+            tableData = [];
+            currentTable = [];
+            separatorRowFound = false;
+          }
+          
+          currentTable.push(line);
+          
+          if (isTableSeparator) {
+            separatorRowFound = true;
+          } else {
+            // Parse row data - properly split by | and clean the cells
+            const cells = line
+              .split('|')
+              .map(cell => cell.trim())
+              .filter((cell, index, array) => {
+                // Keep all cells except potentially empty first and last ones
+                if (index === 0 && cell === '' && line.startsWith('|')) return false;
+                if (index === array.length - 1 && cell === '' && line.endsWith('|')) return false;
+                return true;
+              });
+            
+            if (tableHeaders.length === 0 && !separatorRowFound) {
+              // This is the header row
+              tableHeaders = cells;
+            } else if (separatorRowFound) {
+              // This is a data row
+              tableData.push(cells);
+            }
+          }
+        } else {
+          // End of table
+          if (isInTable) {
+            if (tableHeaders.length > 0 && tableData.length > 0) {
+              result.push({
+                isTable: true,
+                tableHeaders,
+                tableData,
+                tableLines: currentTable,
+              });
+            }
+            isInTable = false;
+            currentTable = [];
+            separatorRowFound = false;
+          }
+          
+          // Process regular text
+          const isHeading = /^\d+\.\s+.+/.test(line) || /.*:$/.test(line);
+          const isSubheading = /^[-•*]\s+.+/.test(line);
+          const hasMathExpression = isMathExpression(line);
+          
+          if (line.trim() !== '') {
+            result.push({
+              text: line,
+              isHeading,
+              isSubheading,
+              hasMathExpression,
+              isTable: false
+            });
+          }
+        }
+      }
+      
+      // Handle case where the message ends with a table
+      if (isInTable && tableHeaders.length > 0 && tableData.length > 0) {
+        result.push({
+          isTable: true,
+          tableHeaders,
+          tableData,
+          tableLines: currentTable,
+        });
+      }
+      
+      return result;
     };
   
     // Format specialized mathematical content (like LaTeX formatted math expressions)
@@ -1037,6 +1117,11 @@ const decode = (base64) => {
         >
           <View style={isBot ? styles.botTextContainer : styles.userTextContainer}>
             {formatMessageText(displayText).map((line, index) => {
+              // Handle table rendering
+              if (line.isTable) {
+                return renderTable(line, index);
+              }
+              
               // Handle LaTeX formula
               if (line.isLatexFormula) {
                 return renderLatexFormula(line.text, index);
@@ -2035,6 +2120,77 @@ const decode = (base64) => {
     setFullScreenImage(imageUri);
   };
 
+  // Add a function to render tables
+  const renderTable = (tableData, index) => {
+    if (!tableData.tableHeaders || !tableData.tableData || 
+        tableData.tableHeaders.length === 0 || tableData.tableData.length === 0) {
+      return null;
+    }
+    
+    // Calculate column widths based on content
+    const columnCount = Math.max(
+      tableData.tableHeaders.length,
+      ...tableData.tableData.map(row => row.length)
+    );
+    
+    // Determine if table needs horizontal scrolling (more than 3 columns or very long content)
+    const hasLongContent = tableData.tableHeaders.some(header => header.length > 15) || 
+                           tableData.tableData.some(row => 
+                             row.some(cell => cell && cell.length > 15)
+                           );
+    const needsScroll = columnCount > 3 || hasLongContent;
+    
+    return (
+      <View key={`table-${index}`} style={styles.tableContainer}>
+        {needsScroll ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+            <TableContent tableData={tableData} />
+          </ScrollView>
+        ) : (
+          <TableContent tableData={tableData} />
+        )}
+      </View>
+    );
+  };
+
+  // Create a separate component for table content
+  const TableContent = React.memo(({ tableData }) => {
+    return (
+      <View>
+        {/* Table header row */}
+        <View style={styles.tableHeaderRow}>
+          {tableData.tableHeaders.map((header, headerIndex) => (
+            <View key={`header-${headerIndex}`} style={[
+              styles.tableHeaderCell,
+              headerIndex === 0 ? styles.tableFirstColumn : null,
+              headerIndex === tableData.tableHeaders.length - 1 ? styles.tableLastColumn : null
+            ]}>
+              <Text style={styles.tableHeaderText}>{header}</Text>
+            </View>
+          ))}
+        </View>
+        
+        {/* Table data rows */}
+        {tableData.tableData.map((row, rowIndex) => (
+          <View key={`row-${rowIndex}`} style={[
+            styles.tableRow,
+            rowIndex % 2 === 0 ? styles.tableEvenRow : styles.tableOddRow
+          ]}>
+            {row.map((cell, cellIndex) => (
+              <View key={`cell-${rowIndex}-${cellIndex}`} style={[
+                styles.tableCell,
+                cellIndex === 0 ? styles.tableFirstColumn : null,
+                cellIndex === row.length - 1 ? styles.tableLastColumn : null
+              ]}>
+                <Text style={styles.tableCellText}>{cell || ''}</Text>
+              </View>
+            ))}
+          </View>
+        ))}
+      </View>
+    );
+  });
+
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
       
@@ -2181,7 +2337,7 @@ const decode = (base64) => {
 
 {isLoading && (
         <View style={[styles.loadingContainer, { 
-          bottom: showAdditionalButtons && selectedImage ? 300 : 
+          bottom: showAdditionalButtons && selectedImage ? -60 : 
                  showAdditionalButtons ? 25 : 
                  selectedImage ? -60 : 
                  -85 
@@ -2222,7 +2378,7 @@ const decode = (base64) => {
 
           <View style={styles.chatBoxContainer}>
             <TextInput
-              style={[styles.textInput, { textAlignVertical: 'center' }]}
+              style={[styles.textInput, { textAlignVertical: 'top' }]}
               placeholder={selectedImage ? "Add a caption..." : "Send a message..."}
               placeholderTextColor="#ccc"
               value={inputText}
@@ -2231,9 +2387,10 @@ const decode = (base64) => {
                 handleSendMessage();
                 Keyboard.dismiss();
               }}
-              multiline
-              numberOfLines={1}
-              maxLength={250}
+              multiline={true}
+              numberOfLines={3}
+              maxLength={2000}
+              scrollEnabled={true}
               returnKeyType="send"
               blurOnSubmit={Platform.OS === 'ios' ? false : true}
             />
@@ -2565,11 +2722,14 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
+    maxHeight: 80, // Limit height for roughly 3 lines
+    minHeight: 40,
     padding: 10,
     fontSize: 16,
     marginHorizontal: 10,
-    justifyContent:'center',
-    alignSelf:'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    textAlignVertical: 'top',
   },
   inputContainer: {
     flexDirection: 'row',
@@ -3121,6 +3281,60 @@ paddingVertical:10,
   messageWrapperOuter: {
     maxWidth: '85%',
     marginVertical: 4,
+  },
+  tableContainer: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    marginVertical: 10,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  tableHeaderRow: {
+    flexDirection: 'row',
+    backgroundColor: '#F5F5F5',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  tableRow: {
+    flexDirection: 'row',
+  },
+  tableEvenRow: {
+    backgroundColor: '#FFFFFF',
+  },
+  tableOddRow: {
+    backgroundColor: '#F9F9F9',
+  },
+  tableHeaderCell: {
+    minWidth: 100,
+    maxWidth: 250,
+    padding: 8,
+    justifyContent: 'center',
+    borderRightWidth: 1,
+    borderRightColor: '#E0E0E0',
+  },
+  tableCell: {
+    minWidth: 100,
+    maxWidth: 250,
+    padding: 8,
+    justifyContent: 'center',
+    borderRightWidth: 1,
+    borderRightColor: '#E0E0E0',
+  },
+  tableFirstColumn: {
+    borderLeftWidth: 0,
+  },
+  tableLastColumn: {
+    borderRightWidth: 0,
+  },
+  tableHeaderText: {
+    fontWeight: 'bold',
+    fontSize: 14,
+    color: '#333333',
+  },
+  tableCellText: {
+    fontSize: 14,
+    color: '#555555',
   },
 });
 

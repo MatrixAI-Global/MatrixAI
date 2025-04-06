@@ -4,23 +4,25 @@ import { useNavigation } from '@react-navigation/native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 const { width } = Dimensions.get('window'); // Get the screen width
 
 const FeatureCardWithDetailsPro = () => {
   const navigation = useNavigation(); // Initialize navigation
   const { getThemeColors } = useTheme();
   const colors = getThemeColors();
+  const { t } = useLanguage();
   const handleUpgradePress = () => {
     navigation.navigate('SubscriptionScreen'); // Replace 'UpgradeScreen' with your target screen's name
   };
 
   return (
     <View style={[styles.container, {backgroundColor: colors.background }]}>
-      <TouchableOpacity style={[styles.card, {backgroundColor: colors.background2, borderWidth: 0.8, borderColor: '#8BB9FFFF'}]}>
+      <TouchableOpacity style={[styles.card, {backgroundColor: colors.card , borderWidth: 0.8, borderColor: colors.border}]}>
         {/* Top section with "Matrix AI" text and "PRO" container */}
-        <View style={[styles.headerRow, {backgroundColor: colors.background2}]}>
+        <View style={[styles.headerRow]}>
                 <View style={styles.titleContainer}>
-                    <Text style={[styles.title, {color: colors.text}]}>Pro Features</Text>
+                    <Text style={[styles.title, {color: colors.text}]}>{t('proFeatures')}</Text>
                     <View style={[styles.proBadge , {backgroundColor: colors.primary}]}>
                         <Text style={[styles.proText ]}>ACTIVE</Text>
                     </View>

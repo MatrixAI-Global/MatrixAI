@@ -120,7 +120,7 @@ const AudioVideoUploadScreen = () => {
         { label: 'Bulgarian', value: 'bg' },
         { label: 'Catalan', value: 'ca' },
       
-        { label: 'Chinese Simplified', value: 'zh' },
+        { label: 'Chinese', value: 'zh' },
       
         { label: 'Czech', value: 'cs' },
         { label: 'Danish', value: 'da' },
@@ -1051,7 +1051,7 @@ const AudioVideoUploadScreen = () => {
                     />
                 <View style={styles.detailsRow}>
     <Text style={[styles.fileName, {color: colors.text}]} numberOfLines={1}>
-        {item.audio_name ? (item.audio_name.length > 10 ? `${item.audio_name.substring(0, 10)}...` : item.audio_name) : 'Unknown File'}
+        {item.audio_name ? (item.audio_name.length > 13 ? `${item.audio_name.substring(0, 13)}...` : item.audio_name) : 'Unknown File'}
     </Text>
     <View style={styles.fileDetails}>
         <MaterialIcons name="access-time" size={14} color={'#C3C3C3FF'} marginRight={2}/>
@@ -1994,6 +1994,7 @@ color:'#000',
     },
     pickerItem: {
         color: '#000000',
+        fontSize: 16,
     },
     toastContainer: {
         position: 'absolute',

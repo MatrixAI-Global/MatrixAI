@@ -254,6 +254,8 @@ const ProfileScreen = ({ navigation }) => {
                 <View style={styles.themeSwitchContainer}>
                     <FuturisticSwitch
                         value={isDarkMode}
+                        
+
                         onValueChange={toggleTheme}
                         colors={colors}
                     />
@@ -278,70 +280,70 @@ const ProfileScreen = ({ navigation }) => {
                     </>
                 )}
 
-                <ThemedText style={[styles.menuTitle, {color: colors.text}]}>Your Information</ThemedText>
+                <ThemedText style={[styles.menuTitle, {color: colors.text}]}>{t('yourInformation')}</ThemedText>
                 
                 {/* Menu Items */}
                 <ThemedCard style={[styles.menuContainer, {backgroundColor: colors.card , borderWidth: 0.8, borderColor: colors.border}]}>
                     <MenuItem 
                         iconName="person-outline" 
-                        label="Profile" 
+                        label={t('profile')} 
                         onPress={handleEditProfile} 
                     />
                     <MenuItem 
                         iconName="document-text-outline" 
-                        label="Order History" 
+                        label={t('orderHistory')} 
                         onPress={() => navigation.navigate('OrderHistoryScreen')} 
                     />
                     <MenuItem 
                         iconName="people-outline" 
-                        label="Refer & Earn" 
+                        label={t('referEarn')} 
                         onPress={handleInside} 
                     />
                     <MenuItem 
                         iconName="cash-outline" 
-                        label="Rewards" 
+                        label={t('rewards')} 
                         onPress={() => navigation.navigate('AddProductScreen')}
                     />
                     
                 </ThemedCard>
 
-                <ThemedText style={[styles.menuTitle, {color: colors.text}]}>Support</ThemedText>
+                <ThemedText style={[styles.menuTitle, {color: colors.text}]}>{t('support')}</ThemedText>
                 
                 <ThemedCard style={[styles.menuContainer, {backgroundColor: colors.card , borderWidth: 0.8, borderColor: colors.border}]}>
                     <MenuItem 
                         iconName="help-circle-outline" 
-                        label="Help Center" 
+                        label={t('helpCenter')} 
                         onPress={() => navigation.navigate('FeedbackScreen')} 
                     />
                     <MenuItem 
                         iconName="headset-outline" 
-                        label="Customer Support" 
+                        label={t('customerSupport')} 
                         onPress={() => navigation.navigate('CustomerSupportScreen')} 
                     />
                     <MenuItem 
                         iconName="star-outline" 
-                        label="Rate Us" 
+                        label={t('rateUs')} 
                         onPress={() => navigation.navigate('FeedbackScreen')} 
                     />
                 </ThemedCard>
 
-                <ThemedText style={[styles.menuTitle, {color: colors.text}]}>Preferences</ThemedText>
+                <ThemedText style={[styles.menuTitle, {color: colors.text}]}>{t('preferences')}</ThemedText>
                 
                 <ThemedCard style={[styles.menuContainer, {backgroundColor: colors.card , borderWidth: 0.8, borderColor: colors.border   }]}>
                     <MenuItem 
                         iconName="settings-outline" 
-                        label="Settings" 
+                        label={t('settings')} 
                         onPress={handleSettings} 
                     />
                     <MenuItem 
                         iconName="log-out-outline" 
-                        label="Logout" 
+                        label={t('logout')} 
                         onPress={handleLogout} 
                     />
                 </ThemedCard>
                 
                 <View style={styles.footer}>
-                    <ThemedText style={[styles.versionText, {color: colors.text}]}>Version 1.0.0</ThemedText>
+                    <ThemedText style={[styles.versionText, {color: colors.text}]}>{t('version')} 1.0.0</ThemedText>
                 </View>
             </ScrollView>
         </SafeAreaView>

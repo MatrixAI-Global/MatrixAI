@@ -59,7 +59,7 @@ const FeatureCard = ({ title, description, iconSource, navigation, targetScreen 
         </View>
 
         {/* Card content */}
-        <Text style={styles.cardTitle} numberOfLines={1} ellipsizeMode="tail">{title}</Text>
+        <Text style={styles.cardTitle} numberOfLines={2} ellipsizeMode="tail">{title}</Text>
         <Text style={styles.cardDescription} numberOfLines={3} ellipsizeMode="tail">{description}</Text>
       </View>
     </TouchableOpacity>

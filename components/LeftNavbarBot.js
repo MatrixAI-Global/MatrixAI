@@ -124,6 +124,7 @@ const LeftNavbarBot = ({ chats, onSelectChat, onNewChat, onClose, onDeleteChat }
           stickySectionHeadersEnabled={true}
           showsVerticalScrollIndicator={false}
           keyExtractor={(item) => item.id}
+          
           contentContainerStyle={styles.listContainer}
         />
       ) : (
@@ -150,7 +151,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: '75%',
-    backgroundColor: '#FFFFFF',
+ 
     elevation: 5,
     padding: 10,
     shadowColor: '#000',
@@ -172,7 +173,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 5,
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: '#E0E0E000',
     marginBottom: 5,
     backgroundColor: '#F5F5F5',
     zIndex: 10,
@@ -195,7 +196,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#5E5E5EFF',
   },
   chatName: {
     fontSize: 16,

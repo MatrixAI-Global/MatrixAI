@@ -21,6 +21,7 @@ import { useTheme } from '../context/ThemeContext';
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import LinearGradient from 'react-native-linear-gradient';
 import * as Animatable from 'react-native-animatable';
+import LottieView from "lottie-react-native";
 
 const { width, height } = Dimensions.get("window");
 
@@ -246,7 +247,12 @@ const CreateImagesScreen = ({ route, navigation }) => {
             >
               <View style={styles.loadingIndicator}>
                 <Animated.View style={[styles.pulseCircle, { transform: [{ scale: pulseAnim }] }]}>
-                  <ActivityIndicator size="large" color="#fff" />
+                <LottieView
+          source={require('../assets/image2.json')}
+          autoPlay
+          loop
+          style={{width: '100%', height: 100, backgroundColor: 'transparent'}}
+        />
                 </Animated.View>
               </View>
               <Text style={[styles.loadingText, {color: colors.text}]}>{loadingText}</Text>
@@ -445,7 +451,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 30,
-    paddingHorizontal: 20,
+   
   },
   loadingIndicator: {
     alignItems: 'center',
@@ -456,7 +462,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: 'rgba(0, 123, 255, 0.3)',
+  
     justifyContent: 'center',
     alignItems: 'center',
   },
