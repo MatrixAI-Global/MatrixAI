@@ -2540,17 +2540,15 @@ const styles = StyleSheet.create({
   chatBoxContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'center',
-    width: '95%',
+    alignSelf: 'stretch',
+    marginHorizontal: 10, // fixed padding is better than '%'
     borderRadius: 25,
-    
     borderWidth: 2,
     borderColor: '#007bff',
     paddingHorizontal: 10,
-    marginHorizontal: '5%',
     backgroundColor: '#fff',
-
   },
+  
   NewChat: {
     alignSelf: 'center',
     backgroundColor: '#4C8EF7',

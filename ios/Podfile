@@ -63,6 +63,12 @@ target 'MatrixAI' do
           config.build_settings['COPY_PHASE_STRIP'] = 'NO'
           config.build_settings['STRIP_INSTALLED_PRODUCT'] = 'NO'
         end
+        
+        # Fix for RNShare compilation errors with new architecture
+        if target.name == 'RNShare'
+          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
+          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'RCT_NEW_ARCH_ENABLED=0'
+        end
       end
     end
     

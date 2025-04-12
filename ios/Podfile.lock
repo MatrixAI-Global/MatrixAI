@@ -2096,27 +2096,8 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
-  - RNShare (12.0.9):
-    - DoubleConversion
-    - glog
-    - hermes-engine
-    - RCT-Folly (= 2024.11.18.00)
-    - RCTRequired
-    - RCTTypeSafety
+  - RNShare (8.0.0):
     - React-Core
-    - React-debug
-    - React-Fabric
-    - React-featureflags
-    - React-graphics
-    - React-ImageManager
-    - React-NativeModulesApple
-    - React-RCTFabric
-    - React-rendererdebug
-    - React-utils
-    - ReactCodegen
-    - ReactCommon/turbomodule/bridging
-    - ReactCommon/turbomodule/core
-    - Yoga
   - RNSound (0.11.2):
     - React-Core
     - RNSound/Core (= 0.11.2)
@@ -2661,7 +2642,7 @@ SPEC CHECKSUMS:
   RNGoogleSignin: 5e115ab981ba1a9f5fae37000f49cd996c394df0
   RNPermissions: 6ec445d97d6707163c69067a6b96bf839ca6f286
   RNScreens: b32d0d59b53acb574fa795a9343591ef4e7ab7c2
-  RNShare: 56b5431c60e1e9ee167191f4f327471af1c2941a
+  RNShare: b971da64389826106ba22e9bd4497fbe8481dfc4
   RNSound: 314cc5226453ef4a3314a196c65e8a65e5106a7b
   RNSVG: 8126581b369adf6a0004b6a6cab1a55e3002d5b0
   RNVectorIcons: bd818296a51dc2bb8c3bd97a3ca399df1afe216d
@@ -2679,6 +2660,6 @@ SPEC CHECKSUMS:
   VisionCamera: f56eaedde0d3fa095143b78374d29e89e71735f9
   Yoga: b94ff2d7559cb66837c97a3f394ddb817faad4d6
 
-PODFILE CHECKSUM: bbcc03470ac7da56f671578dae1d9bd97969a91f
+PODFILE CHECKSUM: 2e123523f608b25bb2e26d16dda1afb116e25dd1
 
-COCOAPODS: 1.15.2
+COCOAPODS: 1.16.2
