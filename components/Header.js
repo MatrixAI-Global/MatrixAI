@@ -157,8 +157,10 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-     marginTop:-10,
-   marginBottom:10,
+        width: '95%',
+        marginTop:-30,
+  
+marginBottom:50,
       
     },
     menuButton: {

@@ -80,6 +80,8 @@ export const translations = {
     'aiChat': 'AI Chat',
     
     // HomeScreen
+    'futureOfAI': 'Let\'s discover the future of AI',
+    'aiTools': 'AI Tools',
     'speechToText': 'Speech to Text',
     'convertAudioToText': 'Convert any audio to text',
     'create': 'Create',
@@ -93,6 +95,14 @@ export const translations = {
     'createPPTDesc': 'Create presentations in less than a minute',
     'worldsBestAITools': 'World\'s best AI tools',
     'allRightsReserved': '@All rights reserved to MatrixAI',
+    
+    // ContentWriterScreen
+    'contentWriter': 'Content Writer',
+    'selectContentType': 'Select Content Type',
+    'writePrompt': 'Write Your Prompt',
+    'enterPromptHere': 'Enter your prompt here...',
+    'generate': 'Generate Content',
+    'generatedContent': 'Generated Content',
   },
   
   // Traditional Chinese
@@ -174,6 +184,8 @@ export const translations = {
     'aiChat': 'AI 聊天',
     
     // HomeScreen
+    'futureOfAI': '體驗人工智能的未來',
+    'aiTools': 'AI 工具',
     'speechToText': '語音轉文字',
     'convertAudioToText': '將任何音訊轉換為文字',
     'create': '創建',
@@ -187,6 +199,14 @@ export const translations = {
     'createPPTDesc': '在不到一分鐘內創建簡報',
     'worldsBestAITools': '世界上最好的AI工具',
     'allRightsReserved': '@MatrixAI保留所有權利',
+    
+    // ContentWriterScreen
+    'contentWriter': '內容寫作',
+    'selectContentType': '選擇內容類型',
+    'writePrompt': '寫下您的提示',
+    'enterPromptHere': '在此輸入您的提示...',
+    'generate': '生成內容',
+    'generatedContent': '生成的內容',
   },
 
   // Simplified Chinese
@@ -233,9 +253,7 @@ export const translations = {
     "customerSupport": "客户支持",
     "rateUs": "评价我们",
     "yourInformation": "您的信息",
-      "proFeatures": "专业功能",
-
-
+    "proFeatures": "专业功能",
 
     // Language settings
     'languageSettings': '语言设置',
@@ -270,6 +288,8 @@ export const translations = {
     'aiChat': 'AI 聊天',
     
     // HomeScreen
+    'futureOfAI': '体验人工智能的未来',
+    'aiTools': 'AI 工具',
     'speechToText': '语音转文字',
     'convertAudioToText': '将任何音频转换为文字',
     'create': '创建',
@@ -283,6 +303,14 @@ export const translations = {
     'createPPTDesc': '在不到一分钟内创建演示文稿',
     'worldsBestAITools': '世界上最好的AI工具',
     'allRightsReserved': '@MatrixAI保留所有权利',
+    
+    // ContentWriterScreen
+    'contentWriter': '内容写作',
+    'selectContentType': '选择内容类型',
+    'writePrompt': '写下您的提示',
+    'enterPromptHere': '在此输入您的提示...',
+    'generate': '生成内容',
+    'generatedContent': '生成的内容',
   }
 };
 

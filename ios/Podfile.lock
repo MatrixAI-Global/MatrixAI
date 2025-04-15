@@ -1320,6 +1320,27 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
+  - react-native-blur (4.4.1):
+    - DoubleConversion
+    - glog
+    - hermes-engine
+    - RCT-Folly (= 2024.11.18.00)
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - Yoga
   - react-native-document-picker (9.3.1):
     - DoubleConversion
     - glog
@@ -1964,6 +1985,27 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
+  - RNCMaskedView (0.3.2):
+    - DoubleConversion
+    - glog
+    - hermes-engine
+    - RCT-Folly (= 2024.11.18.00)
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - Yoga
   - RNCPicker (2.11.0):
     - DoubleConversion
     - glog
@@ -2258,6 +2300,7 @@ DEPENDENCIES:
   - React-microtasksnativemodule (from `../node_modules/react-native/ReactCommon/react/nativemodule/microtasks`)
   - "react-native-audio-waveform (from `../node_modules/@simform_solutions/react-native-audio-waveform`)"
   - react-native-blob-util (from `../node_modules/react-native-blob-util`)
+  - "react-native-blur (from `../node_modules/@react-native-community/blur`)"
   - react-native-document-picker (from `../node_modules/react-native-document-picker`)
   - react-native-get-random-values (from `../node_modules/react-native-get-random-values`)
   - react-native-html-to-pdf (from `../node_modules/react-native-html-to-pdf`)
@@ -2304,6 +2347,7 @@ DEPENDENCIES:
   - "RNCAsyncStorage (from `../node_modules/@react-native-async-storage/async-storage`)"
   - "RNCCheckbox (from `../node_modules/@react-native-community/checkbox`)"
   - "RNCClipboard (from `../node_modules/@react-native-clipboard/clipboard`)"
+  - "RNCMaskedView (from `../node_modules/@react-native-masked-view/masked-view`)"
   - "RNCPicker (from `../node_modules/@react-native-picker/picker`)"
   - RNFS (from `../node_modules/react-native-fs`)
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
@@ -2421,6 +2465,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@simform_solutions/react-native-audio-waveform"
   react-native-blob-util:
     :path: "../node_modules/react-native-blob-util"
+  react-native-blur:
+    :path: "../node_modules/@react-native-community/blur"
   react-native-document-picker:
     :path: "../node_modules/react-native-document-picker"
   react-native-get-random-values:
@@ -2513,6 +2559,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@react-native-community/checkbox"
   RNCClipboard:
     :path: "../node_modules/@react-native-clipboard/clipboard"
+  RNCMaskedView:
+    :path: "../node_modules/@react-native-masked-view/masked-view"
   RNCPicker:
     :path: "../node_modules/@react-native-picker/picker"
   RNFS:
@@ -2590,6 +2638,7 @@ SPEC CHECKSUMS:
   React-microtasksnativemodule: b740ebae7fad70aa78bc24cc0dfc15ac9637b6eb
   react-native-audio-waveform: af3ccd55a785d1049791693f521da2815694a10d
   react-native-blob-util: f82bbc6f071231ae76e1c03b77290de1781df313
+  react-native-blur: c4d838e8cd2896379328aec8a600c6ddad589c78
   react-native-document-picker: bfe9c7d72908d2faba56a4765373c6367090ae2e
   react-native-get-random-values: d16467cf726c618e9c7a8c3c39c31faa2244bbba
   react-native-html-to-pdf: 7a49e6c58ac5221bcc093027b195f4b214f27a9d
@@ -2636,6 +2685,7 @@ SPEC CHECKSUMS:
   RNCAsyncStorage: 62fdbd7e63312228d4868779026248c2677911e1
   RNCCheckbox: 450ce156f3e29e25efa0315c96cfbabe5a39ded1
   RNCClipboard: f13dd3ceae005858e137ae9e70f3c414e174ff81
+  RNCMaskedView: 308c763227e237d4d260bd8841870e099572bb3e
   RNCPicker: cfb51a08c6e10357d9a65832e791825b0747b483
   RNFS: 89de7d7f4c0f6bafa05343c578f61118c8282ed8
   RNGestureHandler: 8b1080a6db0be82dbca18550d6212b885bfab6b2

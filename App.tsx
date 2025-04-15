@@ -7,7 +7,7 @@ enableScreens();
 import 'react-native-url-polyfill/auto';
 import { createStackNavigator } from '@react-navigation/stack';
 import OnboardingScreen from './screens/OnboardingScreen';
-import HomeScreen from './screens/HomeScreen'; // Import HomeScreen directly
+import HomeScreen from './screens/HomeScreen.js'; // Import HomeScreen with .js extension
 import AIShopScreen from './screens/AiShopScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import LoginScreen from './screens/LoginScreens';
@@ -85,6 +85,11 @@ import { getPreferredLanguage } from './utils/languageUtils';
 // Import the ThemeProvider
 import { ThemeProvider } from './context/ThemeContext';
 import { ProfileUpdateProvider } from './context/ProfileUpdateContext.js';
+
+// Import our new screens
+import HumaniseTextScreen from './screens/HumaniseTextScreen';
+import DetectAIScreen from './screens/DetectAIScreen';
+import ContentWriterScreen from './screens/ContentWriterScreen';
 
 const Stack = createStackNavigator();
 
@@ -261,7 +266,7 @@ const App = () => {
                                         options={{ headerShown: false }} 
                                     />
                                     <Stack.Screen 
-                                        name="TranslateScreen" 
+                                        name="SpeechToTextScreen" 
                                         component={AudioVideoUploadScreen} 
                                         options={{ headerShown: false }} 
                                     />
@@ -443,6 +448,24 @@ const App = () => {
                                         component={FeedbackScreen} 
                                         options={{ headerShown: false }} 
                                     />
+                                   
+                                    {/* Add our new screens */}
+                                    <Stack.Screen 
+                                        name="HumaniseText" 
+                                        component={HumaniseTextScreen} 
+                                        options={{ headerShown: false }} 
+                                    />
+                                    <Stack.Screen 
+                                        name="DetectAIScreen" 
+                                        component={DetectAIScreen} 
+                                        options={{ headerShown: false }} 
+                                    />
+                                    <Stack.Screen 
+                                        name="ContentWriterScreen" 
+                                        component={ContentWriterScreen} 
+                                        options={{ headerShown: false }} 
+                                    />
+                                   
                                 </Stack.Navigator>
                             </NavigationContainer>
                             </AirwallexProvider>
