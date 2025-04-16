@@ -4,6 +4,7 @@ import { Animated, Easing } from 'react-native';
 
 import HomeScreen from '../screens/HomeScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import StoriesScreen from '../screens/StoriesScreen';
 // Import other screens as needed
 
 const Stack = createStackNavigator();
@@ -60,6 +61,10 @@ const AppNavigator = () => {
         options={() => ({
           ...slideFromLeft,
         })}
+      />
+      <Stack.Screen 
+        name="Stories" 
+        component={StoriesScreen}
       />
       {/* Add other screens here */}
     </Stack.Navigator>

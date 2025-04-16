@@ -197,43 +197,22 @@ const BotScreen2 = ({ navigation, route }) => {
           // If there's text, use it as the question, otherwise use a default
           const question = inputText.trim() ? inputText : "What do you see in this image?";
           
-          // Send request to Volces API
-          const volcesResponse = await axios.post(
-            'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
+          // Send request using matrix-server API
+          // We already have the file as base64 from earlier
+          const response = await axios.post(
+            'https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/createContent',
             {
-              model: 'doubao-vision-pro-32k-241028',
-              messages: [
-                {
-                  role: 'system',
-                  content: 'You are MatrixAI Bot, a helpful AI assistant.'
-                },
-                {
-                  role: 'user',
-                  content: [
-                    {
-                      type: 'text',
-                      text: question
-                    },
-                    {
-                      type: 'image_url',
-                      image_url: {
-                        url: publicUrl
-                      }
-                    }
-                  ]
-                }
-              ]
+              prompt: question + `\n\n[Image data: ${fileContent}]`
             },
             {
               headers: {
-                'Authorization': 'Bearer 95fad12c-0768-4de2-a4c2-83247337ea89',
                 'Content-Type': 'application/json'
               }
             }
           );
           
-          // Extract the response from Volces API
-          const botMessage = volcesResponse.data.choices[0].message.content.trim();
+          // Extract the response
+          const botMessage = response.data.output.text;
           
           // Add the bot's response to messages
           setMessages((prev) => [
@@ -280,25 +259,35 @@ const BotScreen2 = ({ navigation, route }) => {
 
     setIsLoading(true);
     try {
+      // Prepare message history for context
+      const contextMessages = messageHistory.slice(-5); // Include last 5 messages for context
+      const contextString = contextMessages.map(msg => 
+        `${msg.role === 'assistant' ? 'AI' : 'User'}: ${msg.content}`
+      ).join('\n');
+      
+      // Create a prompt with context
+      let userMessageContent = userMessage;
+      if (contextMessages.length > 0) {
+        userMessageContent = "Previous conversation:\n" + contextString + "\n\nUser's new message: " + userMessageContent;
+      }
+
+      // Make API call
       const response = await axios.post(
-        'https://api.deepseek.com/v1/chat/completions',
+        'https://matrix-server.vercel.app/ask-ai',
         {
-          model: 'deepseek-chat',
-          messages: [
-            { role: 'system', content: 'You are a helpful assistant.' },
-            ...messageHistory,
-            { role: 'user', content: userMessage },
-          ]
+          prompt: userMessageContent
         },
         {
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer sk-fed0eb08e6ad4f1aabe2b0c27c643816`
+            'Content-Type': 'application/json'
           }
         }
       );
-
-      let botMessage = response.data.choices[0].message.content.trim();
+      
+      // Extract AI response
+      let botMessage = response.data.output.text;
+      
+      // Remove markdown formatting if needed
       botMessage = botMessage.replace(/(\*\*|\#\#)/g, "");
 
       setMessages((prev) => [

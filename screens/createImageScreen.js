@@ -13,6 +13,7 @@ import {
   Easing,
   StatusBar,
   ScrollView,
+  Alert,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
@@ -22,18 +23,21 @@ import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import LinearGradient from 'react-native-linear-gradient';
 import * as Animatable from 'react-native-animatable';
 import LottieView from "lottie-react-native";
-
+import { useAuthUser } from '../hooks/useAuthUser';
 const { width, height } = Dimensions.get("window");
+
+const MAX_PROMPT_LENGTH = 100; // Maximum characters before truncation
 
 const CreateImagesScreen = ({ route, navigation }) => {
   const { getThemeColors } = useTheme();
   const colors = getThemeColors();
   const { message } = route.params; // Extract text from params
-  const [imageUrl, setImageUrl] = useState(null); // Store the single selected image URL
-  const [imageUrls, setImageUrls] = useState([]); // Store all fetched image URLs
+  const [imageUrl, setImageUrl] = useState(null); // Store the selected image URL
   const [loading, setLoading] = useState(true); // Track loading state
   const [modalVisible, setModalVisible] = useState(false); // Modal visibility state
   const [currentViewingImage, setCurrentViewingImage] = useState(null);
+  const [showSkeleton, setShowSkeleton] = useState(true); // Control skeleton visibility
+  const { uid } = useAuthUser();  
   
   // Animated values
   const shimmerValue = useRef(new Animated.Value(0)).current;
@@ -41,6 +45,11 @@ const CreateImagesScreen = ({ route, navigation }) => {
   const loadingDots = useRef(new Animated.Value(0)).current;
   const imageOpacity = useRef(new Animated.Value(0)).current;
   const imageScale = useRef(new Animated.Value(0.95)).current;
+
+  // Format prompt for display
+  const truncatedMessage = message.length > MAX_PROMPT_LENGTH 
+    ? `${message.substring(0, MAX_PROMPT_LENGTH)}...` 
+    : message;
 
   useEffect(() => {
     // Start shimmer animation
@@ -86,48 +95,62 @@ const CreateImagesScreen = ({ route, navigation }) => {
     ).start();
   }, [shimmerValue, pulseAnim, loadingDots]);
 
-  useEffect(() => {
-    const fetchAndStoreImages = async () => {
-      try {
-        const storedUrls = await AsyncStorage.getItem("downloadedImageUrls");
-        if (storedUrls) {
-          const urls = JSON.parse(storedUrls);
-          setImageUrls(urls);
-          setImageUrl(urls[0]); // Set the first image as the selected image
+  // Function to fetch and process image
+  const fetchAndStoreImage = async () => {
+    try {
+      // Clear any previously stored image when fetching a new one
+      await AsyncStorage.removeItem("downloadedImage");
+      
+      setLoading(true);
+      setShowSkeleton(true);
+      
+      // Reset animation values
+      imageOpacity.setValue(0);
+      imageScale.setValue(0.95);
+      
+      // Make API request to generate new image
+      const response = await axios.post(
+        "https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/generateImage",
+        { text: message, uid: uid },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdGdkaGVoeGhnYXJrb252cGZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ2Njg4MTIsImV4cCI6MjA1MDI0NDgxMn0.mY8nx-lKrNXjJxHU7eEja3-fTSELQotOP4aZbxvmNPY`,
+          },
+        }
+      );
+
+      if (response.data && response.data.image && response.data.image.url) {
+        const imageData = response.data.image;
+        await AsyncStorage.setItem("downloadedImage", JSON.stringify(imageData));
+        setImageUrl(imageData.url);
+        
+        // Show skeleton for 1 second before revealing the image
+        setTimeout(() => {
+          setShowSkeleton(false);
           setLoading(false);
           fadeInImage();
-        } else {
-          const response = await axios.post(
-            "https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/generateImage2",
-            { text: message, uid: "some-unique-id" },
-            {
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdGdkaGVoeGhnYXJrb252cGZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ2Njg4MTIsImV4cCI6MjA1MDI0NDgxMn0.mY8nx-lKrNXjJxHU7eEja3-fTSELQotOP4aZbxvmNPY`,
-              },
-            }
-          );
-
-          if (response.data.images && response.data.images.length > 0) {
-            const urls = response.data.images;
-            await AsyncStorage.setItem("downloadedImageUrls", JSON.stringify(urls));
-            setImageUrls(urls);
-            setImageUrl(urls[0]); // Set the first image as the selected image
-            setLoading(false);
-            fadeInImage();
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching images:", error);
+        }, 1000);
+      } else {
+        setLoading(false);
+        setShowSkeleton(false);
+        Alert.alert("Error", "Failed to generate image. Please try again.");
       }
-    };
+    } catch (error) {
+      console.error("Error fetching image:", error);
+      setLoading(false);
+      setShowSkeleton(false);
+      Alert.alert("Error", "Something went wrong. Please try again.");
+    }
+  };
 
-    if (message) fetchAndStoreImages();
+  useEffect(() => {
+    if (message) fetchAndStoreImage();
 
     return () => {
-      AsyncStorage.removeItem("downloadedImageUrls");
+      AsyncStorage.removeItem("downloadedImage");
     };
-  }, [message]);
+  }, []);
 
   const fadeInImage = () => {
     Animated.parallel([
@@ -144,32 +167,8 @@ const CreateImagesScreen = ({ route, navigation }) => {
     ]).start();
   };
 
-  const handleSelectImage = (url) => {
-    setImageUrl(url);
-    setModalVisible(false);
-    
-    // Animate the selected image scale
-    Animated.sequence([
-      Animated.timing(imageScale, {
-        toValue: 1.1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(imageScale, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
-
   const handleTryAgain = () => {
-    setImageUrl(null);
-    setLoading(true);
-    setImageUrls([]);
-    // Reset animation
-    imageOpacity.setValue(0);
-    imageScale.setValue(0.95);
+    fetchAndStoreImage();
   };
 
   const openImageModal = (url) => {
@@ -230,12 +229,11 @@ const CreateImagesScreen = ({ route, navigation }) => {
           style={styles.promptContainer}
         >
           <Text style={styles.promptLabel}>PROMPT</Text>
-          <LinearGradient
-            colors={[colors.card, colors.card + '80']}
-            style={styles.promptBox}
-          >
-            <Text style={[styles.promptText, {color: colors.text}]}>{message}</Text>
-          </LinearGradient>
+          {message.length > 100 ? (
+            <Text style={styles.promptText}>{message.substring(0, 100) + "..."}</Text>
+          ) : (
+            <Text style={styles.promptText}>{message}</Text>
+          )}
         </Animatable.View>
 
         {loading ? (
@@ -248,11 +246,11 @@ const CreateImagesScreen = ({ route, navigation }) => {
               <View style={styles.loadingIndicator}>
                 <Animated.View style={[styles.pulseCircle, { transform: [{ scale: pulseAnim }] }]}>
                 <LottieView
-          source={require('../assets/image2.json')}
-          autoPlay
-          loop
-          style={{width: '100%', height: 100, backgroundColor: 'transparent'}}
-        />
+                  source={require('../assets/image2.json')}
+                  autoPlay
+                  loop
+                  style={{width: '100%', height: 100, backgroundColor: 'transparent'}}
+                />
                 </Animated.View>
               </View>
               <Text style={[styles.loadingText, {color: colors.text}]}>{loadingText}</Text>
@@ -260,10 +258,11 @@ const CreateImagesScreen = ({ route, navigation }) => {
                 Please don't leave this screen while the image is being generated
               </Text>
             </Animatable.View>
-            
-            {renderSingleSkeleton()}
           </>
-        ) : (
+        ) : null}
+        
+        {/* Show skeleton during loading or when showSkeleton is true */}
+        {(loading || showSkeleton) ? renderSingleSkeleton() : (
           <Animated.View 
             style={[
               styles.singleContainer, 
@@ -299,27 +298,41 @@ const CreateImagesScreen = ({ route, navigation }) => {
           </Animated.View>
         )}
 
-        {!loading && (
+        {!loading && !showSkeleton && (
           <Animatable.View 
             animation="fadeInUp" 
             duration={600}
             style={styles.buttonsContainer}
           >
             <TouchableOpacity 
-              style={styles.tryAgainButton} 
+              style={styles.generateAgainButtonContainer} 
               onPress={handleTryAgain}
             >
-              <MaterialIcons name="refresh" size={20} color="#000" />
-              <Text style={styles.tryAgainText}>Try Again</Text>
+              <LinearGradient
+                colors={['#8A2387', '#E94057']}
+                start={{x: 0, y: 0}}
+                end={{x: 1, y: 0}}
+                style={styles.generateAgainButton}
+              >
+                <MaterialIcons name="refresh" size={20} color="#fff" />
+                <Text style={styles.generateAgainText}>Generate Again</Text>
+              </LinearGradient>
             </TouchableOpacity>
             
             {imageUrl && (
               <TouchableOpacity
-                style={[styles.downloadButton]}
+                style={styles.downloadButtonContainer}
                 onPress={() => Linking.openURL(imageUrl)}
               >
-                <MaterialIcons name="file-download" size={20} color="#fff" />
-                <Text style={styles.downloadText}>Download</Text>
+                <LinearGradient
+                  colors={['#4F74FF', '#3B5FE3']}
+                  start={{x: 0, y: 0}}
+                  end={{x: 1, y: 0}}
+                  style={styles.downloadButton}
+                >
+                  <MaterialIcons name="file-download" size={20} color="#fff" />
+                  <Text style={styles.downloadText}>Download</Text>
+                </LinearGradient>
               </TouchableOpacity>
             )}
           </Animatable.View>
@@ -363,29 +376,31 @@ const CreateImagesScreen = ({ route, navigation }) => {
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={styles.modalActionButton}
-                onPress={() => {
-                  handleSelectImage(currentViewingImage);
-                }}
+                onPress={() => Linking.openURL(currentViewingImage)}
               >
                 <LinearGradient
-                  colors={['#4F74FF', '#3B5FE3']}
+                  colors={['#8A2387', '#E94057', '#F27121']}
+                  start={{x: 0, y: 0}}
+                  end={{x: 1, y: 0}}
                   style={styles.gradientButton}
                 >
-                  <MaterialIcons name="check" size={20} color="#fff" />
-                  <Text style={styles.modalActionText}>Select Image</Text>
+                  <MaterialIcons name="file-download" size={20} color="#fff" />
+                  <Text style={styles.modalActionText}>Download</Text>
                 </LinearGradient>
               </TouchableOpacity>
               
               <TouchableOpacity
                 style={styles.modalActionButton}
-                onPress={() => Linking.openURL(currentViewingImage)}
+                onPress={() => setModalVisible(false)}
               >
                 <LinearGradient
-                  colors={['#4CAF50', '#3E9142']}
+                  colors={['#4F74FF', '#3B5FE3']}
+                  start={{x: 0, y: 0}}
+                  end={{x: 1, y: 0}}
                   style={styles.gradientButton}
                 >
-                  <MaterialIcons name="file-download" size={20} color="#fff" />
-                  <Text style={styles.modalActionText}>Download</Text>
+                  <MaterialIcons name="close" size={20} color="#fff" />
+                  <Text style={styles.modalActionText}>Close</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -434,24 +449,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#8A8A8A',
-    marginBottom: 4,
+    marginBottom: 8,
     letterSpacing: 1,
   },
   promptBox: {
-    padding: 12,
+    padding: 16,
     borderRadius: 12,
-    minHeight: 60,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
   promptText: {
     fontSize: 16,
-    color: '#E66902',
-    fontWeight: '500',
+    color: '#00A1F7FF',
+    fontWeight: '600',
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   loadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 30,
-   
   },
   loadingIndicator: {
     alignItems: 'center',
@@ -462,7 +483,6 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-  
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -539,35 +559,46 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 32,
     marginBottom: 8,
+    paddingHorizontal: 16,
   },
-  tryAgainButton: {
+  generateAgainButtonContainer: {
+    flex: 1,
+    maxWidth: 160,
+    marginHorizontal: 8,
+    borderRadius: 25,
+    overflow: 'hidden',
+  },
+  generateAgainButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: "rgba(255,255,255,0.9)",
+    justifyContent: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 25,
-    marginHorizontal: 8,
+    paddingHorizontal: 16,
   },
-  tryAgainText: {
-    color: "#000000",
-    fontSize: 16,
-    fontWeight: '500',
+  generateAgainText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: '600',
     marginLeft: 8,
+  },
+  downloadButtonContainer: {
+    flex: 1,
+    maxWidth: 160,
+    marginHorizontal: 8,
+    borderRadius: 25,
+    overflow: 'hidden',
   },
   downloadButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: "#4F74FF",
+    justifyContent: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 25,
-    marginHorizontal: 8,
+    paddingHorizontal: 16,
   },
   downloadText: {
     color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 15,
+    fontWeight: '600',
     marginLeft: 8,
   },
   modalContainer: {
@@ -612,11 +643,14 @@ const styles = StyleSheet.create({
   },
   modalActions: {
     padding: 16,
-    alignItems: 'center',
+    paddingBottom: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
   },
   modalActionButton: {
-    width: '80%',
-    marginBottom: 10,
+    flex: 1,
+    maxWidth: 150,
+    marginHorizontal: 8,
     borderRadius: 25,
     overflow: 'hidden',
   },
@@ -625,11 +659,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
   },
   modalActionText: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     marginLeft: 8,
   },

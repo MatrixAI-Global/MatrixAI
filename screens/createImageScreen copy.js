@@ -21,13 +21,14 @@ import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import LinearGradient from 'react-native-linear-gradient';
 import * as Animatable from 'react-native-animatable';
 import LottieView from "lottie-react-native";
-
+import { useAuthUser } from '../hooks/useAuthUser';
 const { width, height } = Dimensions.get("window");
 
 const CreateImagesScreen2 = ({ route, navigation }) => {
   const { message } = route.params; // Extract text from params
-  const [imageUrl, setImageUrl] = useState(null); // Store the downloaded image URL
-  const [loading, setLoading] = useState(true); // Track loading state
+  const [imageUrls, setImageUrls] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const { getThemeColors } = useTheme();
   const colors = getThemeColors();
   const [selectedImage, setSelectedImage] = useState(null);
@@ -39,7 +40,8 @@ const CreateImagesScreen2 = ({ route, navigation }) => {
   const loadingDots = useRef(new Animated.Value(0)).current;
   const imageOpacity = useRef(new Animated.Value(0)).current;
   const imageScale = useRef(new Animated.Value(0.95)).current;
-  
+  const { uid } = useAuthUser();
+
   useEffect(() => {
     // Start shimmer animation
     Animated.loop(
@@ -84,48 +86,81 @@ const CreateImagesScreen2 = ({ route, navigation }) => {
     ).start();
   }, [shimmerValue, pulseAnim, loadingDots]);
 
-  useEffect(() => {
-    const fetchAndStoreImage = async () => {
-      try {
-        const storedUrl = await AsyncStorage.getItem("downloadedImageUrl");
-        if (storedUrl) {
-          const url = storedUrl;
-          setImageUrl(url);
-          // Create a grid of 4 images using the same URL
-          setGridImages([url, url, url, url]);
-          setLoading(false);
-          fadeInImage();
-        } else {
-          const response = await axios.post(
-            "https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/generateImage",
-            { text: message, uid: "some-unique-id" },
-            {
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdGdkaGVoeGhnYXJrb252cGZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ2Njg4MTIsImV4cCI6MjA1MDI0NDgxMn0.mY8nx-lKrNXjJxHU7eEja3-fTSELQotOP4aZbxvmNPY`,
-              },
-            }
-          );
-
-          if (response.data.images && response.data.images.length > 0) {
-            const url = response.data.images[0];
-            await AsyncStorage.setItem("downloadedImageUrl", url);
-            setImageUrl(url);
-            // Create a grid of 4 images using the same URL
-            setGridImages([url, url, url, url]);
-            setLoading(false);
-            fadeInImage();
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching image:", error);
+  const fetchAndStoreImages = async (refreshing = false) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Clear stored images if refreshing
+      if (refreshing) {
+        await AsyncStorage.removeItem("generatedImages");
       }
-    };
 
-    if (message) fetchAndStoreImage();
+      // Try to get stored images first (unless refreshing)
+      if (!refreshing) {
+        const storedImages = await AsyncStorage.getItem("generatedImages");
+        if (storedImages) {
+          const parsedImages = JSON.parse(storedImages);
+          setImageUrls(parsedImages);
+          setGridImages(parsedImages.slice(0, 4));
+          
+          // Set images immediately but keep loading state for 1-2 seconds
+          fadeInImage();
+          setTimeout(() => {
+            setLoading(false);
+          }, 1500); // 1.5 seconds delay before hiding skeleton
+          
+          return;
+        }
+      }
+
+      // Fetch new images
+      const response = await axios.post(
+        "https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/generateImage2",
+        { text: message, uid: uid },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdGdkaGVoeGhnYXJrb252cGZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ2Njg4MTIsImV4cCI6MjA1MDI0NDgxMn0.mY8nx-lKrNXjJxHU7eEja3-fTSELQotOP4aZbxvmNPY`,
+          },
+        }
+      );
+
+      if (response.data?.images && response.data.images.length > 0) {
+        // Check if images is an array of objects with url property
+        let imageUrlsArray = [];
+        if (response.data.images[0].url) {
+          // Format is [{url: '...', id: '...', timestamp: '...'}]
+          imageUrlsArray = response.data.images.map(img => img.url);
+        } else {
+          // Format is ['url1', 'url2', etc]
+          imageUrlsArray = response.data.images;
+        }
+
+        await AsyncStorage.setItem("generatedImages", JSON.stringify(imageUrlsArray));
+        setImageUrls(imageUrlsArray);
+        setGridImages(imageUrlsArray.slice(0, 4));
+        
+        // Set images immediately but keep loading state for 1-2 seconds
+        fadeInImage();
+        setTimeout(() => {
+          setLoading(false);
+        }, 1500); // 1.5 seconds delay before hiding skeleton
+      } else {
+        throw new Error("No images returned from API");
+      }
+    } catch (error) {
+      console.error("Error fetching images:", error);
+      setError("Failed to generate images. Please try again.");
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (message) fetchAndStoreImages();
 
     return () => {
-      AsyncStorage.removeItem("downloadedImageUrl");
+      // Don't clear storage on unmount to allow re-opening the screen
     };
   }, [message]);
 
@@ -149,13 +184,13 @@ const CreateImagesScreen2 = ({ route, navigation }) => {
   };
 
   const handleTryAgain = () => {
-    setLoading(true);
-    setImageUrl(null);
     setSelectedImage(null);
     setGridImages([null, null, null, null]);
     // Reset animations
     imageOpacity.setValue(0);
     imageScale.setValue(0.95);
+    // Fetch new images
+    fetchAndStoreImages(true);
   };
 
   // Create shimmer interpolation
@@ -219,11 +254,45 @@ const CreateImagesScreen2 = ({ route, navigation }) => {
             colors={[colors.card, colors.card + '80']}
             style={styles.promptBox}
           >
-            <Text style={[styles.promptText, {color: colors.text}]}>{message}</Text>
+            <Text style={[styles.promptText, {color: '#E66902'}]}>{message}</Text>
           </LinearGradient>
         </Animatable.View>
 
-        {loading ? (
+        {/* Always render the images, even during loading */}
+        <Animated.View 
+          style={[
+            styles.gridContainer, 
+            { opacity: imageOpacity, display: gridImages[0] ? 'flex' : 'none' }
+          ]}
+        >
+          {gridImages.map((imageUrl, index) => (
+            imageUrl && (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.imageBox,
+                  selectedImage === imageUrl && styles.selectedBox,
+                ]}
+                onPress={() => imageUrl && handleSelectImage(imageUrl)}
+                disabled={loading}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={{ uri: imageUrl }}
+                  style={styles.image}
+                  resizeMode="cover"
+                />
+                {selectedImage === imageUrl && (
+                  <View style={styles.selectedOverlay}>
+                    <MaterialIcons name="check-circle" size={28} color="#fff" />
+                  </View>
+                )}
+              </TouchableOpacity>
+            )
+          ))}
+        </Animated.View>
+
+        {loading && (
           <>
             <Animatable.View 
               animation="fadeIn" 
@@ -233,11 +302,11 @@ const CreateImagesScreen2 = ({ route, navigation }) => {
               <View style={styles.loadingIndicator}>
                 <Animated.View style={[styles.pulseCircle, { transform: [{ scale: pulseAnim }] }]}>
                   <LottieView
-            source={require('../assets/image2.json')}
-            autoPlay
-            loop
-            style={{width: '100%', height: 100, backgroundColor: 'transparent'}}
-          />
+                    source={require('../assets/image2.json')}
+                    autoPlay
+                    loop
+                    style={{width: '100%', height: 100, backgroundColor: 'transparent'}}
+                  />
                 </Animated.View>
               </View>
               <Text style={[styles.loadingText, {color: colors.text}]}>{loadingText}</Text>
@@ -248,49 +317,23 @@ const CreateImagesScreen2 = ({ route, navigation }) => {
             
             {renderSkeletonGrid()}
           </>
-        ) : (
-          <Animated.View 
-            style={[
-              styles.gridContainer, 
-              { opacity: imageOpacity }
-            ]}
-          >
-            {Array.from({ length: 4 }).map((_, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[
-                  styles.imageBox,
-                  selectedImage === gridImages[index] && styles.selectedBox,
-                  selectedImage === gridImages[index] && { transform: [{ scale: imageScale }] }
-                ]}
-                onPress={() => gridImages[index] && handleSelectImage(gridImages[index])}
-                disabled={!gridImages[index]}
-                activeOpacity={0.7}
-              >
-                {gridImages[index] ? (
-                  <React.Fragment>
-                    <Image
-                      source={{ uri: gridImages[index] }}
-                      style={styles.image}
-                      resizeMode="cover"
-                    />
-                    {selectedImage === gridImages[index] && (
-                      <View style={styles.selectedOverlay}>
-                        <MaterialIcons name="check-circle" size={28} color="#fff" />
-                      </View>
-                    )}
-                  </React.Fragment>
-                ) : (
-                  <View style={styles.placeholderContainer}>
-                    <MaterialIcons name="image-not-supported" size={32} color="#555" />
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
-          </Animated.View>
         )}
 
-        {!loading && (
+        {error && !loading && (
+          <View style={styles.errorContainer}>
+            <MaterialIcons name="error-outline" size={48} color="#E66902" />
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity 
+              style={styles.tryAgainButton} 
+              onPress={handleTryAgain}
+            >
+              <MaterialIcons name="refresh" size={20} color="#000" />
+              <Text style={styles.tryAgainText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {!loading && !error && (
           <Animatable.View 
             animation="fadeInUp" 
             duration={600}
@@ -386,7 +429,6 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-   
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -495,6 +537,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     marginLeft: 8,
+  },
+  errorContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    marginTop: 16,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#E66902',
+    textAlign: 'center',
+    marginVertical: 16,
   },
 });
 

@@ -90,6 +90,7 @@ import { ProfileUpdateProvider } from './context/ProfileUpdateContext.js';
 import HumaniseTextScreen from './screens/HumaniseTextScreen';
 import DetectAIScreen from './screens/DetectAIScreen';
 import ContentWriterScreen from './screens/ContentWriterScreen';
+import StoriesScreen from './screens/StoriesScreen.js';
 
 const Stack = createStackNavigator();
 
@@ -463,6 +464,12 @@ const App = () => {
                                     <Stack.Screen 
                                         name="ContentWriterScreen" 
                                         component={ContentWriterScreen} 
+                                        options={{ headerShown: false }} 
+                                    />
+
+                                     <Stack.Screen 
+                                        name="Stories" 
+                                        component={StoriesScreen}
                                         options={{ headerShown: false }} 
                                     />
                                    

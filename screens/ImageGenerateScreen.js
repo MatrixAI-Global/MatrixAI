@@ -45,15 +45,18 @@ const ImageGenerateScreen = () => {
   const [imageHistory, setImageHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [hasMoreImages, setHasMoreImages] = useState(false);
+  const imagesPerPage = 10;
   
   // Fetch image history when history panel is opened
   useEffect(() => {
     if (historyOpen && uid) {
-      fetchImageHistory();
+      fetchImageHistory(1);
     }
   }, [historyOpen, uid]);
 
-  const fetchImageHistory = async () => {
+  const fetchImageHistory = async (page = 1) => {
     if (!uid) return;
     
     setIsLoading(true);
@@ -61,7 +64,7 @@ const ImageGenerateScreen = () => {
     
     try {
       const response = await fetch(
-        `https://matrix-server.vercel.app/getGeneratedImage?uid=${uid}`,
+        `https://matrix-server.vercel.app/getGeneratedImage?uid=${uid}&page=${page}&limit=${imagesPerPage}`,
         {
           headers: {
             'Content-Type': 'application/json'
@@ -74,11 +77,74 @@ const ImageGenerateScreen = () => {
       }
       
       const result = await response.json();
-      setImageHistory(result.data || []);
+      const newImages = result.data || [];
+      
+      if (page === 1) {
+        setImageHistory(newImages);
+      } else {
+        setImageHistory(prev => [...prev, ...newImages]);
+      }
+      
+      setHistoryPage(page);
+      setHasMoreImages(newImages.length >= imagesPerPage);
     } catch (err) {
       console.error('Error fetching image history:', err);
       setError(err.message);
     } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadMoreImages = () => {
+    if (!isLoading && hasMoreImages) {
+      fetchImageHistory(historyPage + 1);
+    }
+  };
+  
+  const handleRemoveImage = async (imageId) => {
+    if (!uid || !imageId) return;
+    
+    try {
+      Alert.alert(
+        "Remove Image",
+        "Are you sure you want to remove this image?",
+        [
+          {
+            text: "Cancel",
+            style: "cancel"
+          },
+          {
+            text: "Remove",
+            onPress: async () => {
+              setIsLoading(true);
+              const response = await fetch(
+                'https://matrix-server.vercel.app/removeImage',
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    uid: uid,
+                    image_id: imageId
+                  })
+                }
+              );
+              
+              if (!response.ok) {
+                throw new Error('Failed to remove image');
+              }
+              
+              // Remove the image from the local state
+              setImageHistory(prev => prev.filter(img => img.image_id !== imageId));
+              setIsLoading(false);
+            }
+          }
+        ]
+      );
+    } catch (err) {
+      console.error('Error removing image:', err);
+      Alert.alert('Error', 'Failed to remove the image. Please try again.');
       setIsLoading(false);
     }
   };
@@ -153,6 +219,12 @@ const ImageGenerateScreen = () => {
           {item.prompt_text}
         </Text>
         <View style={styles.historyActions}>
+          <TouchableOpacity 
+            style={styles.historyActionButton}
+            onPress={() => handleRemoveImage(item.image_id)}
+          >
+            <MaterialIcons name="delete" size={20} color="#ff6b6b" />
+          </TouchableOpacity>
           <TouchableOpacity 
             style={styles.historyActionButton}
             onPress={() => handleDownloadImage(item.image_url)}
@@ -265,12 +337,14 @@ const ImageGenerateScreen = () => {
             <Image source={require('../assets/back.png')} style={[styles.headerIcon, {tintColor: colors.text}]} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, {color: colors.text}]}>Matrix AI</Text>
-          <TouchableOpacity 
-            style={[styles.historyButton]} 
-            onPress={toggleHistory}
-          >
-          <MaterialIcons name="history" size={24} color={colors.text} />
-          </TouchableOpacity>
+          {!isFinished && (
+            <TouchableOpacity 
+              style={[styles.historyButton]} 
+              onPress={toggleHistory}
+            >
+              <MaterialIcons name="history" size={24} color={colors.text} />
+            </TouchableOpacity>
+          )}
         </Animated.View>
         
         <Animated.View style={[styles.placeholderContainer, { opacity: fadeAnim }]}>
@@ -292,7 +366,10 @@ const ImageGenerateScreen = () => {
         {/* Buttons */}
         {isFinished && (
           <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.generateButton2} onPress={handleGenerate}>
+            <TouchableOpacity 
+              style={[styles.generateButton, { backgroundColor: colors.primary }]} 
+              onPress={handleGenerate}
+            >
               <View style={styles.horizontalContent}>
                 <View style={styles.generateContent}>
                   <Text style={styles.generateText}>Generate</Text>
@@ -305,7 +382,10 @@ const ImageGenerateScreen = () => {
               </View>
             </TouchableOpacity>
           
-            <TouchableOpacity style={styles.generateButton} onPress={handleGenerate2}>
+            <TouchableOpacity 
+              style={[styles.generateButton, { backgroundColor: colors.secondary }]} 
+              onPress={handleGenerate2}
+            >
               <View style={styles.horizontalContent}>
                 <View style={styles.generateContent}>
                   <Text style={styles.generateText}>Generate IV</Text>
@@ -372,7 +452,7 @@ const ImageGenerateScreen = () => {
           </TouchableOpacity>
         </View>
         
-        {isLoading ? (
+        {isLoading && historyPage === 1 ? (
           <View style={styles.loaderContainer}>
             <ActivityIndicator size="large" color="#007BFF" />
             <Text style={styles.loaderText}>Loading your images...</Text>
@@ -382,7 +462,7 @@ const ImageGenerateScreen = () => {
             <Text style={styles.errorText}>{error}</Text>
             <TouchableOpacity 
               style={styles.retryButton}
-              onPress={fetchImageHistory}
+              onPress={() => fetchImageHistory(1)}
             >
               <Text style={styles.retryText}>Retry</Text>
             </TouchableOpacity>
@@ -392,13 +472,32 @@ const ImageGenerateScreen = () => {
             <Text style={styles.emptyText}>No images generated yet</Text>
           </View>
         ) : (
-          <FlatList
-            data={imageHistory}
-            renderItem={renderHistoryItem}
-            keyExtractor={item => item.image_id}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.historyList}
-          />
+          <>
+            <FlatList
+              data={imageHistory}
+              renderItem={renderHistoryItem}
+              keyExtractor={item => item.image_id}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.historyList}
+              onEndReached={loadMoreImages}
+              onEndReachedThreshold={0.5}
+              ListFooterComponent={
+                hasMoreImages ? (
+                  <TouchableOpacity 
+                    style={styles.viewMoreButton}
+                    onPress={loadMoreImages}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.viewMoreText}>View More</Text>
+                    )}
+                  </TouchableOpacity>
+                ) : null
+              }
+            />
+          </>
         )}
       </Animated.View>
     </View>
@@ -552,11 +651,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   generateButton: {
-    backgroundColor: '#007BFF',
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 25,
     marginHorizontal: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   generateButton2: {
     backgroundColor: '#FF6600FF',
@@ -693,6 +796,19 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.6)',
     fontSize: 16,
     textAlign: 'center',
+  },
+  viewMoreButton: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingVertical: 10,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 15,
+  },
+  viewMoreText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
 

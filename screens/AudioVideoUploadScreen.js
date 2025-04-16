@@ -1365,9 +1365,9 @@ const AudioVideoUploadScreen = () => {
         )}
             {/* Add File Floating Button */}
           
-            <TouchableOpacity style={[styles.floatingButton]} onPress={handleFloatingButtonPress}>
+            {/* <TouchableOpacity style={[styles.floatingButton]} onPress={handleFloatingButtonPress}>
                 <Image source={micIcon} style={[styles.floatingButtonIcon]} />
-            </TouchableOpacity>
+            </TouchableOpacity> */}
     
     
             {popupVisible && (

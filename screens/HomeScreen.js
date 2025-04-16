@@ -263,95 +263,100 @@ const HomeScreen = () => {
       >
         {/* Hero Banner with professional design */}
         <View style={styles.heroSection}>
-          <LinearGradient
-            colors={getHeroBgColors()}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.heroBg}
+          <TouchableOpacity 
+            activeOpacity={0.9}
+            onPress={() => navigation.navigate('Stories')}
           >
-            {/* Decorative elements */}
-            <Animated.View 
-              style={[
-                styles.heroCircle1, 
-                { 
-                  opacity: 0.1, 
-                  transform: [{ rotate: spin }],
-                  borderColor: colors.primary
-                }
-              ]}
-            />
-            <Animated.View 
-              style={[
-                styles.heroCircle2, 
-                { 
-                  opacity: 0.15, 
-                  transform: [{ rotate: spin }],
-                  borderColor: currentTheme === 'dark' ? colors.secondary : colors.primary
-                }
-              ]}
-            />
-            
-            {/* Hero Content */}
-            <View style={styles.heroContentContainer}>
-              <View style={styles.heroTextContainer}>
-                <Animated.Text 
-                  style={[
-                    styles.heroTitle,
-                    { 
-                      color: colors.text,
-                      opacity: heroTextOpacity,
-                      transform: [{ translateY: heroTextTranslateY }]
-                    }
-                  ]}
-                >
-                  MatrixAI
-                </Animated.Text>
-                
-                <Animated.Text 
-                  style={[
-                    styles.heroSubtitle,
-                    { 
-                      color: currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(60, 60, 67, 0.7)',
-                      opacity: heroTextOpacity,
-                      transform: [{ translateY: heroTextTranslateY }]
-                    }
-                  ]}
-                >
-                  {t('futureOfAI')}
-                </Animated.Text>
-              </View>
-              
+            <LinearGradient
+              colors={getHeroBgColors()}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.heroBg}
+            >
+              {/* Decorative elements */}
               <Animated.View 
                 style={[
-                  styles.heroImageContainer,
-                  {
-                    opacity: heroTextOpacity,
-                    transform: [{ translateY: heroTextTranslateY }]
+                  styles.heroCircle1, 
+                  { 
+                    opacity: 0.1, 
+                    transform: [{ rotate: spin }],
+                    borderColor: colors.primary
                   }
                 ]}
-              >
-                <View style={styles.heroLogoContainer}>
-                  <LinearGradient
-                    colors={currentTheme === 'dark' ? [colors.primary, colors.secondary] : [colors.primary, '#4A00E0']}
-                    style={styles.heroLogoBg}
-                  >
-                    <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-                      <FontAwesome5 name="robot" size={42} color="#FFFFFF" />
-                    </Animated.View>
-                  </LinearGradient>
-                  <Animated.View 
+              />
+              <Animated.View 
+                style={[
+                  styles.heroCircle2, 
+                  { 
+                    opacity: 0.15, 
+                    transform: [{ rotate: spin }],
+                    borderColor: currentTheme === 'dark' ? colors.secondary : colors.primary
+                  }
+                ]}
+              />
+              
+              {/* Hero Content */}
+              <View style={styles.heroContentContainer}>
+                <View style={styles.heroTextContainer}>
+                  <Animated.Text 
                     style={[
-                      styles.heroLogoRing, 
+                      styles.heroTitle,
                       { 
-                        transform: [{ rotate: spin }],
-                        borderColor: currentTheme === 'dark' ? `rgba(${parseInt(colors.primary.slice(1, 3), 16)}, ${parseInt(colors.primary.slice(3, 5), 16)}, ${parseInt(colors.primary.slice(5, 7), 16)}, 0.3)` : 'rgba(74, 0, 224, 0.3)'
+                        color: colors.text,
+                        opacity: heroTextOpacity,
+                        transform: [{ translateY: heroTextTranslateY }]
                       }
                     ]}
-                  />
+                  >
+                    MatrixAI
+                  </Animated.Text>
+                  
+                  <Animated.Text 
+                    style={[
+                      styles.heroSubtitle,
+                      { 
+                        color: currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(60, 60, 67, 0.7)',
+                        opacity: heroTextOpacity,
+                        transform: [{ translateY: heroTextTranslateY }]
+                      }
+                    ]}
+                  >
+                    {t('futureOfAI')}
+                  </Animated.Text>
                 </View>
-              </Animated.View>
-            </View>
-          </LinearGradient>
+                
+                <Animated.View 
+                  style={[
+                    styles.heroImageContainer,
+                    {
+                      opacity: heroTextOpacity,
+                      transform: [{ translateY: heroTextTranslateY }]
+                    }
+                  ]}
+                >
+                  <View style={styles.heroLogoContainer}>
+                    <LinearGradient
+                      colors={currentTheme === 'dark' ? [colors.primary, colors.secondary] : [colors.primary, '#4A00E0']}
+                      style={styles.heroLogoBg}
+                    >
+                      <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                        <FontAwesome5 name="robot" size={42} color="#FFFFFF" />
+                      </Animated.View>
+                    </LinearGradient>
+                    <Animated.View 
+                      style={[
+                        styles.heroLogoRing, 
+                        { 
+                          transform: [{ rotate: spin }],
+                          borderColor: currentTheme === 'dark' ? `rgba(${parseInt(colors.primary.slice(1, 3), 16)}, ${parseInt(colors.primary.slice(3, 5), 16)}, ${parseInt(colors.primary.slice(5, 7), 16)}, 0.3)` : 'rgba(74, 0, 224, 0.3)'
+                        }
+                      ]}
+                    />
+                  </View>
+                </Animated.View>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
 
         {/* Tools Section with improved layout */}

@@ -16,7 +16,8 @@ import {
   Keyboard,
   Platform,
   StatusBar,
-  PixelRatio
+  PixelRatio,
+  Alert
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -28,6 +29,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { BlurView } from '@react-native-community/blur';
+import axios from 'axios';
 
 const { width, height } = Dimensions.get('window');
 const scale = Math.min(width / 375, height / 812); // Base scale on iPhone X dimensions for consistency
@@ -185,52 +187,149 @@ const DetectAIScreen = () => {
     
     setIsAnalyzing(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      // Generate a random score for demo purposes
-      // In a real app, this would be from an ML model API
-      const aiProbability = Math.random();
+    // Create a prompt specifically for AI text detection
+    const prompt = `Analyze the following text and determine if it was written by AI or a human. 
+    Provide a detailed analysis with a score from 0 to 1 where 1 means definitely AI-generated and 0 means definitely human-written.
+    Also evaluate for: repetitive patterns, natural language flow, stylistic consistency, and unique expressions.
+    Format your response as JSON with the following structure:
+    {
+      "aiProbability": 0.7, 
+      "humanProbability": 0.3,
+      "features": [
+        {"name": "Repetitive patterns", "score": 0.8},
+        {"name": "Natural language flow", "score": 0.3},
+        {"name": "Stylistic consistency", "score": 0.6},
+        {"name": "Unique expressions", "score": 0.2}
+      ]
+    }
+    
+    Text to analyze: "${inputText}"`;
+
+    // Make API call to matrix-server
+    axios.post('https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/createContent', {
+      prompt: prompt
+    }, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+    .then(response => {
+      // Extract the response and parse the JSON
+      const aiOutput = response.data.output.text;
       
-      const result = {
-        text: inputText,
-        aiProbability,
-        humanProbability: 1 - aiProbability,
-        features: [
-          { name: 'Repetitive patterns', score: Math.random() * 0.3 + (aiProbability > 0.5 ? 0.6 : 0.2) },
-          { name: 'Natural language flow', score: Math.random() * 0.3 + (aiProbability < 0.5 ? 0.6 : 0.2) },
-          { name: 'Stylistic consistency', score: Math.random() * 0.5 + 0.3 },
-          { name: 'Unique expressions', score: Math.random() * 0.3 + (aiProbability < 0.5 ? 0.6 : 0.2) },
-        ]
-      };
-      
-      setAnalysisResult(result);
+      // Try to extract JSON from the response
+      let jsonMatch;
+      try {
+        // Look for JSON object in the response
+        jsonMatch = aiOutput.match(/\{[\s\S]*\}/);
+        const jsonStr = jsonMatch ? jsonMatch[0] : null;
+        
+        // Parse the JSON
+        const resultData = jsonStr ? JSON.parse(jsonStr) : null;
+        
+        if (resultData && resultData.aiProbability !== undefined) {
+          const result = {
+            text: inputText,
+            aiProbability: resultData.aiProbability,
+            humanProbability: resultData.humanProbability || (1 - resultData.aiProbability),
+            features: resultData.features || [
+              { name: 'Repetitive patterns', score: Math.random() * 0.3 + (resultData.aiProbability > 0.5 ? 0.6 : 0.2) },
+              { name: 'Natural language flow', score: Math.random() * 0.3 + (resultData.aiProbability < 0.5 ? 0.6 : 0.2) },
+              { name: 'Stylistic consistency', score: Math.random() * 0.5 + 0.3 },
+              { name: 'Unique expressions', score: Math.random() * 0.3 + (resultData.aiProbability < 0.5 ? 0.6 : 0.2) }
+            ]
+          };
+          
+          setAnalysisResult(result);
+          
+          // Add to history
+          const newHistoryItem = {
+            id: Date.now().toString(),
+            text: inputText,
+            aiProbability: result.aiProbability,
+            date: 'Just now'
+          };
+          
+          setHistoryItems([newHistoryItem, ...historyItems]);
+          
+          // Animate result appearance
+          Animated.parallel([
+            Animated.timing(resultOpacity, {
+              toValue: 1,
+              duration: 500,
+              useNativeDriver: true,
+            }),
+            Animated.timing(meterAnim, {
+              toValue: result.aiProbability,
+              duration: 1000,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: false,
+            })
+          ]).start();
+        } else {
+          throw new Error('Invalid response format');
+        }
+      } catch (error) {
+        console.error('Error parsing API response:', error);
+        // Fallback to random data if parsing fails
+        handleFallbackAnalysis();
+      }
+    })
+    .catch(error => {
+      console.error('Error calling AI API:', error);
+      // Use fallback if API call fails
+      handleFallbackAnalysis();
+    })
+    .finally(() => {
       setIsAnalyzing(false);
-      
-      // Add to history
-      const newHistoryItem = {
-        id: Date.now().toString(),
-        text: inputText,
-        aiProbability: result.aiProbability,
-        date: 'Just now'
-      };
-      
-      setHistoryItems([newHistoryItem, ...historyItems]);
-      
-      // Animate result appearance
-      Animated.parallel([
-        Animated.timing(resultOpacity, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(meterAnim, {
-          toValue: result.aiProbability,
-          duration: 1000,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: false,
-        })
-      ]).start();
-    }, 2000);
+    });
+  };
+  
+  // Fallback function in case the API call fails
+  const handleFallbackAnalysis = () => {
+    // Generate a random score for demo purposes as fallback
+    const aiProbability = Math.random();
+    
+    const result = {
+      text: inputText,
+      aiProbability,
+      humanProbability: 1 - aiProbability,
+      features: [
+        { name: 'Repetitive patterns', score: Math.random() * 0.3 + (aiProbability > 0.5 ? 0.6 : 0.2) },
+        { name: 'Natural language flow', score: Math.random() * 0.3 + (aiProbability < 0.5 ? 0.6 : 0.2) },
+        { name: 'Stylistic consistency', score: Math.random() * 0.5 + 0.3 },
+        { name: 'Unique expressions', score: Math.random() * 0.3 + (aiProbability < 0.5 ? 0.6 : 0.2) },
+      ]
+    };
+    
+    setAnalysisResult(result);
+    
+    // Add to history
+    const newHistoryItem = {
+      id: Date.now().toString(),
+      text: inputText,
+      aiProbability: result.aiProbability,
+      date: 'Just now'
+    };
+    
+    setHistoryItems([newHistoryItem, ...historyItems]);
+    
+    // Animate result appearance
+    Animated.parallel([
+      Animated.timing(resultOpacity, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(meterAnim, {
+        toValue: result.aiProbability,
+        duration: 1000,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      })
+    ]).start();
+    
+    Alert.alert('Notice', 'Using fallback analysis as API call failed. Results are simulated.');
   };
   
   const handleReset = () => {

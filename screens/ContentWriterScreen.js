@@ -28,6 +28,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Clipboard from '@react-native-clipboard/clipboard';
 import Share from 'react-native-share';
+import axios from 'axios';
 
 const { width, height } = Dimensions.get('window');
 const scale = Math.min(width / 375, height / 812); // Base scale on iPhone X dimensions for consistency
@@ -206,33 +207,42 @@ const ContentWriterScreen = () => {
     
     setIsGenerating(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      // Generate content based on type
-      let result = '';
-      
-      switch(contentType) {
-        case 'article':
-          result = `# ${prompt}\n\nIn recent years, the topic of ${prompt.toLowerCase()} has gained significant attention across various sectors. This article explores the key aspects and implications of this important subject.\n\n## Background\n\nThe concept of ${prompt.toLowerCase()} first emerged in the early 2000s when researchers began exploring its potential applications. Since then, it has evolved considerably, incorporating new methodologies and approaches.\n\n## Key Benefits\n\n- Improved efficiency and productivity\n- Enhanced decision-making capabilities\n- Greater accessibility and inclusivity\n- Reduced operational costs\n\n## Future Outlook\n\nAs we look ahead, ${prompt.toLowerCase()} is likely to continue its trajectory of innovation and development. Experts predict that we will see even more sophisticated implementations in the coming years.`;
-          break;
-        case 'email':
-          result = `Subject: Regarding ${prompt}\n\nDear [Recipient],\n\nI hope this email finds you well. I am writing to discuss ${prompt.toLowerCase()} and its potential impact on our ongoing projects.\n\nRecently, our team has been exploring various approaches to address the challenges related to this matter. We believe that a collaborative strategy would yield the most favorable outcomes.\n\nWould you be available for a brief meeting next week to discuss this further? Your insights would be invaluable to our planning process.\n\nThank you for your consideration, and I look forward to your response.\n\nBest regards,\n[Your Name]`;
-          break;
-        case 'blog':
-          result = `# ${prompt}: A Comprehensive Guide\n\n![Featured Image](https://example.com/image.jpg)\n\n## Introduction\n\nWelcome to our comprehensive guide on ${prompt.toLowerCase()}! In this blog post, we'll explore everything you need to know about this fascinating topic, from its fundamentals to advanced applications.\n\n## Why This Matters\n\nIn today's rapidly evolving landscape, understanding ${prompt.toLowerCase()} is more important than ever. It affects how we approach problems, make decisions, and plan for the future.\n\n## Getting Started\n\nIf you're new to ${prompt.toLowerCase()}, here are some basic concepts to help you get started:\n\n1. Understand the core principles\n2. Familiarize yourself with key terminology\n3. Explore practical applications\n4. Connect with the community\n\n## Conclusion\n\nAs we've seen, ${prompt.toLowerCase()} offers tremendous potential for innovation and growth. By staying informed and engaged, you can leverage its benefits for your personal and professional development.\n\n## Share Your Thoughts\n\nHave you had experience with ${prompt.toLowerCase()}? Share your thoughts and questions in the comments section below!`;
-          break;
-        case 'social':
-          result = `📣 Just published a new piece on ${prompt}! \n\nKey takeaways:\n• Understanding the fundamentals is crucial\n• Implementation can lead to 30% better outcomes\n• Start small and scale gradually\n\nCheck out the full post here: [link] #${prompt.replace(/\s+/g, '')} #Innovation`;
-          break;
-        case 'marketing':
-          result = `# ${prompt} - Transform Your Approach Today\n\n## Are you struggling with conventional methods?\n\nIntroducing our revolutionary approach to ${prompt.toLowerCase()} - designed to help you achieve unprecedented results with minimal effort.\n\n## Key Features:\n\n✅ Streamlined implementation process\n✅ Customizable to your specific needs\n✅ Comprehensive analytics and reporting\n✅ Expert support team available 24/7\n\n## Limited Time Offer\n\nSign up today and receive a 20% discount on our premium package! Use code: ${prompt.replace(/\s+/g, '').toUpperCase()}20\n\n## Testimonials\n\n"Implementing this solution transformed our business completely!" - John D., CEO\n\n"The results exceeded our expectations by 200%" - Sarah L., Marketing Director\n\n## Contact Us\n\nReady to transform your approach to ${prompt.toLowerCase()}? Contact our team at info@example.com or call (555) 123-4567`;
-          break;
-        default:
-          result = `Content about ${prompt}`;
+    // Create a detailed prompt for content generation based on the selected type
+    let contentPrompt;
+    
+    switch(contentType) {
+      case 'article':
+        contentPrompt = `Write a professional article about "${prompt}". Include headings, subheadings, and bullet points where appropriate. The article should be well-structured, informative, and engaging.`;
+        break;
+      case 'email':
+        contentPrompt = `Write a professional email about "${prompt}". Include a subject line, greeting, body, and closing. The email should be clear, concise, and professional.`;
+        break;
+      case 'blog':
+        contentPrompt = `Write an engaging blog post about "${prompt}". Include a catchy title, introduction, main points with headings, and a conclusion. Make it conversational and include a call to action at the end.`;
+        break;
+      case 'social':
+        contentPrompt = `Create a social media post about "${prompt}". Keep it concise, engaging, and include relevant hashtags. Make it engaging and shareable, with clear key points.`;
+        break;
+      case 'marketing':
+        contentPrompt = `Create marketing copy for "${prompt}". Include a compelling headline, key benefits, features, testimonials, and a strong call to action. Make it persuasive and focused on value.`;
+        break;
+      default:
+        contentPrompt = `Write content about "${prompt}".`;
+    }
+    
+    // Make API call to matrix-server
+    axios.post('https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/createContent', {
+      prompt: contentPrompt
+    }, {
+      headers: {
+        'Content-Type': 'application/json'
       }
+    })
+    .then(response => {
+      // Extract the response
+      const result = response.data.output.text.trim();
       
       setGeneratedContent(result);
-      setIsGenerating(false);
       
       // Add to history
       const newHistoryItem = {
@@ -258,7 +268,72 @@ const ContentWriterScreen = () => {
           useNativeDriver: true,
         })
       ]).start();
-    }, 3000);
+    })
+    .catch(error => {
+      console.error('Error generating content:', error);
+      Alert.alert('Error', 'Failed to generate content. Please try again.');
+      
+      // Fallback to template content if API fails
+      handleFallbackGeneration();
+    })
+    .finally(() => {
+      setIsGenerating(false);
+    });
+  };
+  
+  // Fallback function for content generation if API fails
+  const handleFallbackGeneration = () => {
+    // Generate content based on type
+    let result = '';
+    
+    switch(contentType) {
+      case 'article':
+        result = `# ${prompt}\n\nIn recent years, the topic of ${prompt.toLowerCase()} has gained significant attention across various sectors. This article explores the key aspects and implications of this important subject.\n\n## Background\n\nThe concept of ${prompt.toLowerCase()} first emerged in the early 2000s when researchers began exploring its potential applications. Since then, it has evolved considerably, incorporating new methodologies and approaches.\n\n## Key Benefits\n\n- Improved efficiency and productivity\n- Enhanced decision-making capabilities\n- Greater accessibility and inclusivity\n- Reduced operational costs\n\n## Future Outlook\n\nAs we look ahead, ${prompt.toLowerCase()} is likely to continue its trajectory of innovation and development. Experts predict that we will see even more sophisticated implementations in the coming years.`;
+        break;
+      case 'email':
+        result = `Subject: Regarding ${prompt}\n\nDear [Recipient],\n\nI hope this email finds you well. I am writing to discuss ${prompt.toLowerCase()} and its potential impact on our ongoing projects.\n\nRecently, our team has been exploring various approaches to address the challenges related to this matter. We believe that a collaborative strategy would yield the most favorable outcomes.\n\nWould you be available for a brief meeting next week to discuss this further? Your insights would be invaluable to our planning process.\n\nThank you for your consideration, and I look forward to your response.\n\nBest regards,\n[Your Name]`;
+        break;
+      case 'blog':
+        result = `# ${prompt}: A Comprehensive Guide\n\n![Featured Image](https://example.com/image.jpg)\n\n## Introduction\n\nWelcome to our comprehensive guide on ${prompt.toLowerCase()}! In this blog post, we'll explore everything you need to know about this fascinating topic, from its fundamentals to advanced applications.\n\n## Why This Matters\n\nIn today's rapidly evolving landscape, understanding ${prompt.toLowerCase()} is more important than ever. It affects how we approach problems, make decisions, and plan for the future.\n\n## Getting Started\n\nIf you're new to ${prompt.toLowerCase()}, here are some basic concepts to help you get started:\n\n1. Understand the core principles\n2. Familiarize yourself with key terminology\n3. Explore practical applications\n4. Connect with the community\n\n## Conclusion\n\nAs we've seen, ${prompt.toLowerCase()} offers tremendous potential for innovation and growth. By staying informed and engaged, you can leverage its benefits for your personal and professional development.\n\n## Share Your Thoughts\n\nHave you had experience with ${prompt.toLowerCase()}? Share your thoughts and questions in the comments section below!`;
+        break;
+      case 'social':
+        result = `📣 Just published a new piece on ${prompt}! \n\nKey takeaways:\n• Understanding the fundamentals is crucial\n• Implementation can lead to 30% better outcomes\n• Start small and scale gradually\n\nCheck out the full post here: [link] #${prompt.replace(/\s+/g, '')} #Innovation`;
+        break;
+      case 'marketing':
+        result = `# ${prompt} - Transform Your Approach Today\n\n## Are you struggling with conventional methods?\n\nIntroducing our revolutionary approach to ${prompt.toLowerCase()} - designed to help you achieve unprecedented results with minimal effort.\n\n## Key Features:\n\n✅ Streamlined implementation process\n✅ Customizable to your specific needs\n✅ Comprehensive analytics and reporting\n✅ Expert support team available 24/7\n\n## Limited Time Offer\n\nSign up today and receive a 20% discount on our premium package! Use code: ${prompt.replace(/\s+/g, '').toUpperCase()}20\n\n## Testimonials\n\n"Implementing this solution transformed our business completely!" - John D., CEO\n\n"The results exceeded our expectations by 200%" - Sarah L., Marketing Director\n\n## Contact Us\n\nReady to transform your approach to ${prompt.toLowerCase()}? Contact our team at info@example.com or call (555) 123-4567`;
+        break;
+      default:
+        result = `Content about ${prompt}`;
+    }
+    
+    setGeneratedContent(result);
+    
+    // Add to history
+    const newHistoryItem = {
+      id: Date.now().toString(),
+      prompt: prompt,
+      content: result,
+      type: contentType,
+      date: 'Just now'
+    };
+    
+    setHistoryItems([newHistoryItem, ...historyItems]);
+    
+    // Animate result appearance
+    Animated.parallel([
+      Animated.timing(resultOpacity, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(resultTranslateY, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      })
+    ]).start();
+    
+    Alert.alert('Notice', 'Using template content as API call failed.');
   };
   
   const handleClearForm = () => {
@@ -291,28 +366,54 @@ const ContentWriterScreen = () => {
     }
   };
   
-  const renderContentTypeItem = ({ item }) => (
-    <TouchableOpacity
-      style={[
-        styles.typeItem,
-        contentType === item.id && styles.selectedTypeItem,
-        { backgroundColor: currentTheme === 'dark' ? 'rgba(30, 30, 40, 0.6)' : 'rgba(255, 255, 255, 0.8)' }
-      ]}
-      onPress={() => setContentType(item.id)}
-    >
-      <MaterialCommunityIcons 
-        name={item.icon} 
-        size={normalize(24)} 
-        color={contentType === item.id ? '#FFFFFF' : colors.text} 
-      />
-      <Text style={[
-        styles.typeName,
-        { color: contentType === item.id ? '#FFFFFF' : colors.text }
-      ]}>
-        {item.name}
-      </Text>
-    </TouchableOpacity>
-  );
+  const renderContentTypeItem = ({ item }) => {
+    // Determine the appropriate background color based on content type when selected
+    const selectedColor = item.id === 'email' ? '#2196F3' : 
+                          item.id === 'blog' ? '#4CAF50' : 
+                          item.id === 'social' ? '#9C27B0' : 
+                          item.id === 'marketing' ? '#FF9800' : '#FF6D00';
+    
+    // Apply different styling based on selection state
+    const isSelected = contentType === item.id;
+    
+    return (
+      <TouchableOpacity
+        style={[
+          styles.typeItem,
+          isSelected && [styles.selectedTypeItem, { backgroundColor: selectedColor }],
+          { 
+            backgroundColor: currentTheme === 'dark' ? 'rgba(30, 30, 40, 0.6)' : 'rgba(255, 255, 255, 0.8)',
+            borderWidth: 1,
+            borderColor: isSelected ? selectedColor : 'transparent',
+            transform: isSelected ? [{ scale: 1.05 }] : [{ scale: 1 }]
+          }
+        ]}
+        onPress={() => setContentType(item.id)}
+      >
+        <MaterialCommunityIcons 
+          name={item.icon} 
+          size={normalize(24)} 
+          color={isSelected ? '#FFFFFF' : colors.text} 
+        />
+        <Text style={[
+          styles.typeName,
+          { 
+            color: isSelected ? '#FFFFFF' : colors.text,
+            fontWeight: isSelected ? '600' : '500'
+          }
+        ]}>
+          {item.name}
+        </Text>
+        
+        {/* Add a small indicator for the selected item */}
+        {isSelected && (
+          <View style={styles.selectedIndicator}>
+            <MaterialIcons name="check" size={16} color="#FFFFFF" />
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
   
   const renderHistoryItem = ({ item }) => {
     // For very small screens, we might need to truncate the text more
@@ -898,6 +999,18 @@ const styles = StyleSheet.create({
   emptyHistoryText: {
     fontSize: 16,
     marginTop: 12,
+  },
+  selectedIndicator: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
   },
 });
 

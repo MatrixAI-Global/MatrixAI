@@ -30,6 +30,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Share from 'react-native-share';
 import Clipboard from '@react-native-clipboard/clipboard';
+import axios from 'axios';
 
 const { width, height } = Dimensions.get('window');
 const scale = Math.min(width / 375, height / 812); // Base scale on iPhone X dimensions for consistency
@@ -197,30 +198,39 @@ const HumaniseTextScreen = () => {
     
     setIsProcessing(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      // Example transformation based on tone
-      let result = '';
-      
-      switch(selectedTone) {
-        case 'casual':
-          result = `Hey, just wanted to let you know that ${inputText.toLowerCase()}`;
-          break;
-        case 'formal':
-          result = `I would like to inform you that ${inputText}`;
-          break;
-        case 'friendly':
-          result = `Hi there! ${inputText} Hope that helps! 😊`;
-          break;
-        case 'professional':
-          result = `I'm reaching out regarding ${inputText}. Please let me know if you require any clarification.`;
-          break;
-        default:
-          result = inputText;
+    // Create a detailed prompt for humanising the text based on the selected tone
+    let humanisePrompt;
+    
+    switch(selectedTone) {
+      case 'casual':
+        humanisePrompt = `Rewrite the following text in a casual, conversational tone as if you're talking to a friend. Make it sound natural and human-written, avoiding any AI-like patterns: "${inputText}"`;
+        break;
+      case 'formal':
+        humanisePrompt = `Rewrite the following text in a formal, professional tone suitable for business or academic contexts. Keep it human-sounding while maintaining professionalism: "${inputText}"`;
+        break;
+      case 'friendly':
+        humanisePrompt = `Rewrite the following text in a friendly, warm tone. Add some personality and make it sound like it was written by a human, not AI. You can include emojis where appropriate: "${inputText}"`;
+        break;
+      case 'professional':
+        humanisePrompt = `Rewrite the following text in a professional tone suitable for work environments. Make it sound human-written while maintaining clarity and professionalism: "${inputText}"`;
+        break;
+      default:
+        humanisePrompt = `Rewrite the following text to sound more human and less like AI-generated text: "${inputText}"`;
+    }
+    
+    // Make API call to matrix-server
+    axios.post('https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/createContent', {
+      prompt: humanisePrompt
+    }, {
+      headers: {
+        'Content-Type': 'application/json'
       }
+    })
+    .then(response => {
+      // Extract the response
+      const result = response.data.output.text.trim();
       
       setOutputText(result);
-      setIsProcessing(false);
       setIsFinished(true);
       
       // Add to history
@@ -247,7 +257,70 @@ const HumaniseTextScreen = () => {
           useNativeDriver: true,
         })
       ]).start();
-    }, 2000);
+    })
+    .catch(error => {
+      console.error('Error humanising text:', error);
+      Alert.alert('Error', 'Failed to humanise text. Please try again.');
+      
+      // Fallback to simple transformation if API fails
+      handleFallbackHumanisation();
+    })
+    .finally(() => {
+      setIsProcessing(false);
+    });
+  };
+  
+  // Fallback function for text humanisation if API fails
+  const handleFallbackHumanisation = () => {
+    // Example transformation based on tone
+    let result = '';
+    
+    switch(selectedTone) {
+      case 'casual':
+        result = `Hey, just wanted to let you know that ${inputText.toLowerCase()}`;
+        break;
+      case 'formal':
+        result = `I would like to inform you that ${inputText}`;
+        break;
+      case 'friendly':
+        result = `Hi there! ${inputText} Hope that helps! 😊`;
+        break;
+      case 'professional':
+        result = `I'm reaching out regarding ${inputText}. Please let me know if you require any clarification.`;
+        break;
+      default:
+        result = inputText;
+    }
+    
+    setOutputText(result);
+    setIsFinished(true);
+    
+    // Add to history
+    const newHistoryItem = {
+      id: Date.now().toString(),
+      originalText: inputText,
+      humanisedText: result,
+      tone: selectedTone,
+      date: 'Just now'
+    };
+    
+    setHistoryItems([newHistoryItem, ...historyItems]);
+    
+    // Animate result appearance
+    Animated.parallel([
+      Animated.timing(resultOpacity, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(resultTranslateY, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      })
+    ]).start();
+    
+    Alert.alert('Notice', 'Using simple transformation as API call failed.');
   };
   
   const handleReset = () => {
@@ -281,28 +354,53 @@ const HumaniseTextScreen = () => {
     }
   };
   
-  const renderToneItem = ({ item }) => (
-    <TouchableOpacity
-      style={[
-        styles.toneItem,
-        selectedTone === item.id && styles.selectedToneItem,
-        { backgroundColor: currentTheme === 'dark' ? 'rgba(30, 30, 40, 0.6)' : 'rgba(255, 255, 255, 0.8)' }
-      ]}
-      onPress={() => setSelectedTone(item.id)}
-    >
-      <MaterialCommunityIcons 
-        name={item.icon} 
-        size={normalize(24)} 
-        color={selectedTone === item.id ? '#FFFFFF' : colors.text} 
-      />
-      <Text style={[
-        styles.toneName,
-        { color: selectedTone === item.id ? '#FFFFFF' : colors.text }
-      ]}>
-        {item.name}
-      </Text>
-    </TouchableOpacity>
-  );
+  const renderToneItem = ({ item }) => {
+    // Determine the appropriate background color based on tone when selected
+    const selectedColor = item.id === 'formal' ? '#3F51B5' : 
+                          item.id === 'professional' ? '#2196F3' : 
+                          item.id === 'friendly' ? '#9C27B0' : '#FF9800';
+    
+    // Apply different styling based on selection state
+    const isSelected = selectedTone === item.id;
+    
+    return (
+      <TouchableOpacity
+        style={[
+          styles.toneItem,
+          isSelected && [styles.selectedToneItem, { backgroundColor: selectedColor }],
+          { 
+            backgroundColor: currentTheme === 'dark' ? 'rgba(30, 30, 40, 0.6)' : 'rgba(255, 255, 255, 0.8)',
+            borderWidth: 1,
+            borderColor: isSelected ? selectedColor : 'transparent',
+            transform: isSelected ? [{ scale: 1.05 }] : [{ scale: 1 }]
+          }
+        ]}
+        onPress={() => setSelectedTone(item.id)}
+      >
+        <MaterialCommunityIcons 
+          name={item.icon} 
+          size={normalize(24)} 
+          color={isSelected ? '#FFFFFF' : colors.text} 
+        />
+        <Text style={[
+          styles.toneName,
+          { 
+            color: isSelected ? '#FFFFFF' : colors.text,
+            fontWeight: isSelected ? '600' : '500'
+          }
+        ]}>
+          {item.name}
+        </Text>
+        
+        {/* Add a small indicator for the selected item */}
+        {isSelected && (
+          <View style={styles.selectedIndicator}>
+            <MaterialIcons name="check" size={normalize(14)} color="#FFFFFF" />
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
   
   const renderHistoryItem = ({ item }) => {
     // For very small screens, we might need to truncate the text more
@@ -1206,6 +1304,18 @@ const styles = StyleSheet.create({
     fontSize: normalize(14),
     marginTop: responsiveSpacing(4),
     opacity: 0.7,
+  },
+  selectedIndicator: {
+    position: 'absolute',
+    top: responsiveSpacing(4),
+    right: responsiveSpacing(4),
+    width: responsiveSpacing(18),
+    height: responsiveSpacing(18),
+    borderRadius: responsiveSpacing(9),
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
   },
 });
 

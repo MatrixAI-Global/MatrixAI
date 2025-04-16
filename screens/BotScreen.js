@@ -186,25 +186,36 @@ const decode = (base64) => {
         }
       }
 
+      // Prepare a prompt that includes system content and message history context
+      let userMessageContent = userMessage;
+      
+      // Add system content and conversation history as context
+      if (systemContent) {
+        userMessageContent = systemContent + "\n\n" + userMessageContent;
+      }
+      
+      // Add previous messages for context if available
+      if (messageHistory.length > 0) {
+        const contextMessages = messageHistory.slice(-5); // Include last 5 messages for context
+        const contextString = contextMessages.map(msg => `${msg.role === 'assistant' ? 'AI' : 'User'}: ${msg.content}`).join('\n');
+        userMessageContent = "Previous conversation:\n" + contextString + "\n\nUser's new message: " + userMessageContent;
+      }
+
+      // Make API call
       const response = await axios.post(
-        'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
+        'https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/createContent',
         {
-          model: 'deepseek-r1-250120',
-          messages: [
-            { role: 'system', content: systemContent },
-            ...messageHistory,
-            { role: 'user', content: userMessage },
-          ]
+          prompt: userMessageContent
         },
         {
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer 95fad12c-0768-4de2-a4c2-83247337ea89`
+            'Content-Type': 'application/json'
           }
         }
       );
-
-      const botMessage = response.data.choices[0].message.content.trim();
+      
+      // Extract AI response
+      const botMessage = response.data.output.text;
 
       let chatNameUpdated = false;
       setChats(prevChats => prevChats.map(chat => {
@@ -327,43 +338,24 @@ const decode = (base64) => {
               }
             }
             
-            // Send request to Volces API
-            const volcesResponse = await axios.post(
-              'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
+            // Send request to matrix-server API
+            // Convert image to base64 for sending to API
+            const imageContent = await RNFS.readFile(selectedImage, 'base64');
+            
+            const response = await axios.post(
+              'https://matrix-server.vercel.app/ask-ai',
               {
-                model: 'doubao-vision-pro-32k-241028',
-                messages: [
-                  {
-                    role: 'system',
-                    content: systemContent
-                  },
-                  {
-                    role: 'user',
-                    content: [
-                      {
-                        type: 'text',
-                        text: question
-                      },
-                      {
-                        type: 'image_url',
-                        image_url: {
-                          url: publicUrl
-                        }
-                      }
-                    ]
-                  }
-                ]
+                prompt: question + (imageContent ? `\n\n[Image data: ${imageContent}]` : '')
               },
               {
                 headers: {
-                  'Authorization': 'Bearer 95fad12c-0768-4de2-a4c2-83247337ea89',
                   'Content-Type': 'application/json'
                 }
               }
             );
             
-            // Extract the response from Volces API
-            const botMessage = volcesResponse.data.choices[0].message.content.trim();
+            // Extract the response
+            const botMessage = response.data.output.text;
             
             // Add the bot's response to messages
             setMessages((prev) => [
