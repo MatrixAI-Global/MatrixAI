@@ -107,6 +107,7 @@ const BotScreen2 = ({ navigation, route }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [showAdditionalButtons, setShowAdditionalButtons] = useState(false); // New state for additional buttons
+  const [isSendDisabled, setIsSendDisabled] = useState(false); // New state to track send button disabled state
   const swipeableRefs = useRef({});
 
   const toggleMessageExpansion = (messageId) => {
@@ -146,109 +147,170 @@ const BotScreen2 = ({ navigation, route }) => {
   };
 
   const handleSendMessage = async () => {
-    if (inputText.trim() || selectedImage) {
-      // If there's an image, process it
-      if (selectedImage) {
-        try {
-          setIsLoading(true);
-         
-          // Generate a unique image ID
-          const imageID = Date.now().toString(36) + Math.random().toString(36).substring(2, 15);
-          const fileExtension = imageFileName ? imageFileName.split('.').pop() : 'jpg';
-          
-          // Read the file as base64
-          const fileContent = await RNFS.readFile(selectedImage, 'base64');
-          
-          // Create file path for Supabase storage
-          const filePath = `users/${uid}/Image/${imageID}.${fileExtension}`;
-          
-          // Upload to Supabase storage
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('user-uploads')
-            .upload(filePath, decode(fileContent), {
-              contentType: imageType || 'image/jpeg',
-              upsert: false
-            });
+    if ((inputText.trim() || selectedImage) && !isSendDisabled) {
+      // Disable the send button immediately
+      setIsSendDisabled(true);
+      
+      try {
+        setIsLoading(true);
+       
+        // If there's an image, process it
+        if (selectedImage) {
+          try {
+            // Generate a unique image ID
+            const imageID = Date.now().toString(36) + Math.random().toString(36).substring(2, 15);
+            const fileExtension = imageFileName ? imageFileName.split('.').pop() : 'jpg';
             
-          if (uploadError) {
-            throw new Error(`Upload error: ${uploadError.message}`);
+            // Read the file as base64
+            const fileContent = await RNFS.readFile(selectedImage, 'base64');
+            
+            // Create file path for Supabase storage
+            const filePath = `users/${uid}/Image/${imageID}.${fileExtension}`;
+            
+            // Upload to Supabase storage
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('user-uploads')
+              .upload(filePath, decode(fileContent), {
+                contentType: imageType || 'image/jpeg',
+                upsert: false
+              });
+              
+            if (uploadError) {
+              throw new Error(`Upload error: ${uploadError.message}`);
+            }
+            
+            // Get the public URL for the uploaded image
+            const { data: { publicUrl } } = supabase.storage
+              .from('user-uploads')
+              .getPublicUrl(filePath);
+            
+            // Add the image to messages
+            const newMessage = {
+              id: Date.now().toString(),
+              image: publicUrl,
+              text: inputText.trim() ? inputText : "",
+              sender: 'user'
+            };
+            
+            setMessages((prev) => [...prev, newMessage]);
+            setSelectedImage(null);
+            setInputText('');
+
+            // Save the chat history for the image
+            await saveChatHistory(publicUrl, 'user');
+            
+            // If there's text, use it as the question, otherwise use a default
+            const question = "What do you see in this image?";
+            
+            // Send request using Volces API for image analysis first
+            const volcesResponse = await axios.post(
+              'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
+              {
+                model: 'doubao-vision-pro-32k-241028',
+                messages: [
+                  {
+                    role: 'system',
+                    content: 'You are MatrixAI Bot, a helpful AI assistant.'
+                  },
+                  {
+                    role: 'user',
+                    content: [
+                      {
+                        type: 'text',
+                        text: question
+                      },
+                      {
+                        type: 'image_url',
+                        image_url: {
+                          url: publicUrl
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                headers: {
+                  'Authorization': 'Bearer 95fad12c-0768-4de2-a4c2-83247337ea89',
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+            
+            // Extract the response from Volces API
+            const imageAnalysisResponse = volcesResponse.data.choices[0].message.content.trim();
+            
+            // Now, send this response combined with user's question to createContent API
+            const combinedPrompt = `${userMessageContent}\n\nImage analysis: ${imageAnalysisResponse} so answer the user's question with the image analysis and only answer the user's question`;
+            
+            const finalResponse = await axios.post(
+              'https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/createContent',
+              {
+                prompt: combinedPrompt
+              },
+              {
+                headers: {
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+            
+            // Extract the final response - use Volces response as fallback
+            const finalBotMessage = finalResponse.data.output.text || imageAnalysisResponse;
+            
+            // Add the bot's response to messages
+            setMessages((prev) => [
+              ...prev,
+              { id: Date.now().toString(), text: finalBotMessage, sender: 'bot' },
+            ]);
+            
+            // Save the chat history for the bot response
+            await saveChatHistory(finalBotMessage, 'bot');
+            
+            // Clear the image and text
+            setSelectedImage(null);
+            setInputText('');
+            
+          } catch (error) {
+            console.error('Error processing image:', error);
+            Alert.alert('Error', 'Failed to process image');
+            
+            setMessages((prev) => [
+              ...prev,
+              { id: Date.now().toString(), text: 'Error processing image. Please try again.', sender: 'bot' },
+            ]);
+          } finally {
+            setIsLoading(false);
+            // Re-enable the send button after a short delay
+            setTimeout(() => {
+              setIsSendDisabled(false);
+            }, 1000);
           }
-          
-          // Get the public URL for the uploaded image
-          const { data: { publicUrl } } = supabase.storage
-            .from('user-uploads')
-            .getPublicUrl(filePath);
-          
-          // Add the image to messages
+        } else {
+          // Regular text message handling
           const newMessage = {
             id: Date.now().toString(),
-            image: publicUrl,
-            text: inputText.trim() ? inputText : "",
-            sender: 'user'
+            text: inputText,
+            sender: 'user',
           };
-          
           setMessages((prev) => [...prev, newMessage]);
-          setSelectedImage(null);
-          setInputText('');
-
-          // Save the chat history for the image
-          await saveChatHistory(publicUrl, 'user');
-          
-          // If there's text, use it as the question, otherwise use a default
-          const question = inputText.trim() ? inputText : "What do you see in this image?";
-          
-          // Send request using matrix-server API
-          // We already have the file as base64 from earlier
-          const response = await axios.post(
-            'https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/createContent',
-            {
-              prompt: question + `\n\n[Image data: ${fileContent}]`
-            },
-            {
-              headers: {
-                'Content-Type': 'application/json'
-              }
-            }
-          );
-          
-          // Extract the response
-          const botMessage = response.data.output.text;
-          
-          // Add the bot's response to messages
-          setMessages((prev) => [
-            ...prev,
-            { id: Date.now().toString(), text: botMessage, sender: 'bot' },
-          ]);
-          
-          // Save the chat history for the bot response
-          await saveChatHistory(botMessage, 'bot');
-          
-          // Clear the image and text
-          setSelectedImage(null);
+          saveChatHistory(inputText, 'user');
+          fetchDeepSeekResponse(inputText);
           setInputText('');
           
-        } catch (error) {
-          console.error('Error processing image:', error);
-          Alert.alert('Error', 'Failed to process image');
-          
-          setMessages((prev) => [
-            ...prev,
-            { id: Date.now().toString(), text: 'Error processing image. Please try again.', sender: 'bot' },
-          ]);
-        } finally {
-          setIsLoading(false);
+          // Re-enable the send button after a short delay to prevent double-sends
+          setTimeout(() => {
+            setIsSendDisabled(false);
+          }, 1000);
         }
-      } else {
-        // Regular text message handling
-        const newMessage = {
-          id: Date.now().toString(),
-          text: inputText,
-          sender: 'user',
-        };
-        setMessages((prev) => [...prev, newMessage]);
-        saveChatHistory(inputText, 'user');
-        fetchDeepSeekResponse(inputText);
-        setInputText('');
+      } catch (error) {
+        console.error("Error sending message:", error);
+        Alert.alert("Error", "Failed to send message. Please try again.");
+        
+        // Re-enable the send button
+        setTimeout(() => {
+          setIsSendDisabled(false);
+        }, 1000);
       }
     }
   };
@@ -273,7 +335,7 @@ const BotScreen2 = ({ navigation, route }) => {
 
       // Make API call
       const response = await axios.post(
-        'https://matrix-server.vercel.app/ask-ai',
+        'https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/createContent',
         {
           prompt: userMessageContent
         },
@@ -1145,23 +1207,29 @@ const BotScreen2 = ({ navigation, route }) => {
         </View>
       ) : (
         // Chat List or No Messages View
-        <FlatList
-          data={messages}
-          keyExtractor={(item) => item.id}
-          renderItem={renderMessage}
-          contentContainerStyle={[styles.chat,]}
-          onContentSizeChange={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
-          onLayout={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
-          ref={flatListRef}
-          style={{ marginBottom: showAdditionalButtons ? 220 : 120 }}
-          ListEmptyComponent={
-            !isInitialLoading && (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No messages yet. Start a conversation!</Text>
-              </View>
-            )
-          }
-        />
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+        >
+          <FlatList
+            data={messages}
+            keyExtractor={(item) => item.id}
+            renderItem={renderMessage}
+            contentContainerStyle={[styles.chat,]}
+            onContentSizeChange={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
+            onLayout={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
+            ref={flatListRef}
+            style={{ marginBottom: showAdditionalButtons ? 220 : 120 }}
+            ListEmptyComponent={
+              !isInitialLoading && (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>No messages yet. Start a conversation!</Text>
+                </View>
+              )
+            }
+          />
+        </KeyboardAvoidingView>
       )}
         <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -1227,8 +1295,12 @@ const BotScreen2 = ({ navigation, route }) => {
           )}
         </TouchableOpacity>
        
-        <TouchableOpacity onPress={handleSendMessage} style={styles.sendButton}>
-          <Ionicons name="send" size={24} color="#4C8EF7" />
+        <TouchableOpacity 
+          onPress={handleSendMessage} 
+          style={[styles.sendButton, isSendDisabled && styles.disabledButton]} 
+          disabled={isSendDisabled}
+        >
+          <Ionicons name="send" size={24} color={isSendDisabled ? "#ccc" : "#4C8EF7"} />
         </TouchableOpacity>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -1376,6 +1448,9 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     padding: 5,
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
   sendIcon: {
     width: 20,

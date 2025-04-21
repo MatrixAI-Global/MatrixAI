@@ -62,9 +62,10 @@ const decode = (base64) => {
   const [inputText, setInputText] = useState('');
   const [showInput, setShowInput] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);  // Track if user is typing
+  const [isApiLoading, setIsApiLoading] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false); // Track if data is loaded
-  const [expandedMessages, setExpandedMessages] = useState({}); // Track expanded messages
+  const [expandedMessages, setExpandedMessages] = useState({});
   const [showAdditionalButtons, setShowAdditionalButtons] = useState(false); 
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState(null);
@@ -78,6 +79,8 @@ const decode = (base64) => {
 
   // Add keyboard state tracking
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [isSendDisabled, setIsSendDisabled] = useState(false); // New state to track send button disabled state
+  const swipeableRefs = useRef({});
 
   // Set initial chat ID from route params if available - prevent infinite updates
   useEffect(() => {
@@ -250,7 +253,10 @@ const decode = (base64) => {
   };
 
   const handleSendMessage = async () => {
-    if (inputText.trim() || selectedImage) {
+    if ((inputText.trim() || selectedImage) && !isSendDisabled) {
+      // Disable the send button immediately
+      setIsSendDisabled(true);
+      
       try {
         // Get current user session first to ensure we have authentication
         const { data: sessionData } = await supabase.auth.getSession();
@@ -320,7 +326,7 @@ const decode = (base64) => {
             await saveChatHistory(publicUrl, 'user');
             
             // If there's text, use it as the question, otherwise use a default
-            const question = inputText.trim() ? inputText : "What do you see in this image?";
+            const question = "What do you see in this image?";
             
             // Create system message with role information if available
             let systemContent = 'You are MatrixAI Bot, a helpful AI assistant.';
@@ -338,14 +344,51 @@ const decode = (base64) => {
               }
             }
             
-            // Send request to matrix-server API
-            // Convert image to base64 for sending to API
-            const imageContent = await RNFS.readFile(selectedImage, 'base64');
-            
-            const response = await axios.post(
-              'https://matrix-server.vercel.app/ask-ai',
+            // First, use Volces API for image analysis
+            const volcesResponse = await axios.post(
+              'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
               {
-                prompt: question + (imageContent ? `\n\n[Image data: ${imageContent}]` : '')
+                model: 'doubao-vision-pro-32k-241028',
+                messages: [
+                  {
+                    role: 'system',
+                    content: systemContent
+                  },
+                  {
+                    role: 'user',
+                    content: [
+                      {
+                        type: 'text',
+                        text: question
+                      },
+                      {
+                        type: 'image_url',
+                        image_url: {
+                          url: publicUrl
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                headers: {
+                  'Authorization': 'Bearer 95fad12c-0768-4de2-a4c2-83247337ea89',
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+            
+            // Extract the response from Volces API
+            const imageAnalysisResponse = volcesResponse.data.choices[0].message.content.trim();
+            
+            // Now, send this response combined with user's question to createContent API
+            const combinedPrompt = `${userMessageContent}\n\nImage analysis: ${imageAnalysisResponse} so answer the user's question with the image analysis and only answer the user's question`;
+            
+            const finalResponse = await axios.post(
+              'https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/createContent',
+              {
+                prompt: combinedPrompt
               },
               {
                 headers: {
@@ -354,17 +397,17 @@ const decode = (base64) => {
               }
             );
             
-            // Extract the response
-            const botMessage = response.data.output.text;
+            // Extract the final response
+            const finalBotMessage = finalResponse.data.output.text || imageAnalysisResponse;
             
             // Add the bot's response to messages
             setMessages((prev) => [
               ...prev,
-              { id: Date.now().toString(), text: botMessage, sender: 'bot' },
+              { id: Date.now().toString(), text: finalBotMessage, sender: 'bot' },
             ]);
             
             // Save the chat history for the bot response
-            await saveChatHistory(botMessage, 'bot');
+            await saveChatHistory(finalBotMessage, 'bot');
             
             // Clear the image and text
             setSelectedImage(null);
@@ -380,6 +423,10 @@ const decode = (base64) => {
             ]);
           } finally {
             setIsLoading(false);
+            // Re-enable the send button after a short delay
+            setTimeout(() => {
+              setIsSendDisabled(false);
+            }, 1000);
           }
       } else {
           // Regular text message handling
@@ -410,31 +457,27 @@ const decode = (base64) => {
             // Save the user's message to Supabase
         await saveChatHistory(inputText, 'user');
         
-            // Fetch response from DeepSeek
-            await fetchDeepSeekResponse(inputText);
+        // Process the message with an AI service
+        await fetchDeepSeekResponse(inputText);
           } catch (error) {
-            console.error('Error handling text message:', error);
-            Alert.alert('Error', 'Failed to process message');
-            
-            // Add error message to the chat
-            setMessages(prev => [
-              ...prev,
-              { 
-                id: Date.now().toString(), 
-                text: 'Error processing message. Please try again.', 
-                sender: 'bot',
-                timestamp: new Date().toISOString()
-              },
-            ]);
+            console.error('Error in message handling:', error);
+            Alert.alert('Error', 'Failed to send message');
           } finally {
             setIsLoading(false);
+            // Re-enable the send button after a short delay
+            setTimeout(() => {
+              setIsSendDisabled(false);
+            }, 1000);
           }
       }
       setIsTyping(false);
       } catch (error) {
-        console.error('Error handling message:', error);
+        console.error('Error in send message:', error);
         Alert.alert('Error', 'Failed to send message');
-      setIsTyping(false);
+        // Re-enable the send button
+        setTimeout(() => {
+          setIsSendDisabled(false);
+        }, 1000);
       }
     }
   };
@@ -1260,8 +1303,13 @@ const decode = (base64) => {
 
   // Also memoize the FlatList to prevent unnecessary re-renders
   const memoizedFlatList = React.useMemo(() => (
-    <View style={{ flex: 1, position: 'relative' }}>
-    <FlatList
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={{ flex: 1 }}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
+    >
+      <View style={{ flex: 1, position: 'relative' }}>
+        <FlatList
           data={messages}
           keyExtractor={(item) => item.id}
           renderItem={renderMessage}
@@ -1269,9 +1317,10 @@ const decode = (base64) => {
           onContentSizeChange={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
           onLayout={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
           ref={flatListRef}
-          style={{ marginBottom: showAdditionalButtons ? 135 : 30 }}
+          style={{ marginBottom: showAdditionalButtons ? 135 : 30 || keyboardAvoidingView ? 100 : 0 }}
         />
-    </View>
+      </View>
+    </KeyboardAvoidingView>
   ), [messages, renderMessage, showAdditionalButtons]);
 
   useEffect(() => {
@@ -2394,8 +2443,12 @@ const decode = (base64) => {
               )}
             </TouchableOpacity>
                    
-            <TouchableOpacity onPress={handleSendMessage} style={styles.sendButton}>
-              <Ionicons name="send" size={24} color="#4C8EF7" />
+            <TouchableOpacity 
+              onPress={handleSendMessage} 
+              style={[styles.sendButton, isSendDisabled && styles.disabledButton]} 
+              disabled={isSendDisabled}
+            >
+              <Ionicons name="send" size={24} color={isSendDisabled ? "#ccc" : "#4C8EF7"} />
             </TouchableOpacity>
           </View>
 
@@ -2568,6 +2621,9 @@ const styles = StyleSheet.create({
   },
   sendButton: {
    padding: 5,
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
   
   // WhatsApp style image preview container

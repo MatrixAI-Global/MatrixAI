@@ -610,8 +610,8 @@ const DetectAIScreen = () => {
               shadowColor: colors.primary
             }]}>
               <View style={styles.inputHeaderBar}>
-                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>
-                  <MaterialCommunityIcons name="text-box-outline" size={normalize(14)} color={colors.textSecondary} /> Input Text
+                <Text style={[styles.inputLabel, { color: '#3F51B5' }]}>
+                  <MaterialCommunityIcons name="text-box-outline" size={normalize(14)} color={'#3F51B5'} /> Input Text
                 </Text>
                 <TouchableOpacity 
                   style={[styles.pasteButton, { minWidth: responsiveSpacing(70), minHeight: responsiveSpacing(30), justifyContent: 'center', alignItems: 'center' }]} 
@@ -632,7 +632,7 @@ const DetectAIScreen = () => {
                 <TextInput
                   style={[styles.textInput, { color: colors.text, height: Math.max(150 * scale, 150) }]}
                   placeholder="Enter or paste text to analyze for AI detection..."
-                  placeholderTextColor={colors.textSecondary}
+                  placeholderTextColor={'#A3A3A3FF'}
                   value={inputText}
                   onChangeText={setInputText}
                   multiline
@@ -664,12 +664,12 @@ const DetectAIScreen = () => {
               </View>
               
               <View style={styles.textInputFooter}>
-                <Text style={[styles.characterCount, { color: colors.textSecondary }]}>
+                <Text style={[styles.characterCount, { color: '#3F51B5' }]}>
                   {inputText.length} characters
                 </Text>
                 {inputText.length > 1000 && (
-                  <Text style={[styles.longTextNote, { color: colors.success }]}>
-                    <Ionicons name="checkmark-circle" size={normalize(12)} color={colors.success} /> Sufficient length
+                  <Text style={[styles.longTextNote, { color: '#3F51B5' }]}>
+                    <Ionicons name="checkmark-circle" size={normalize(12)} color={'#3F51B5'} /> Sufficient length
                   </Text>
                 )}
               </View>

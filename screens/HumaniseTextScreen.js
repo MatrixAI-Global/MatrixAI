@@ -609,7 +609,7 @@ const HumaniseTextScreen = () => {
           {/* Input Section */}
           <View style={styles.inputContainer}>
             <View style={styles.sectionHeaderContainer}>
-              <MaterialCommunityIcons name="text-box-edit-outline" size={normalize(20)} color={colors.primary} />
+              <MaterialCommunityIcons name="text-box-check-outline" size={normalize(20)} color={colors.primary} />
               <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Text</Text>
             </View>
             
@@ -619,8 +619,8 @@ const HumaniseTextScreen = () => {
               shadowColor: colors.primary
             }]}>
               <View style={styles.inputHeaderBar}>
-                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>
-                  <MaterialCommunityIcons name="text-box-outline" size={normalize(14)} color={colors.textSecondary} /> Input Text
+                <Text style={[styles.inputLabel, { color: '#9C27B0' }]}>
+                  <MaterialCommunityIcons name="text-box-outline" size={normalize(14)} color={'#9C27B0'} /> Input Text
                 </Text>
                 <TouchableOpacity 
                   style={[styles.pasteButton, { minWidth: responsiveSpacing(70), minHeight: responsiveSpacing(30), justifyContent: 'center', alignItems: 'center' }]} 
@@ -641,7 +641,7 @@ const HumaniseTextScreen = () => {
                 <TextInput
                   style={[styles.textInput, { color: colors.text, height: Math.max(150 * scale, 150) }]}
                   placeholder="Enter text you want to humanise..."
-                  placeholderTextColor={colors.textSecondary}
+                  placeholderTextColor={'#A3A3A3FF'}
                   value={inputText}
                   onChangeText={setInputText}
                   multiline
@@ -673,12 +673,12 @@ const HumaniseTextScreen = () => {
               </View>
               
               <View style={styles.textInputFooter}>
-                <Text style={[styles.characterCount, { color: colors.textSecondary }]}>
+                <Text style={[styles.characterCount, { color: '#9C27B0' }]}>
                   {inputText.length} characters
                 </Text>
                 {inputText.length > 0 && selectedTone && (
-                  <Text style={[styles.longTextNote, { color: colors.success }]}>
-                    <Ionicons name="checkmark-circle" size={normalize(12)} color={colors.success} /> {selectedTone.charAt(0).toUpperCase() + selectedTone.slice(1)} tone
+                    <Text style={[styles.longTextNote, { color: '#9C27B0' }]}>
+                    <Ionicons name="checkmark-circle" size={normalize(12)} color={'#9C27B0'} /> {selectedTone.charAt(0).toUpperCase() + selectedTone.slice(1)} tone
                   </Text>
                 )}
               </View>
@@ -1009,6 +1009,7 @@ const styles = StyleSheet.create({
   },
   toneList: {
     paddingVertical: responsiveSpacing(8),
+    marginLeft: responsiveSpacing(16),
   },
   toneItem: {
     flexDirection: 'row',

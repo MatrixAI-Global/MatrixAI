@@ -21,6 +21,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { authenticate, createPaymentIntent, confirmSubscriptionPurchase } from '../../utils/airwallexApi';
+import { useAirwallex } from '../../components/AirwallexProvider';
 
 const { width } = Dimensions.get('window');
 
@@ -53,6 +54,9 @@ const AirwallexPaymentScreen = ({ navigation, route }) => {
   const [successData, setSuccessData] = useState(null);
   const [countdown, setCountdown] = useState(0);
   const [cardValid, setCardValid] = useState(false);
+  const [initializingAirwallex, setInitializingAirwallex] = useState(true);
+  const [airwallexError, setAirwallexError] = useState(null);
+  const { initialized, initializing, error, initializeAirwallex } = useAirwallex();
   
   // Add useEffect to handle back button and cleanup 
   useEffect(() => {
@@ -675,6 +679,77 @@ const AirwallexPaymentScreen = ({ navigation, route }) => {
       {method.id === 'card' && selectedPaymentMethod === 'card' && renderCardInputForm()}
     </View>
   );
+
+  // Initialize Airwallex when the payment screen mounts
+  useEffect(() => {
+    const initPaymentSystem = async () => {
+      setInitializingAirwallex(true);
+      try {
+        const result = await initializeAirwallex();
+        if (!result.success) {
+          setAirwallexError(result.error);
+        }
+      } catch (err) {
+        console.error('Error initializing Airwallex:', err);
+        setAirwallexError('Failed to initialize payment system. Please try again.');
+      } finally {
+        setInitializingAirwallex(false);
+      }
+    };
+
+    initPaymentSystem();
+  }, []);
+
+  // Add this after other useEffect hooks and before rendering UI
+  // Show loading state while initializing Airwallex
+  if (initializingAirwallex || initializing) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#2274F0" />
+        <Text style={{ marginTop: 10, color: '#666', textAlign: 'center' }}>
+          Initializing payment system...
+        </Text>
+      </View>
+    );
+  }
+
+  // Show error if Airwallex initialization failed
+  if (airwallexError || error) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+        <Icon name="alert-circle" size={50} color="#e74c3c" />
+        <Text style={{ marginTop: 10, fontSize: 18, fontWeight: 'bold', textAlign: 'center' }}>
+          Payment System Error
+        </Text>
+        <Text style={{ marginTop: 10, color: '#666', textAlign: 'center' }}>
+          {airwallexError || error}
+        </Text>
+        <TouchableOpacity 
+          style={{ 
+            marginTop: 20, 
+            backgroundColor: '#2274F0', 
+            paddingVertical: 12, 
+            paddingHorizontal: 20, 
+            borderRadius: 8 
+          }}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={{ color: 'white', fontWeight: 'bold' }}>Go Back</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={{ 
+            marginTop: 10, 
+            paddingVertical: 12, 
+            paddingHorizontal: 20, 
+            borderRadius: 8 
+          }}
+          onPress={() => initPaymentSystem()}
+        >
+          <Text style={{ color: '#2274F0', fontWeight: 'bold' }}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <LinearGradient

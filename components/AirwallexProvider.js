@@ -1,78 +1,79 @@
-import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator, Text, Alert } from 'react-native';
+import React, { useState, createContext, useContext } from 'react';
 import { authenticate } from '../utils/airwallexApi';
 
+// Create a context to expose authentication methods
+export const AirwallexContext = createContext({
+  initialized: false,
+  initializing: false,
+  error: null,
+  initializeAirwallex: async () => {},
+});
+
 /**
- * AirwallexProvider component to initialize Airwallex on app startup
- * This ensures the Airwallex API is authenticated when needed
+ * AirwallexProvider component that provides lazy authentication
+ * Authentication will only happen when explicitly called, not on app mount
  */
 const AirwallexProvider = ({ children }) => {
-  const [initializing, setInitializing] = useState(true);
+  const [initialized, setInitialized] = useState(false);
+  const [initializing, setInitializing] = useState(false);
   const [error, setError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
   const MAX_RETRIES = 2;
 
-  // Initialize Airwallex auth on component mount
-  useEffect(() => {
-    const initAirwallex = async () => {
-      try {
-        console.log('Initializing Airwallex...');
-        // Pre-authenticate with Airwallex to ensure token is ready
-        await authenticate();
-        console.log('Airwallex initialized successfully');
-        setError(null);
-      } catch (err) {
-        console.error('Failed to initialize Airwallex:', err);
-        setError(err.message || 'Failed to initialize payment provider');
-        
-        // Only retry a limited number of times
-        if (retryCount < MAX_RETRIES) {
-          console.log(`Retry attempt ${retryCount + 1} of ${MAX_RETRIES}`);
-          setRetryCount(prev => prev + 1);
-          // Try again in 2 seconds
-          setTimeout(() => initAirwallex(), 2000);
-          return;
-        }
-      } finally {
-        // Only set initializing to false if we're done retrying
-        if (retryCount >= MAX_RETRIES || !error) {
-          setInitializing(false);
-        }
-      }
-    };
-
-    initAirwallex();
-  }, [retryCount]);
-
-  // Show loading state while initializing
-  if (initializing) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#2274F0" />
-        <Text style={{ marginTop: 10, color: '#666', textAlign: 'center' }}>
-          {retryCount > 0 
-            ? `Initializing payment system... (Retrying ${retryCount}/${MAX_RETRIES})`
-            : 'Initializing payment system...'}
-        </Text>
-      </View>
-    );
-  }
-
-  // Show error state if initialization failed after all retries
-  if (error) {
-    console.warn('Continuing despite Airwallex initialization error:', error);
+  // Function to initialize Airwallex auth only when explicitly called
+  const initializeAirwallex = async () => {
+    // If already initialized or initializing, don't start again
+    if (initialized || initializing) return { success: initialized, error };
     
-    // We could show an alert here, but it might be better to just log it
-    // and let the app continue - the payment screen will handle errors gracefully
-    // Alert.alert(
-    //   'Payment System Notice',
-    //   'The payment system is currently in offline mode. Some payment features may be limited.',
-    //   [{ text: 'OK' }]
-    // );
-  }
+    setInitializing(true);
+    setError(null);
+    
+    try {
+      console.log('Initializing Airwallex...');
+      // Authenticate with Airwallex
+      await authenticate();
+      console.log('Airwallex initialized successfully');
+      setInitialized(true);
+      setError(null);
+      return { success: true, error: null };
+    } catch (err) {
+      console.error('Failed to initialize Airwallex:', err);
+      const errorMessage = err.message || 'Failed to initialize payment provider';
+      setError(errorMessage);
+      
+      // Only retry a limited number of times
+      if (retryCount < MAX_RETRIES) {
+        console.log(`Retry attempt ${retryCount + 1} of ${MAX_RETRIES}`);
+        setRetryCount(prev => prev + 1);
+        // Try again in 2 seconds
+        setTimeout(() => initializeAirwallex(), 2000);
+      }
+      
+      return { success: false, error: errorMessage };
+    } finally {
+      // Only set initializing to false if we're done retrying or succeeded
+      if (retryCount >= MAX_RETRIES || initialized) {
+        setInitializing(false);
+      }
+    }
+  };
 
-  // Render children once initialized or if error (to avoid blocking the app)
-  return children;
+  // Provide context values to children
+  return (
+    <AirwallexContext.Provider 
+      value={{
+        initialized,
+        initializing,
+        error,
+        initializeAirwallex,
+      }}
+    >
+      {children}
+    </AirwallexContext.Provider>
+  );
 };
+
+// Custom hook to use the Airwallex context
+export const useAirwallex = () => useContext(AirwallexContext);
 
 export default AirwallexProvider; 

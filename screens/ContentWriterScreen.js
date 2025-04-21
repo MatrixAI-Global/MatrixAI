@@ -573,7 +573,7 @@ const ContentWriterScreen = () => {
             <TextInput
               style={[styles.promptInput, { color: colors.text }]}
               placeholder="Enter your topic or request..."
-              placeholderTextColor={colors.textSecondary}
+              placeholderTextColor={'#A3A3A3FF'}
               value={prompt}
               onChangeText={setPrompt}
               multiline
@@ -826,6 +826,7 @@ const styles = StyleSheet.create({
   },
   typeList: {
     paddingVertical: 8,
+    marginLeft: responsiveSpacing(16),
   },
   typeItem: {
     flexDirection: 'row',

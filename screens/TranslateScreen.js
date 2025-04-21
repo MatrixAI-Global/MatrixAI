@@ -22,6 +22,7 @@ const formatTime = (seconds) => {
       NativeModules,
       Dimensions,
       Platform,
+      PanResponder,
   } from 'react-native';
   import { SafeAreaView } from 'react-native-safe-area-context';
 import { PDFDocument, rgb, PNGImage } from 'react-native-pdf-lib';
@@ -118,6 +119,27 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
       const [isTranscriptionVisible, setTranscriptionVisible] = useState(false);
       const [isSpeechToTextEnabled, setSpeechToTextEnabled] = useState(true);
       const [isEditingEnabled, setEditingEnabled] = useState(true);
+   
+      // Disable swipe-back gesture just for this screen
+      useEffect(() => {
+        // Save the previous state
+        const previousState = navigation.getState();
+        
+        // Disable swipe to go back
+        navigation.setOptions({
+          gestureEnabled: false,
+        });
+        
+        // Clean up - restore default behavior when component unmounts
+        return () => {
+          // Only restore if the navigation object is still valid
+          if (navigation) {
+            navigation.setOptions({
+              gestureEnabled: true,
+            });
+          }
+        };
+      }, [navigation]);
    
       const [translations, setTranslations] = useState([]);
       const [selectedButton, setSelectedButton] = useState('transcription');
@@ -1493,11 +1515,69 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
         }, 50);
     };
 
+    // Function to handle thumb dragging
+    const handleThumbDrag = (event, gestureState) => {
+        if (!sound || !audioDuration) return;
+        
+        // Get container element measurements
+        const { locationX } = event.nativeEvent;
+        
+        // Calculate percentage and position, ensuring it stays within bounds
+        let percentage = Math.max(0, Math.min(locationX, sliderWidth)) / sliderWidth;
+        
+        // Handle edge cases
+        if (isNaN(percentage) || !isFinite(percentage)) {
+            percentage = 0;
+        }
+        
+        // Calculate the new position in seconds
+        const newPosition = percentage * audioDuration;
+        
+        // Update audio position
+        sound.setCurrentTime(newPosition);
+        setAudioPosition(newPosition);
+        setIsSeeking(true);
+        
+        // Update progress to show the current position visually
+        onAudioProgress({
+            currentTime: newPosition,
+            duration: audioDuration
+        });
+    };
+    
+    // Add state to track if the thumb is being actively dragged
+    const [isThumbActive, setIsThumbActive] = useState(false);
+    
+    // Create PanResponder for the custom thumb
+    const thumbPanResponder = React.useMemo(
+        () =>
+            PanResponder.create({
+                onStartShouldSetPanResponder: () => true,
+                onMoveShouldSetPanResponder: () => true,
+                onPanResponderGrant: () => {
+                    setIsSeeking(true);
+                    setIsThumbActive(true);
+                },
+                onPanResponderMove: handleThumbDrag,
+                onPanResponderRelease: (e, gestureState) => {
+                    // Final position update
+                    handleThumbDrag(e, gestureState);
+                    setIsSeeking(false);
+                    setIsThumbActive(false);
+                },
+                onPanResponderTerminate: () => {
+                    setIsSeeking(false);
+                    setIsThumbActive(false);
+                },
+            }),
+        [audioDuration, sound, sliderWidth]
+    );
+
     const handleLayout = (event) => {
         const { width } = event.nativeEvent.layout;
         setSliderWidth(width);
     };
-
+    
     // Calculate the position of the custom thumb
     const thumbPosition = (audioPosition / audioDuration) * sliderWidth;
 
@@ -1724,6 +1804,40 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
         }
     };
 
+    // Create PanResponder for the waveform container
+    const waveformPanResponder = React.useMemo(
+        () =>
+            PanResponder.create({
+                onStartShouldSetPanResponder: () => true,
+                onMoveShouldSetPanResponder: () => true,
+                onPanResponderGrant: (e) => {
+                    setIsSeeking(true);
+                    setIsThumbActive(true); // Use the same visual effect
+                    handleWaveformTap(e);
+                },
+                onPanResponderMove: (e) => {
+                    if (!sound || !audioDuration) return;
+                    
+                    const { locationX } = e.nativeEvent;
+                    const percentage = Math.max(0, Math.min(locationX, sliderWidth)) / sliderWidth;
+                    const newPosition = percentage * audioDuration;
+                    
+                    sound.setCurrentTime(newPosition);
+                    setAudioPosition(newPosition);
+                    
+                    onAudioProgress({
+                        currentTime: newPosition,
+                        duration: audioDuration
+                    });
+                },
+                onPanResponderRelease: () => {
+                    setIsSeeking(false);
+                    setIsThumbActive(false);
+                },
+            }),
+        [audioDuration, sound, sliderWidth]
+    );
+
     return (
         
         <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
@@ -1903,17 +2017,28 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                   maximumTrackTintColor="transparent"
                   thumbTintColor="transparent" // Hide the default thumb
                 />
-                {/* Custom Thumb */}
+                {/* Custom Thumb - Draggable */}
                 <View
+                  {...thumbPanResponder.panHandlers}
                   style={[
                     styles.customThumb,
                     { left: thumbPosition -1 }, // Adjust for thumb width
+                    isThumbActive && { 
+                      width: 20, 
+                      backgroundColor: '#ff8c00', 
+                      borderColor: '#ffb700',
+                      shadowOpacity: 0.5,
+                      shadowRadius: 4,
+                    }
                   ]}
                 />
               </View>
   
               {/* Lottie Animation for Waves */}
-              <View style={styles.waveAnimationContainer2}>
+              <View 
+                style={styles.waveAnimationContainer2}
+                {...waveformPanResponder.panHandlers}
+              >
                 <LottieView
                   source={require('../assets/waves.json')} // Add your Lottie animation JSON here
                   autoPlay={isAudioPlaying} // Sync with audio playback
@@ -2560,13 +2685,19 @@ const styles = StyleSheet.create({
     },
     customThumb: {
         position: 'absolute',
-        width: 5,
+        width: 6,
         height: 90,
-        borderRadius:50,
+        borderRadius: 8,
         backgroundColor: 'orange',
-        borderRadius: 0,
-      
-        zIndex:200,
+        zIndex: 200,
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.3,
+        shadowRadius: 2,
+        // Add a subtle inner glow to indicate it's interactive
+        borderWidth: 2,
+        borderColor: 'rgba(255, 190, 100, 0.7)',
       },
       headerTitle: {
         width: 250,
@@ -2816,7 +2947,8 @@ flexDirection:'row',
     buttonsContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        padding: 16,
+        marginHorizontal: 16,
+        marginTop:10,
     },
     dropdownButton: {
         padding: 5,
@@ -2937,11 +3069,7 @@ zIndex:101,
         borderBottomWidth: 1,
         borderBottomColor: '#007bff',
     },
-    buttonsContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        padding: 16,
-    },
+  
  
  
     buttonText2: {
@@ -2950,7 +3078,7 @@ zIndex:101,
     },
     contentContainer: {
         flex: 1,
-        padding: 16,
+        paddingHorizontal: 16,
     },
     transcriptionRow: {
         flexDirection: 'row',
