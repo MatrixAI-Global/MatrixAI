@@ -35,6 +35,8 @@ import Toast from 'react-native-toast-message';
 import { useTheme } from '../context/ThemeContext';
 import LeftNavbarBot from '../components/LeftNavbarBot';
 import Clipboard from '@react-native-clipboard/clipboard';
+import Markdown from 'react-native-markdown-display';
+import MathView from 'react-native-math-view';
 
 // Function to decode base64 to ArrayBuffer
 const decode = (base64) => {
@@ -695,7 +697,7 @@ const decode = (base64) => {
     const hasOperators = /[\+\-\*\/\(\)\[\]\{\}\^×÷]/.test(text);
     
     // Check for number patterns with operators (this is the strongest indicator)
-    const hasNumberWithOperator = /\d+\s*[\+\-\*\/\=\(\)\[\]\{\}\^×÷]\s*\d+/.test(text);
+    const hasNumberWithOperator = /\d+\s*[\+\-\*\/\=]\s*\d+/.test(text);
     
     // Check for common math expressions at the start of the text
     const isCommonMathExpression = /^(solve|calculate|find|evaluate|simplify|compute)/.test(text.toLowerCase());
@@ -741,9 +743,7 @@ const decode = (base64) => {
 
   // Check if text looks like it has a math expression with subscripts
   const hasMathSubscripts = (text) => {
-    // Check for common subscript patterns like a_n, x_i, etc.
-    return /[a-zA-Z]_[a-zA-Z0-9]/.test(text) || 
-           /[a-zA-Z]_\{[^}]+\}/.test(text);
+    return /([a-zA-Z])_(\d)|([a-zA-Z])_n|([a-zA-Z])_i|([a-zA-Z])_j|([a-zA-Z])_k|([a-zA-Z])_a|([a-zA-Z])_x|([a-zA-Z])_\{([^}]+)\}/.test(text);
   };
 
   // Memoize the message rendering to prevent excessive renders
@@ -786,7 +786,10 @@ const decode = (base64) => {
     // Check if the message has an image
     if (item.image) {
       return (
-        <View style={[styles.messageWrapperOuter, isBot ? {alignSelf: 'flex-start'} : {alignSelf: 'flex-end'}]}>
+        <View style={[
+          styles.messageWrapperOuter, 
+          isBot ? styles.botMessageWrapper : styles.userMessageWrapper
+        ]}>
           <Animatable.View
             animation="fadeInUp"
             duration={800}
@@ -803,7 +806,164 @@ const decode = (base64) => {
               />
             </TouchableOpacity>
             {item.text && (
-              <Text style={isBot ? styles.botText : styles.userText}>
+              <Markdown 
+                key={`markdown-${index}`}
+                style={{
+                  body: {
+                    color: isBot ? colors.botText : '#fff',
+                    fontSize: 16,
+                  },
+                  heading1: {
+                    color: isBot ? colors.botText : '#fff',
+                    fontWeight: 'bold',
+                    fontSize: 20,
+                    marginTop: 8,
+                    marginBottom: 4,
+                  },
+                  heading2: {
+                    color: isBot ? colors.botText : '#fff',
+                    fontWeight: 'bold',
+                    fontSize: 18,
+                    marginTop: 8,
+                    marginBottom: 4,
+                  },
+                  heading3: {
+                    color: isBot ? colors.botText : '#fff',
+                    fontWeight: 'bold',
+                    fontSize: 16,
+                    marginTop: 8,
+                    marginBottom: 4,
+                  },
+                  paragraph: {
+                    color: isBot ? colors.botText : '#fff',
+                    fontSize: 16,
+                    marginTop: 4,
+                    marginBottom: 4,
+                  },
+                  list_item: {
+                    color: isBot ? colors.botText : '#fff',
+                    fontSize: 16,
+                    marginTop: 4,
+                  },
+                  bullet_list: {
+                    color: isBot ? colors.botText : '#fff',
+                  },
+                  ordered_list: {
+                    color: isBot ? colors.botText : '#FFFFFF',
+                  },
+                  ordered_list: {
+                    color: isBot ? colors.botText : '#FFFFFF',
+                  },
+                  blockquote: {
+                    backgroundColor: 'rgba(128, 128, 128, 0.1)',
+                    borderLeftWidth: 4,
+                    borderLeftColor: colors.primary,
+                    paddingLeft: 8,
+                    paddingVertical: 4,
+                    color: isBot ? colors.botText : '#FFFFFF',
+                  },
+                  code_block: {
+                    backgroundColor: 'rgba(128, 128, 128, 0.1)',
+                    padding: 8,
+                    borderRadius: 4,
+                    color: isBot ? colors.botText : '#FFFFFF',
+                  },
+                  code_inline: {
+                    backgroundColor: 'rgba(128, 128, 128, 0.1)',
+                    padding: 2,
+                    borderRadius: 2,
+                    color: isBot ? colors.botText : '#FFFFFF',
+                  },
+                  link: {
+                    color: colors.primary,
+                    textDecorationLine: 'underline',
+                  },
+                  table: {
+                    borderWidth: 1,
+                    borderColor: '#E0E0E0',
+                    marginVertical: 10,
+                  },
+                  tr: {
+                    borderBottomWidth: 1,
+                    borderBottomColor: '#E0E0E0',
+                    flexDirection: 'row',
+                  },
+                  th: {
+                    padding: 8,
+                    fontWeight: 'bold',
+                    borderRightWidth: 1,
+                    borderRightColor: '#E0E0E0',
+                    backgroundColor: '#F5F5F5',
+                    color: '#333333',
+                  },
+                  td: {
+                    padding: 8,
+                    borderRightWidth: 1,
+                    borderRightColor: '#E0E0E0',
+                    color: '#333333',
+                  },
+                  text: {
+                    color: isBot ? colors.botText : '#FFFFFF',
+                  }
+                }}
+                // Adding custom renderers for better ordered lists
+                rules={{
+                  // Custom ordered list renderer
+                  list: (node, children, parent, styles) => {
+                    if (node.ordered) {
+                      return (
+                        <View key={node.key} style={styles.ordered_list}>
+                          {children}
+                        </View>
+                      );
+                    }
+                    return (
+                      <View key={node.key} style={styles.bullet_list}>
+                        {children}
+                      </View>
+                    );
+                  },
+                  // Custom ordered list item renderer
+                  list_item: (node, children, parent, styles) => {
+                    if (parent.ordered) {
+                      return (
+                        <View key={node.key} style={styles.ordered_list_item}>
+                          <Text style={[styles.list_item_number, {color: isBot ? colors.botText : '#fff'}]}>{node.index + 1}.</Text>
+                          <View style={styles.list_item_content}>
+                            {children}
+                          </View>
+                        </View>
+                      );
+                    }
+                    return (
+                      <View key={node.key} style={styles.list_item}>
+                        <Text style={[styles.list_item_bullet, {color: isBot ? colors.botText : '#fff'}]}>•</Text>
+                        <View style={{ flex: 1 }}>
+                          {children}
+                        </View>
+                      </View>
+                    );
+                  },
+                  // Custom fraction renderer for better display
+                  text: (node, children, parent, styles) => {
+                    // Improve fraction display using custom renderer
+                    const text = node.content.replace(/(\d+)\/(\d+)/g, (match, p1, p2) => {
+                      return `${p1}∕${p2}`; // Unicode division slash
+                    });
+                    
+                    return (
+                      <Text key={node.key} style={styles.text}>
+                        {text}
+                      </Text>
+                    );
+                  }
+                }}
+              >
+                {isBot ? item.text : ''}
+              </Markdown>
+            )}
+            {!isBot && item.text && (
+              <Text style={styles.userText}>
                 {item.text}
               </Text>
             )}
@@ -847,118 +1007,220 @@ const decode = (base64) => {
     };
   
     // Function to process and format the message text
-    const formatMessageText = (text) => {
+    const formatMessageText = (text, sender) => {
       if (!text) return [];
       
-      // Remove "###", "***", "**", and "---" from the text
-      text = text.replace(/###/g, '')
-                 .replace(/\*\*\*/g, '')
-                 .replace(/\*\*/g, '')
-                 .replace(/---/g, ''); // Remove "---"
-
-      // Check if the text contains LaTeX-style formulas (\[ \] or \( \))
-      const hasLatexFormulas = /\\\[.*?\\\]|\\\(.*?\\\)/s.test(text);
-
-      // Special handling for mathematical content in Chinese text
-      if (hasLatexFormulas) {
-        return formatMathematicalContent(text);
-      }
-
-      const lines = text.split('\n');
+      const isBot = sender === 'bot';
+      const isChineseContent = /[\u3400-\u9FBF]/.test(text);
       
-      // Detect markdown tables by looking for patterns
-      // Tables typically have lines with | characters and separator rows with dashes
-      let isInTable = false;
-      let currentTable = [];
-      let tableHeaders = [];
-      let tableData = [];
-      let separatorRowFound = false;
-      const result = [];
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-        
-        // Check if this line is part of a table (has | characters)
-        const isTableRow = line.includes('|');
-        const isTableSeparator = isTableRow && line.replace(/\|/g, '').trim().replace(/[^-:]/g, '') !== '';
-        
-        if (isTableRow) {
-          if (!isInTable) {
-            isInTable = true;
-            tableHeaders = [];
-            tableData = [];
-            currentTable = [];
-            separatorRowFound = false;
+      // Check if the text is already in markdown format or should be converted to markdown
+      const hasExistingMarkdown = /(\#{1,3}\s.+)|(\*\*.+\*\*)|(^\s*[\*\-]\s.+)|(^\s*\d+\.\s.+)|(^>.+)|(^\`\`.+\`\`)/.test(text);
+      
+      // For bot messages, we'll enhance with markdown formatting
+      if (isBot) {
+        // If it doesn't already have markdown formatting, add it
+        if (!hasExistingMarkdown) {
+          // Pre-process text to enhance with markdown formatting
+          
+          // Convert numbered lists (e.g., "1. Item") to markdown formatted lists
+          text = text.replace(/^(\d+)\.[ \t]+(.+)/gm, '$1. $2');
+          
+          // Convert bullet points to markdown bullet lists
+          text = text.replace(/^[\-•][ \t]+(.+)/gm, '* $1');
+          
+          // Convert lines that end with colon and look like headings to markdown headings
+          text = text.replace(/^([A-Z][^.!?:]*):$/gm, '## $1');
+          
+          // For Chinese content, process headings and subheadings differently
+          if (isChineseContent) {
+            // Find Chinese headings (typically marked with ### or 标题：)
+            text = text.replace(/^(#+\s+.+)|^([\u4e00-\u9fa5]+[：:])$/gm, '## $1$2');
+            
+            // Add numbers to section titles (1., 2., etc.)
+            text = text.replace(/^##\s+(.*?)$/gm, (match, p1, offset) => {
+              // Count previous headings to determine number
+              const prevHeadings = text.substring(0, offset).match(/^##\s+/gm) || [];
+              const headingNum = prevHeadings.length + 1;
+              return `## ${headingNum}. ${p1}`;
+            });
+            
+            // Process numbered lists in Chinese - letter for subtitles (a., b., etc.)
+            text = text.replace(/^([a-z])[、.．][\s](.+)/gm, '$1. $2');
+            
+            // Process bullet points in Chinese with specific color
+            text = text.replace(/^[•·◦◆■◉○●][\s](.+)/gm, '* $1');
           }
           
-          currentTable.push(line);
+          // Add bold to important words
+          text = text.replace(/\b(Note|Important|Warning|Caution):/g, '**$1:**');
           
-          if (isTableSeparator) {
-            separatorRowFound = true;
+          // Convert section titles (all caps) to headings
+          text = text.replace(/^([A-Z][A-Z\s]+)$/gm, '## $1');
+        }
+        
+        // Process math expressions in the text
+        // Look for LaTeX-style math expressions ($...$ or $$...$$)
+        text = text.replace(/\$\$(.+?)\$\$/g, (match, equation) => {
+          // For display math, keep as is
+          return match;
+        });
+        
+        text = text.replace(/\$(.+?)\$/g, (match, equation) => {
+          // For inline math, keep as is
+          return match;
+        });
+        
+        // For tables, we need to maintain the special handling
+        const lines = text.split('\n');
+        let isInTable = false;
+        let tableContent = [];
+        let nonTableContent = [];
+
+        // First detect tables
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          
+          // Check for table rows (containing | character)
+          if (line.includes('|') && (line.indexOf('|') !== line.lastIndexOf('|'))) {
+            if (!isInTable) {
+              isInTable = true;
+              tableContent = [line];
+            } else {
+              tableContent.push(line);
+            }
           } else {
-            // Parse row data - properly split by | and clean the cells
-            const cells = line
-              .split('|')
-              .map(cell => cell.trim())
-              .filter((cell, index, array) => {
-                // Keep all cells except potentially empty first and last ones
-                if (index === 0 && cell === '' && line.startsWith('|')) return false;
-                if (index === array.length - 1 && cell === '' && line.endsWith('|')) return false;
-                return true;
-              });
+            if (isInTable) {
+              // We've ended a table, process it
+              const tableResult = {
+                isTable: true,
+                tableText: tableContent.join('\n')
+              };
+              nonTableContent.push(tableResult);
+              isInTable = false;
+              tableContent = [];
+            }
             
-            if (tableHeaders.length === 0 && !separatorRowFound) {
-              // This is the header row
-              tableHeaders = cells;
-            } else if (separatorRowFound) {
-              // This is a data row
-              tableData.push(cells);
+            if (line.trim() !== '') {
+              nonTableContent.push({
+                isTable: false,
+                text: line
+              });
             }
           }
-        } else {
-          // End of table
-          if (isInTable) {
-            if (tableHeaders.length > 0 && tableData.length > 0) {
-              result.push({
+        }
+        
+        // Handle case where text ends with a table
+        if (isInTable && tableContent.length > 0) {
+          nonTableContent.push({
+            isTable: true,
+            tableText: tableContent.join('\n')
+          });
+        }
+        
+        // If we found any tables, return a mix of markdown and table components
+        if (nonTableContent.some(item => item.isTable)) {
+          return nonTableContent.map(item => {
+            if (item.isTable) {
+              // Parse the table for our table renderer
+              const tableLines = item.tableText.split('\n');
+              let tableHeaders = [];
+              let tableData = [];
+              let separatorFound = false;
+              
+              tableLines.forEach(line => {
+                // Check if this is a separator row
+                const isSeparator = line.replace(/\|/g, '').trim().replace(/[^-:]/g, '') !== '';
+                
+                if (isSeparator) {
+                  separatorFound = true;
+                  return;
+                }
+                
+                // Parse cells
+                const cells = line
+                  .split('|')
+                  .map(cell => {
+                    // Remove stars and other markdown from cell content
+                    return cell.trim()
+                      .replace(/^\*\s/, '') // Remove bullet points
+                      .replace(/^\d+\.\s/, '') // Remove numbered list markers
+                      .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold
+                      .replace(/\*(.*?)\*/g, '$1'); // Remove italics
+                  })
+                  .filter((cell, idx, arr) => {
+                    if (idx === 0 && cell === '' && line.startsWith('|')) return false;
+                    if (idx === arr.length - 1 && cell === '' && line.endsWith('|')) return false;
+                    return true;
+                  });
+                
+                if (cells.length > 0) {
+                  if (!separatorFound && tableHeaders.length === 0) {
+                    tableHeaders = cells;
+                  } else if (separatorFound) {
+                    tableData.push(cells);
+                  }
+                }
+              });
+              
+              return {
                 isTable: true,
                 tableHeaders,
                 tableData,
-                tableLines: currentTable,
-              });
+                tableLines
+              };
+            } else {
+              // For non-table content, process math expressions and other formatting
+              const line = item.text;
+              const isHeading = /^#{1,3}\s.+/.test(line) || /^[A-Z].*:$/.test(line);
+              const isSubheading = /^[\*\-•]\s+.+/.test(line) || /^\d+\.\s+.+/.test(line);
+              const hasMathExpression = isMathExpression(line) || /\$(.+?)\$/.test(line);
+              const isChineseHeading = isChineseContent && (/^#+\s+.+/.test(line) || /^([\u4e00-\u9fa5]+[：:])$/.test(line));
+              const isChineseSubheading = isChineseContent && (/^[•·◦◆■◉○●][\s]/.test(line) || /^[一二三四五六七八九十]、/.test(line) || /^\d+[、.．][\s]/.test(line));
+              
+              return {
+                text: line,
+                isHeading,
+                isSubheading,
+                hasMathExpression,
+                isTable: false,
+                isMarkdown: true,
+                isChineseHeading,
+                isChineseSubheading,
+                isChineseContent
+              };
             }
-            isInTable = false;
-            currentTable = [];
-            separatorRowFound = false;
-          }
-          
-          // Process regular text
-          const isHeading = /^\d+\.\s+.+/.test(line) || /.*:$/.test(line);
-          const isSubheading = /^[-•*]\s+.+/.test(line);
-          const hasMathExpression = isMathExpression(line);
-          
-          if (line.trim() !== '') {
-            result.push({
+          });
+        } else {
+          // If there are no tables, just return the enhanced text as markdown
+          const lines = text.split('\n');
+          return lines.map(line => {
+            const isHeading = /^#{1,3}\s.+/.test(line) || /^[A-Z].*:$/.test(line);
+            const isSubheading = /^[\*\-•]\s+.+/.test(line) || /^\d+\.\s+.+/.test(line);
+            const hasMathExpression = isMathExpression(line) || /\$(.+?)\$/.test(line);
+            const isChineseHeading = isChineseContent && (/^#+\s+.+/.test(line) || /^([\u4e00-\u9fa5]+[：:])$/.test(line));
+            const isChineseSubheading = isChineseContent && (/^[•·◦◆■◉○●][\s]/.test(line) || /^[一二三四五六七八九十]、/.test(line) || /^\d+[、.．][\s]/.test(line));
+            
+            return {
               text: line,
               isHeading,
               isSubheading,
               hasMathExpression,
-              isTable: false
-            });
-          }
+              isTable: false,
+              isMarkdown: true,
+              isChineseHeading,
+              isChineseSubheading,
+              isChineseContent
+            };
+          });
         }
+      } else {
+        // For user messages, just return as plain text
+        return [{
+          text: text,
+          isMarkdown: false,
+          isTable: false
+        }];
       }
-      
-      // Handle case where the message ends with a table
-      if (isInTable && tableHeaders.length > 0 && tableData.length > 0) {
-        result.push({
-          isTable: true,
-          tableHeaders,
-          tableData,
-          tableLines: currentTable,
-        });
-      }
-      
-      return result;
     };
   
     // Format specialized mathematical content (like LaTeX formatted math expressions)
@@ -1141,7 +1403,10 @@ const decode = (base64) => {
     };
   
     return (
-      <View style={[styles.messageWrapperOuter, isBot ? {alignSelf: 'flex-start'} : {alignSelf: 'flex-end'}]}>
+      <View style={[
+        styles.messageWrapperOuter, 
+        isBot ? styles.botMessageWrapper : styles.userMessageWrapper
+      ]}>
         <Animatable.View
           animation="fadeInUp"
           duration={800}
@@ -1151,7 +1416,189 @@ const decode = (base64) => {
           ]}
         >
           <View style={isBot ? styles.botTextContainer : styles.userTextContainer}>
-            {formatMessageText(displayText).map((line, index) => {
+            {formatMessageText(displayText, item.sender).map((line, index) => {
+              // Handle markdown content
+              if (line.isMarkdown) {
+                return (
+                  <Markdown 
+                    key={`markdown-${index}`}
+                    style={{
+                      body: {
+                        color: isBot ? colors.botText : '#fff',
+                        fontSize: 16,
+                      },
+                      heading1: {
+                        color: isBot ? colors.botText : '#fff',
+                        fontWeight: 'bold',
+                        fontSize: 20,
+                        marginTop: 8,
+                        marginBottom: 4,
+                      },
+                      heading2: {
+                        color: isBot ? colors.botText : '#fff',
+                        fontWeight: 'bold',
+                        fontSize: 18,
+                        marginTop: 8,
+                        marginBottom: 4,
+                      },
+                      heading3: {
+                        color: isBot ? colors.botText : '#fff',
+                        fontWeight: 'bold',
+                        fontSize: 16,
+                        marginTop: 8,
+                        marginBottom: 4,
+                      },
+                      paragraph: {
+                        color: isBot ? colors.botText : '#fff',
+                        fontSize: 16,
+                        marginTop: 4,
+                        marginBottom: 4,
+                      },
+                      list_item: {
+                        color: isBot ? colors.botText : '#fff',
+                        fontSize: 16,
+                        marginTop: 4,
+                      },
+                      bullet_list: {
+                        color: isBot ? colors.botText : '#fff',
+                      },
+                      ordered_list: {
+                        marginLeft: 10,
+                      },
+                      ordered_list_item: {
+                        flexDirection: 'row',
+                        alignItems: 'flex-start',
+                        marginBottom: 4,
+                      },
+                      ordered_list_icon: {
+                        marginRight: 5,
+                        fontWeight: 'bold',
+                        color: '#333333',
+                      },
+                      list_item_number: {
+                        marginRight: 5,
+                        fontWeight: 'bold',
+                        fontSize: 16,
+                        color: '#333333',
+                        width: 20,
+                        textAlign: 'right',
+                      },
+                      list_item_content: {
+                        flex: 1,
+                        fontSize: 16,
+                        color: '#333333',
+                      },
+                      list_item_bullet: {
+                        marginRight: 5,
+                        fontSize: 16,
+                        color: '#333333',
+                      },
+                      blockquote: {
+                        backgroundColor: 'rgba(128, 128, 128, 0.1)',
+                        borderLeftWidth: 4,
+                        borderLeftColor: isBot ? colors.primary : '#fff',
+                        paddingLeft: 8,
+                        paddingVertical: 4,
+                        color: isBot ? colors.botText : '#fff',
+                      },
+                      code_block: {
+                        backgroundColor: 'rgba(128, 128, 128, 0.1)',
+                        padding: 8,
+                        borderRadius: 4,
+                        color: isBot ? colors.botText : '#fff',
+                      },
+                      code_inline: {
+                        backgroundColor: 'rgba(128, 128, 128, 0.1)',
+                        padding: 2,
+                        borderRadius: 2,
+                        color: isBot ? colors.botText : '#fff',
+                      },
+                      link: {
+                        color: colors.primary,
+                        textDecorationLine: 'underline',
+                      },
+                      table: {
+                        borderWidth: 1,
+                        borderColor: '#E0E0E0',
+                        marginVertical: 10,
+                      },
+                      tr: {
+                        borderBottomWidth: 1,
+                        borderBottomColor: '#E0E0E0',
+                        flexDirection: 'row',
+                      },
+                      th: {
+                        padding: 8,
+                        fontWeight: 'bold',
+                        borderRightWidth: 1,
+                        borderRightColor: '#E0E0E0',
+                        backgroundColor: '#F5F5F5',
+                        color: '#333333',
+                      },
+                      td: {
+                        padding: 8,
+                        borderRightWidth: 1,
+                        borderRightColor: '#E0E0E0',
+                        color: '#333333',
+                      },
+                      text: {
+                        color: isBot ? colors.botText : '#FFFFFF',
+                      }
+                    }}
+                    // Adding custom renderers for better ordered lists
+                    rules={{
+                      // Custom ordered list renderer
+                      list: (node, children, parent, styles) => {
+                        if (node.ordered) {
+                          return (
+                            <View key={node.key} style={styles.ordered_list}>
+                              {children}
+                            </View>
+                          );
+                        }
+                        return (
+                          <View key={node.key} style={styles.bullet_list}>
+                            {children}
+                          </View>
+                        );
+                      },
+                      // Custom ordered list item renderer
+                      list_item: (node, children, parent, styles) => {
+                        if (parent.ordered) {
+                          return (
+                            <View key={node.key} style={styles.ordered_list_item}>
+                              <Text style={[styles.list_item_number, {color: isBot ? colors.botText : '#fff'}]}>{node.index + 1}.</Text>
+                              <View style={styles.list_item_content}>
+                                {children}
+                              </View>
+                            </View>
+                          );
+                        }
+                        return (
+                          <View key={node.key} style={styles.list_item}>
+                            <Text style={[styles.list_item_bullet, {color: isBot ? colors.botText : '#fff'}]}>•</Text>
+                            <View style={{ flex: 1 }}>
+                              {children}
+                            </View>
+                          </View>
+                        );
+                      },
+                      // Custom text renderer to ensure text color
+                      text: (node, children, parent, styles) => {
+                        // Use dynamic color based on sender
+                        return (
+                          <Text key={node.key} style={[styles.text, {color: isBot ? colors.botText : '#fff'}]}>
+                            {node.content}
+                          </Text>
+                        );
+                      }
+                    }}
+                  >
+                    {line.text}
+                  </Markdown>
+                );
+              }
+              
               // Handle table rendering
               if (line.isTable) {
                 return renderTable(line, index);
@@ -1207,7 +1654,7 @@ const decode = (base64) => {
                       </TouchableOpacity>
                     );
                   } else if (part) {
-                    elements.push(<Text key={`text-${index}-${i}`} style={isBot ? styles.botText : styles.userText}>{part}</Text>);
+                    elements.push(<Text key={`text-${index}-${i}`} style={[isBot ? styles.botText : styles.userText, { color: isBot ? colors.botText : '#fff' }]}>{part}</Text>);
                   }
                 });
                 
@@ -1227,8 +1674,8 @@ const decode = (base64) => {
               else if (line.isHeading) {
                 return (
                   <View key={`line-${index}`} style={styles.headingContainer}>
-                    <Text style={styles.headingPointer}>➤</Text>
-                    <Text style={isBot ? styles.botText : styles.userText}>{line.text}</Text>
+                    <Text style={[styles.headingPointer, {color: isBot ? colors.botText : '#fff'}]}>➤</Text>
+                    <Text style={[styles.botText, {color: isBot ? colors.botText : '#fff'}]}>{line.text}</Text>
                   </View>
                 );
               }
@@ -1237,8 +1684,8 @@ const decode = (base64) => {
               else if (line.isSubheading) {
                 return (
                   <View key={`line-${index}`} style={styles.subheadingContainer}>
-                    <Text style={styles.subheadingPointer}>•</Text>
-                    <Text style={isBot ? styles.botText : styles.userText}>{line.text}</Text>
+                    <Text style={[styles.subheadingPointer, {color: isBot ? colors.botText : '#fff'}]}>•</Text>
+                    <Text style={[styles.botText, {color: isBot ? colors.botText : '#fff'}]}>{line.text}</Text>
                   </View>
                 );
               }
@@ -1251,7 +1698,7 @@ const decode = (base64) => {
               // Plain text with no special formatting
               else {
                 return (
-                  <Text key={`line-${index}`} style={isBot ? styles.botText : styles.userText}>
+                  <Text key={`line-${index}`} style={[styles.botText, {color: isBot ? colors.botText : '#fff'}]}>
                     {line.text}
                   </Text>
                 );
@@ -1896,28 +2343,150 @@ const decode = (base64) => {
 
   // Function to render a single line of text with math expressions highlighted
   const renderTextWithMath = (line, index) => {
+    // Check for LaTeX delimiters with $$ and $ notation
+    if (line.text.includes('$') && (line.text.includes('$$') || line.text.match(/\$[^$]+\$/))) {
+      // Extract LaTeX sections
+      const parts = [];
+      let lastIndex = 0;
+      
+      // First handle display math ($$...$$)
+      const displayRegex = /\$\$(.*?)\$\$/g;
+      let displayMatch;
+      
+      while ((displayMatch = displayRegex.exec(line.text)) !== null) {
+        // Add text before the math
+        if (displayMatch.index > lastIndex) {
+          parts.push({
+            type: 'text',
+            content: line.text.substring(lastIndex, displayMatch.index)
+          });
+        }
+        
+        // Add the display math
+        parts.push({
+          type: 'display-math',
+          content: displayMatch[1]
+        });
+        
+        lastIndex = displayMatch.index + displayMatch[0].length;
+      }
+      
+      // Then handle inline math ($...$)
+      if (lastIndex < line.text.length) {
+        const remainingText = line.text.substring(lastIndex);
+        const inlineRegex = /\$(.*?)\$/g;
+        let inlineMatch;
+        let inlineLastIndex = 0;
+        
+        while ((inlineMatch = inlineRegex.exec(remainingText)) !== null) {
+          // Add text before the math
+          if (inlineMatch.index > inlineLastIndex) {
+            parts.push({
+              type: 'text',
+              content: remainingText.substring(inlineLastIndex, inlineMatch.index)
+            });
+          }
+          
+          // Add the inline math
+          parts.push({
+            type: 'inline-math',
+            content: inlineMatch[1]
+          });
+          
+          inlineLastIndex = inlineMatch.index + inlineMatch[0].length;
+        }
+        
+        // Add any remaining text
+        if (inlineLastIndex < remainingText.length) {
+          parts.push({
+            type: 'text',
+            content: remainingText.substring(inlineLastIndex)
+          });
+        }
+      }
+      
+      return (
+        <View key={`math-line-${index}`} style={styles.textLine}>
+          {parts.map((part, partIndex) => {
+            if (part.type === 'text') {
+              return (
+                <Text 
+                  key={`text-part-${index}-${partIndex}`} 
+                  style={[isBot ? styles.botText : styles.userText, {color: isBot ? colors.botText : '#fff'}]}
+                >
+                  {part.content}
+                </Text>
+              );
+            } else if (part.type === 'inline-math') {
+              return (
+                <View key={`inline-math-${index}-${partIndex}`} style={styles.inlineMathContainer}>
+                  <MathView
+                    math={part.content}
+                    style={[styles.mathView, { color: isBot ? colors.botText : '#333333' }]}
+                    resizeMode="cover"
+                  />
+                </View>
+              );
+            } else if (part.type === 'display-math') {
+              return (
+                <View key={`display-math-${index}-${partIndex}`} style={styles.displayMathContainer}>
+                  <MathView
+                    math={part.content}
+                    style={[styles.mathView, { color: isBot ? colors.botText : '#333333' }]}
+                    resizeMode="cover"
+                  />
+                </View>
+              );
+            }
+            return null;
+          })}
+        </View>
+      );
+    }
+    
     // Add support for subscript notation
     if (hasMathSubscripts(line.text)) {
-      // Process subscripts
-      const formattedText = line.text
-        .replace(/([a-zA-Z])_(\d)/g, (match, p1, p2) => {
-          const subscripts = {
-            '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄',
-            '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉'
-          };
-          return p1 + subscripts[p2];
-        })
-        .replace(/([a-zA-Z])_n/g, '$1ₙ')
-        .replace(/([a-zA-Z])_i/g, '$1ᵢ')
-        .replace(/([a-zA-Z])_j/g, '$1ⱼ')
-        .replace(/([a-zA-Z])_k/g, '$1ₖ')
-        .replace(/([a-zA-Z])_a/g, '$1ₐ')
-        .replace(/([a-zA-Z])_x/g, '$1ₓ')
-        .replace(/([a-zA-Z])_\{([^}]+)\}/g, '$1ₙ');
+      // Process subscripts and use MathView for rendering
+      const mathText = line.text
+        .replace(/([a-zA-Z])_(\d)/g, '$1_{$2}')
+        .replace(/([a-zA-Z])_n/g, '$1_{n}')
+        .replace(/([a-zA-Z])_i/g, '$1_{i}')
+        .replace(/([a-zA-Z])_j/g, '$1_{j}')
+        .replace(/([a-zA-Z])_k/g, '$1_{k}')
+        .replace(/([a-zA-Z])_a/g, '$1_{a}')
+        .replace(/([a-zA-Z])_x/g, '$1_{x}')
+        .replace(/([a-zA-Z])_\{([^}]+)\}/g, '$1_{$2}');
       
       return (
         <View key={`math-line-${index}`} style={styles.mathContainer}>
-          <Text style={styles.mathText}>{formattedText}</Text>
+          <MathView
+            math={mathText}
+            style={[styles.mathView, { color: isBot ? colors.botText : '#333333' }]}
+            resizeMode="cover"
+          />
+        </View>
+      );
+    }
+    
+    // Check for specific patterns like Pythagorean theorem (a^2 + b^2 = c^2)
+    if (/[a-z]\^2\s*[\+\-]\s*[a-z]\^2\s*=\s*[a-z]\^2/.test(line.text) ||
+        /\d+\^2\s*[\+\-]\s*\d+\^2\s*=\s*[a-z]\^2/.test(line.text) ||
+        /\d+\s*\+\s*\d+\s*=\s*[a-z]\^2/.test(line.text) ||
+        /[a-z]\^2\s*[\+\-]\s*[a-z]\^2\s*=/.test(line.text)) {
+      // Format it as LaTeX
+      let latexFormula = line.text
+        .replace(/([a-z])\^(\d+)/g, '$1^{$2}')
+        .replace(/(\d+)\^(\d+)/g, '$1^{$2}')
+        .replace(/sqrt\(([^)]+)\)/g, '\\sqrt{$1}')
+        .replace(/√\s*([a-z0-9]+)/g, '\\sqrt{$1}');
+      
+      return (
+        <View key={`pythagorean-${index}`} style={styles.mathContainer}>
+          <MathView
+            math={latexFormula}
+            style={[styles.mathView, { color: isBot ? colors.botText : '#333333' }]}
+            resizeMode="cover"
+          />
         </View>
       );
     }
@@ -1934,7 +2503,10 @@ const decode = (base64) => {
       parts.forEach((part, i) => {
         if (part) {
           elements.push(
-            <Text key={`text-part-${index}-${i}`} style={styles.botText}>
+            <Text key={`text-part-${index}-${i}`} style={[
+              isBot ? styles.botText : styles.userText,
+              isBot && { color: colors.botText }
+            ]}>
               {part}
             </Text>
           );
@@ -1942,31 +2514,17 @@ const decode = (base64) => {
         
         if (matches[i]) {
           // Format the math expression for better readability
-          const { formattedMath, hasFraction, hasSquareRoot } = formatMathExpression(matches[i]);
+          const latexExpression = formatMathToLatex(matches[i]);
           
-          if (hasFraction) {
-            // Split the formula to find fractions
-            const fractionParts = parseFractionFormula(formattedMath);
-            
-            elements.push(
-              <View key={`math-part-${index}-${i}`} style={styles.mathContainer}>
-                {renderFractionFormula(fractionParts)}
-              </View>
-            );
-          } else if (hasSquareRoot) {
-            // Handle square root specially
-            elements.push(
-              <View key={`math-part-${index}-${i}`} style={styles.mathContainer}>
-                {renderSquareRoot(formattedMath)}
-              </View>
-            );
-          } else {
-            elements.push(
-              <View key={`math-part-${index}-${i}`} style={styles.mathContainer}>
-                <Text style={styles.mathText}>{formattedMath}</Text>
-              </View>
-            );
-          }
+          elements.push(
+            <View key={`math-part-${index}-${i}`} style={styles.mathContainer}>
+              <MathView
+                math={latexExpression}
+                style={[styles.mathView, { color: isBot ? colors.botText : '#333333' }]}
+                resizeMode="cover"
+              />
+            </View>
+          );
         }
       });
       
@@ -1979,7 +2537,10 @@ const decode = (base64) => {
     
     // If no math expressions found, return regular text
     return (
-      <Text key={`line-${index}`} style={styles.botText}>
+      <Text key={`text-${index}`} style={[
+        isBot ? styles.botText : styles.userText,
+        {color: isBot ? colors.botText : '#fff'}
+      ]}>
         {line.text}
       </Text>
     );
@@ -2030,16 +2591,16 @@ const decode = (base64) => {
         {parts.map((part, i) => {
           if (part.type === 'text') {
             return (
-              <Text key={`formula-part-${i}`} style={styles.mathText}>
+              <Text key={`formula-part-${i}`} style={[styles.mathText, { color: isBot ? colors.botText : '#fff' }]}>
                 {part.content}
               </Text>
             );
           } else if (part.type === 'fraction') {
             return (
               <View key={`fraction-${i}`} style={styles.fractionContainer}>
-                <Text style={styles.numerator}>{part.numerator}</Text>
-                <View style={styles.fractionLine} />
-                <Text style={styles.denominator}>{part.denominator}</Text>
+                <Text style={[styles.numerator, { color: isBot ? colors.botText : '#fff' }]}>{part.numerator}</Text>
+                <View style={[styles.fractionLine, { backgroundColor: isBot ? colors.botText : '#fff' }]} />
+                <Text style={[styles.denominator, { color: isBot ? colors.botText : '#fff' }]}>{part.denominator}</Text>
               </View>
             );
           }
@@ -2049,7 +2610,7 @@ const decode = (base64) => {
     );
   };
   
-  // Render square root notation
+  // Render square root notation using MathView
   const renderSquareRoot = (formula) => {
     // Extract the content inside the square root
     const rootMatch = formula.match(/√\(([^)]+)\)/);
@@ -2057,103 +2618,112 @@ const decode = (base64) => {
     
     return (
       <View style={styles.sqrtContainer}>
-        <Text style={styles.sqrtSymbol}>√</Text>
-        <View style={styles.sqrtOverline}>
-          <View style={styles.sqrtBar} />
-          <Text style={styles.mathText}>{rootContent}</Text>
-        </View>
+        <MathView
+          math={`\\sqrt{${rootContent}}`}
+          style={[styles.mathView, { color: isBot ? colors.botText : '#333333' }]}
+          resizeMode="cover"
+        />
       </View>
     );
   };
   
-  // Function to format math expressions to be more readable
-  const formatMathExpression = (expression) => {
-    // Replace * with × for multiplication and add line break
-    let formatted = expression.replace(/\*/g, ' ×\n');
+  // New function to convert regular math expressions to LaTeX format
+  const formatMathToLatex = (expression) => {
+    let latex = expression;
     
-    // Add line breaks for complex expressions
-    formatted = formatted.replace(/([+\-=×])\s*/g, '$1\n');
+    // First check for Pythagorean theorem patterns (a^2 + b^2 = c^2) or (3^2 + 4^2 = c^2)
+    if (/[a-z]\^2\s*[\+\-]\s*[a-z]\^2\s*=\s*[a-z]\^2/.test(expression) || 
+        /\d+\^2\s*[\+\-]\s*\d+\^2\s*=\s*[a-z]\^2/.test(expression)) {
+      latex = latex
+        .replace(/([a-z])\^(\d+)/g, '$1^{$2}')
+        .replace(/(\d+)\^(\d+)/g, '$1^{$2}');
+      return latex;
+    }
     
-    // Check if the expression has fractions
-    const hasFraction = /\d+\s*\/\s*\d+/.test(formatted);
+    // Handle simple calculations like "9 + 16 = c^2"
+    if (/\d+\s*[\+\-\*\/]\s*\d+\s*=\s*[a-z]\^2/.test(expression)) {
+      latex = latex.replace(/([a-z])\^(\d+)/g, '$1^{$2}');
+      return latex;
+    }
     
-    // Check if the expression has square roots
-    const hasSquareRoot = /√\(([^)]+)\)/.test(formatted) || /√\d+/.test(formatted);
+    // Handle result formulas like "c^2 = 25" or "c = sqrt{25} = 5"
+    if (/[a-z]\^2\s*=\s*\d+/.test(expression) || 
+        /[a-z]\s*=\s*\\?sqrt\{?\d+\}?\s*=/.test(expression)) {
+      latex = latex
+        .replace(/([a-z])\^(\d+)/g, '$1^{$2}')
+        .replace(/sqrt\{?(\d+)\}?/g, '\\sqrt{$1}');
+      return latex;
+    }
     
-    // Format common mathematical functions
-    formatted = formatted.replace(/sqrt\(([^)]+)\)/g, '√($1)');
-    formatted = formatted.replace(/square root of (\d+)/gi, '√$1');
-    formatted = formatted.replace(/square root/gi, '√');
+    // Convert regular math operations to LaTeX
+    latex = latex.replace(/\*/g, '\\times ');
+    latex = latex.replace(/\//g, '\\div ');
+    latex = latex.replace(/sqrt\(([^)]+)\)/g, '\\sqrt{$1}');
+    latex = latex.replace(/square root of (\d+)/gi, '\\sqrt{$1}');
+    latex = latex.replace(/square root/gi, '\\sqrt{}');
+    
+    // Convert fractions
+    latex = latex.replace(/(\d+)\s*\/\s*(\d+)/g, '\\frac{$1}{$2}');
+    
+    // Convert trigonometric functions
+    latex = latex.replace(/sin\(([^)]+)\)/g, '\\sin($1)');
+    latex = latex.replace(/cos\(([^)]+)\)/g, '\\cos($1)');
+    latex = latex.replace(/tan\(([^)]+)\)/g, '\\tan($1)');
+    
+    // Convert logarithmic functions
+    latex = latex.replace(/log\(([^)]+)\)/g, '\\log($1)');
+    
+    // Replace ^ with LaTeX power notation
+    latex = latex.replace(/\^(\d+)/g, '^{$1}');
+    latex = latex.replace(/([a-zA-Z0-9])\^([a-zA-Z0-9])/g, '$1^{$2}');
     
     // Format pi
-    formatted = formatted.replace(/\bpi\b/gi, 'π');
+    latex = latex.replace(/\bpi\b/gi, '\\pi ');
+    
+    // Replace special quad and rightarrow symbols
+    latex = latex.replace(/\\quad/g, '\\,');
+    latex = latex.replace(/\\rightarrow/g, '\\to');
+    
+    return latex;
+  };
+  
+  // Function to format math expressions to LaTeX format
+  const formatMathExpression = (expression) => {
+    // Convert to LaTeX format
+    let latex = expression;
+    
+    // Replace * with × for multiplication
+    latex = latex.replace(/\*/g, '\\times ');
+    
+    // Format fractions
+    latex = latex.replace(/(\d+)\s*\/\s*(\d+)/g, '\\frac{$1}{$2}');
+    
+    // Format square roots
+    latex = latex.replace(/sqrt\(([^)]+)\)/g, '\\sqrt{$1}');
+    latex = latex.replace(/square root of (\d+)/gi, '\\sqrt{$1}');
+    latex = latex.replace(/square root/gi, '\\sqrt{}');
+    
+    // Format pi
+    latex = latex.replace(/\bpi\b/gi, '\\pi ');
     
     // Format trigonometric functions
-    formatted = formatted.replace(/\b(sin|cos|tan)\(/g, '$1(');
+    latex = latex.replace(/\b(sin|cos|tan)\(/g, '\\$1(');
     
     // Format logarithmic functions
-    formatted = formatted.replace(/\blog\(/g, 'log(');
-    
-    // Handle subscripts like a_{n}
-    formatted = formatted.replace(/([a-zA-Z])_\{([^}]+)\}/g, '$1ₙ');
-    
-    // Handle specific subscripts
-    formatted = formatted.replace(/_0/g, '₀');
-    formatted = formatted.replace(/_1/g, '₁');
-    formatted = formatted.replace(/_2/g, '₂');
-    formatted = formatted.replace(/_3/g, '₃');
-    formatted = formatted.replace(/_4/g, '₄');
-    formatted = formatted.replace(/_5/g, '₅');
-    formatted = formatted.replace(/_6/g, '₆');
-    formatted = formatted.replace(/_7/g, '₇');
-    formatted = formatted.replace(/_8/g, '₈');
-    formatted = formatted.replace(/_9/g, '₉');
-    formatted = formatted.replace(/_n/g, 'ₙ');
-    formatted = formatted.replace(/_i/g, 'ᵢ');
-    formatted = formatted.replace(/_j/g, 'ⱼ');
-    formatted = formatted.replace(/_k/g, 'ₖ');
-    formatted = formatted.replace(/_a/g, 'ₐ');
-    formatted = formatted.replace(/_x/g, 'ₓ');
+    latex = latex.replace(/\blog\(/g, '\\log(');
     
     // Handle exponents
-    formatted = formatted.replace(/\^2/g, '²');
-    formatted = formatted.replace(/\^3/g, '³');
-    formatted = formatted.replace(/\^4/g, '⁴');
-    formatted = formatted.replace(/\^5/g, '⁵');
-    formatted = formatted.replace(/\^6/g, '⁶');
-    formatted = formatted.replace(/\^7/g, '⁷');
-    formatted = formatted.replace(/\^8/g, '⁸');
-    formatted = formatted.replace(/\^9/g, '⁹');
-    formatted = formatted.replace(/\^0/g, '⁰');
+    latex = latex.replace(/\^2/g, '^{2}');
+    latex = latex.replace(/\^3/g, '^{3}');
+    latex = latex.replace(/\^(\d+)/g, '^{$1}');
     
-    // Handle variables with exponents
-    formatted = formatted.replace(/([a-z])\^2/gi, '$1²');
-    formatted = formatted.replace(/([a-z])\^3/gi, '$1³');
-    formatted = formatted.replace(/([a-z])\^4/gi, '$1⁴');
-    formatted = formatted.replace(/([a-z])\^5/gi, '$1⁵');
-    formatted = formatted.replace(/([a-z])\^6/gi, '$1⁶');
-    formatted = formatted.replace(/([a-z])\^7/gi, '$1⁷');
-    formatted = formatted.replace(/([a-z])\^8/gi, '$1⁸');
-    formatted = formatted.replace(/([a-z])\^9/gi, '$1⁹');
+    // Check if the expression has fractions
+    const hasFraction = /\\frac\{.+\}\{.+\}/.test(latex);
     
-    // Format common formulas
-    formatted = formatted.replace(/a\^2\s*\+\s*b\^2\s*=\s*c\^2/g, 'a² + b² = c²');
-    formatted = formatted.replace(/E\s*=\s*mc\^2/g, 'E = mc²');
-    formatted = formatted.replace(/F\s*=\s*ma/g, 'F = ma');
+    // Check if the expression has square roots
+    const hasSquareRoot = /\\sqrt\{.+\}/.test(latex);
     
-    // Format area formulas
-    formatted = formatted.replace(/area\s*=\s*πr\^2/gi, 'Area = πr²');
-    formatted = formatted.replace(/area\s*=\s*π\s*×\s*r\^2/gi, 'Area = π × r²');
-    formatted = formatted.replace(/area\s*=\s*l\s*×\s*w/gi, 'Area = L × W');
-    
-    // Format perimeter formulas
-    formatted = formatted.replace(/perimeter\s*=\s*2\s*×\s*\(l\s*\+\s*w\)/gi, 'Perimeter = 2 × (L + W)');
-    formatted = formatted.replace(/circumference\s*=\s*2\s*×\s*π\s*×\s*r/gi, 'Circumference = 2 × π × r');
-    
-    // Clean up excess spaces and line breaks
-    formatted = formatted.replace(/\s+/g, ' ').trim();
-    
-    return { formattedMath: formatted, hasFraction, hasSquareRoot };
+    return { formattedMath: latex, hasFraction, hasSquareRoot };
   };
 
   // Function to handle image tap and show fullscreen view
@@ -2168,66 +2738,151 @@ const decode = (base64) => {
       return null;
     }
     
-    // Calculate column widths based on content
-    const columnCount = Math.max(
-      tableData.tableHeaders.length,
-      ...tableData.tableData.map(row => row.length)
-    );
+    // Process table data to remove asterisks/stars from content
+    const processedTableHeaders = tableData.tableHeaders.map(header => 
+      header ? header.replace(/\*\*/g, '').replace(/\*/g, '') : '');
+    
+    const processedTableData = tableData.tableData.map(row => 
+      row.map(cell => cell ? cell.toString().replace(/\*\*/g, '').replace(/\*/g, '') : ''));
+    
+    // Find the maximum text length in each column to calculate proportional widths
+    const getMaxTextLengthForColumn = (colIndex) => {
+      const headerLength = processedTableHeaders[colIndex]?.length || 0;
+      const cellLengths = processedTableData.map(row => (row[colIndex]?.length || 0));
+      return Math.max(headerLength, ...cellLengths);
+    };
+    
+    // Calculate width percentages based on content length
+    const columnCount = processedTableHeaders.length;
+    const columnLengths = Array.from({ length: columnCount }, (_, i) => getMaxTextLengthForColumn(i));
+    const totalLength = columnLengths.reduce((sum, len) => sum + len, 0);
     
     // Determine if table needs horizontal scrolling (more than 3 columns or very long content)
-    const hasLongContent = tableData.tableHeaders.some(header => header.length > 15) || 
-                           tableData.tableData.some(row => 
-                             row.some(cell => cell && cell.length > 15)
+    const hasLongContent = processedTableHeaders.some(header => header && header.length > 20) || 
+                           processedTableData.some(row => 
+                             row.some(cell => cell && cell.length > 20)
                            );
     const needsScroll = columnCount > 3 || hasLongContent;
     
+    // Check if this is a schedule-like table as in the image
+    const isScheduleTable = processedTableHeaders.some(header => 
+      header && (header.includes("Day") || header.includes("Morning") || header.includes("Afternoon")));
+    
     return (
-      <View key={`table-${index}`} style={styles.tableContainer}>
+      <View key={`table-${index}`} style={[
+        styles.tableContainer,
+        isScheduleTable && styles.scheduleTableContainer
+      ]}>
         {needsScroll ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={true}>
-            <TableContent tableData={tableData} />
+            <TableContent 
+              tableHeaders={processedTableHeaders}
+              tableData={processedTableData}
+              columnLengths={columnLengths} 
+              totalLength={totalLength}
+              isScheduleTable={isScheduleTable}
+            />
           </ScrollView>
         ) : (
-          <TableContent tableData={tableData} />
+          <TableContent 
+            tableHeaders={processedTableHeaders}
+            tableData={processedTableData}
+            columnLengths={columnLengths} 
+            totalLength={totalLength}
+            isScheduleTable={isScheduleTable}
+          />
         )}
       </View>
     );
   };
 
   // Create a separate component for table content
-  const TableContent = React.memo(({ tableData }) => {
+  const TableContent = React.memo(({ tableHeaders, tableData, columnLengths, totalLength, isScheduleTable }) => {
     return (
-      <View>
+      <View style={isScheduleTable ? styles.scheduleTableWrapper : styles.regularTableWrapper}>
         {/* Table header row */}
-        <View style={styles.tableHeaderRow}>
-          {tableData.tableHeaders.map((header, headerIndex) => (
-            <View key={`header-${headerIndex}`} style={[
-              styles.tableHeaderCell,
-              headerIndex === 0 ? styles.tableFirstColumn : null,
-              headerIndex === tableData.tableHeaders.length - 1 ? styles.tableLastColumn : null
-            ]}>
-              <Text style={styles.tableHeaderText}>{header}</Text>
-            </View>
-          ))}
+        <View style={[styles.tableHeaderRow, isScheduleTable && styles.scheduleTableHeaderRow]}>
+          {tableHeaders.map((header, headerIndex) => {
+            // Calculate width based on content length proportion
+            const widthPercentage = columnLengths[headerIndex] / totalLength;
+            const minWidth = Math.max(100, 50 + (columnLengths[headerIndex] * 10));
+            
+            return (
+              <View 
+                key={`header-${headerIndex}`} 
+                style={[
+                  styles.tableHeaderCell,
+                  {
+                    flex: widthPercentage * 3, // Make the width proportional to text length
+                    minWidth: minWidth,
+                  },
+                  headerIndex === 0 ? styles.tableFirstColumn : null,
+                  headerIndex === tableHeaders.length - 1 ? styles.tableLastColumn : null,
+                  isScheduleTable && styles.scheduleTableHeaderCell
+                ]}
+              >
+                <Text style={[
+                  styles.tableHeaderText,
+                  { color: '#333333' },
+                  isScheduleTable && styles.scheduleTableHeaderText
+                ]}>
+                  {header || ''}
+                </Text>
+              </View>
+            );
+          })}
         </View>
         
         {/* Table data rows */}
-        {tableData.tableData.map((row, rowIndex) => (
-          <View key={`row-${rowIndex}`} style={[
-            styles.tableRow,
-            rowIndex % 2 === 0 ? styles.tableEvenRow : styles.tableOddRow
-          ]}>
-            {row.map((cell, cellIndex) => (
-              <View key={`cell-${rowIndex}-${cellIndex}`} style={[
-                styles.tableCell,
-                cellIndex === 0 ? styles.tableFirstColumn : null,
-                cellIndex === row.length - 1 ? styles.tableLastColumn : null
-              ]}>
-                <Text style={styles.tableCellText}>{cell || ''}</Text>
-              </View>
-            ))}
-          </View>
-        ))}
+        {tableData.map((row, rowIndex) => {
+          // Check if the row contains day information
+          const isDayRow = row.some(cell => cell && cell.toString().includes && cell.toString().includes("Day"));
+          
+          return (
+            <View 
+              key={`row-${rowIndex}`} 
+              style={[
+                styles.tableRow,
+                rowIndex % 2 === 0 ? styles.tableEvenRow : styles.tableOddRow,
+                isScheduleTable && styles.scheduleTableRow,
+                isDayRow && styles.dayRow,
+                rowIndex === tableData.length - 1 && styles.tableLastRow
+              ]}
+            >
+              {row.map((cell, cellIndex) => {
+                // Use the same width calculation as for headers
+                const widthPercentage = columnLengths[cellIndex] / totalLength;
+                const minWidth = Math.max(100, 50 + (columnLengths[cellIndex] * 10));
+                
+                return (
+                  <View 
+                    key={`cell-${rowIndex}-${cellIndex}`} 
+                    style={[
+                      styles.tableCell,
+                      {
+                        flex: widthPercentage * 3, // Make the width proportional to text length
+                        minWidth: minWidth,
+                      },
+                      cellIndex === 0 ? styles.tableFirstColumn : null,
+                      cellIndex === row.length - 1 ? styles.tableLastColumn : null,
+                      isScheduleTable && styles.scheduleTableCell,
+                      isDayRow && styles.dayCellStyle
+                    ]}
+                  >
+                    <Text style={[
+                      styles.tableCellText,
+                      { color: '#333333' },
+                      isScheduleTable && styles.scheduleTableCellText,
+                      isDayRow && styles.dayText
+                    ]}>
+                      {cell || ''}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          );
+        })}
       </View>
     );
   });
@@ -2519,6 +3174,7 @@ const decode = (base64) => {
 };
 
 const styles = StyleSheet.create({
+
   backButton: {
     position: 'absolute',
     left: 0,
@@ -2691,7 +3347,6 @@ const styles = StyleSheet.create({
   messageContainer: {
     maxWidth: '85%',
     marginVertical: 4,
-  
     padding: 12,
     borderRadius: 5,
     backgroundColor: '#fff',
@@ -2706,29 +3361,27 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   botMessageContainer: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#E0E0E0',
-    marginLeft: 15,
+    alignSelf: 'stretch',
+    width: '100%',
+    maxWidth: '100%',
+    marginLeft: 0,
+    marginRight: 0,
+    padding: 15,
+    backgroundColor: 'transparent',
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   userMessageContainer: {
     alignSelf: 'flex-end',
     backgroundColor: '#4C8EF7',
     marginRight: 15,
+    maxWidth: '85%',
   },
   botTail: {
-    position: 'absolute',
-    left: -10,
-    bottom: 0,
-    width: 0,
-    height: 0,
-    borderLeftWidth: 10,
-    borderRightWidth: 10,
-    borderBottomWidth: 10,
-    borderStyle: 'solid',
-    backgroundColor: 'transparent',
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderBottomColor: '#E0E0E0',
+    display: 'none', // Hide the tail for bot messages
   },
   userTail: {
     position: 'absolute',
@@ -2759,11 +3412,11 @@ const styles = StyleSheet.create({
     height: 300,
   },
   botText: {
-    color: '#333',
     fontSize: 16,
+    color: '#333333', // Default color that will be overridden with inline style
   },
   userText: {
-    color: '#FFF',
+    color: '#fff',
     fontSize: 16,
   },
   textInput: {
@@ -3098,8 +3751,8 @@ paddingVertical:10,
   mathText: {
     fontFamily: 'monospace',
     fontWeight: 'bold',
-    fontSize: 12,
-    color: '#1B5E20',
+    fontSize: 14,
+    color: '#333333', // Default color that will be overridden with inline style
     letterSpacing: 1,
     flexShrink: 1,
   },
@@ -3135,7 +3788,7 @@ paddingVertical:10,
     fontWeight: 'bold',
     fontSize: 12,
     marginRight: 8,
-    color: '#2196F3',
+    color: '#007bff',
   },
   subheadingText: {
     fontWeight: 'bold',
@@ -3156,18 +3809,13 @@ paddingVertical:10,
     marginRight: 5,
   },
   inlineMathContainer: {
-    backgroundColor: '#EAF5FF',
-    borderRadius: 12,
-    padding: 8,
-    marginVertical: 4,
-    borderWidth: 2,
-    borderColor: '#4C8EF7',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 4,
+    padding: 4,
+    marginHorizontal: 2,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
     alignSelf: 'flex-start',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3,
-    elevation: 4,
   },
   formulaContainer: {
     flexDirection: 'row',
@@ -3327,6 +3975,16 @@ paddingVertical:10,
   messageWrapperOuter: {
     maxWidth: '85%',
     marginVertical: 4,
+    width: 'auto',
+  },
+  botMessageWrapper: {
+    alignSelf: 'stretch',
+    width: '100%',
+    maxWidth: '100%',
+  },
+  userMessageWrapper: {
+    alignSelf: 'flex-end',
+    maxWidth: '85%',
   },
   tableContainer: {
     borderWidth: 1,
@@ -3335,6 +3993,9 @@ paddingVertical:10,
     marginVertical: 10,
     overflow: 'hidden',
     width: '100%',
+    alignSelf: 'flex-start',
+    backgroundColor: '#fff',
+    maxWidth: '100%',
   },
   tableHeaderRow: {
     flexDirection: 'row',
@@ -3344,6 +4005,8 @@ paddingVertical:10,
   },
   tableRow: {
     flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
   },
   tableEvenRow: {
     backgroundColor: '#FFFFFF',
@@ -3352,18 +4015,18 @@ paddingVertical:10,
     backgroundColor: '#F9F9F9',
   },
   tableHeaderCell: {
-    minWidth: 100,
-    maxWidth: 250,
-    padding: 8,
+    flex: 1,
+    padding: 12,
     justifyContent: 'center',
+    alignItems: 'center',
     borderRightWidth: 1,
     borderRightColor: '#E0E0E0',
   },
   tableCell: {
-    minWidth: 100,
-    maxWidth: 250,
-    padding: 8,
+    flex: 1,
+    padding: 12,
     justifyContent: 'center',
+    alignItems: 'center',
     borderRightWidth: 1,
     borderRightColor: '#E0E0E0',
   },
@@ -3375,12 +4038,189 @@ paddingVertical:10,
   },
   tableHeaderText: {
     fontWeight: 'bold',
-    fontSize: 14,
+    fontSize: 15,
     color: '#333333',
+    textAlign: 'center',
   },
   tableCellText: {
     fontSize: 14,
-    color: '#555555',
+    color: '#333333',
+    textAlign: 'center',
+  },
+  regularTableWrapper: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#ccc',
+  },
+  scheduleTableWrapper: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  scheduleTableRow: {
+    backgroundColor: '#F5F5F5',
+  },
+  scheduleTableHeaderCell: {
+    backgroundColor: '#f1f2f6',
+    padding: 12,
+  },
+  scheduleTableHeaderText: {
+    fontWeight: 'bold',
+    fontSize: 15,
+    color: '#333',
+    textAlign: 'center',
+  },
+  scheduleTableCell: {
+    padding: 12,
+    borderRightWidth: 1,
+    borderRightColor: '#eee',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scheduleTableCellText: {
+    fontSize: 14,
+    color: '#333',
+    textAlign: 'center',
+  },
+  dayRow: {
+    backgroundColor: '#f0f0f0',
+  },
+  dayText: {
+    fontWeight: 'bold',
+    fontStyle: 'italic',
+    color: '#333',
+  },
+  messageTextContainer: {
+    width: '100%',
+  },
+  ordered_list: {
+    marginLeft: 10,
+  },
+  ordered_list_item: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 4,
+  },
+  ordered_list_icon: {
+    marginRight: 5,
+    fontWeight: 'bold',
+    color: '#333333',
+  },
+  list_item_number: {
+    marginRight: 5,
+    fontWeight: 'bold',
+    fontSize: 16,
+    color: '#333333',
+    width: 20,
+    textAlign: 'right',
+  },
+  list_item_content: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333333',
+  },
+  list_item_bullet: {
+    marginRight: 5,
+    fontSize: 16,
+    color: '#333333',
+  },
+  chineseHeadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 8,
+    width: '80%',
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#BBDEFB',
+  },
+  chineseHeadingText: {
+    fontWeight: 'bold',
+    fontSize: 18,
+    color: '#1976D2', // Default color that will be overridden with inline style
+    marginRight: 8,
+  },
+  chineseSubheadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '80%',
+  },
+  chineseSubheadingPointer: {
+    fontSize: 16,
+    marginRight: 8,
+    color: '#007bff',  // Changed from #2196F3 to #007bff
+  },
+  chineseSubheadingText: {
+    fontWeight: 'bold',
+    fontSize: 12,
+    color: '#2196F3', // Default color that will be overridden with inline style
+    flex: 1,
+  },
+  displayMathContainer: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    padding: 10,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    alignSelf: 'flex-start',
+    width: '100%', 
+    maxWidth: '100%',
+  },
+  scheduleTableContainer: {
+    borderWidth: 2,
+    borderColor: '#4C8EF7',
+    borderStyle: 'dashed',
+  },
+  scheduleTableHeaderRow: {
+    backgroundColor: '#E3F2FD',
+  },
+  dayCellStyle: {
+    backgroundColor: '#fff',
+  },
+  tableLastRow: {
+    borderBottomWidth: 0,
+  },
+  // MathView styles
+  mathView: {
+    minHeight: 30,
+    alignSelf: 'center',
+    margin: 5,
+  },
+  mathContainer: {
+    marginVertical: 5,
+    padding: 5,
+    backgroundColor: 'rgba(240, 240, 240, 0.3)',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inlineMathContainer: {
+    marginHorizontal: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  displayMathContainer: {
+    marginVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: 'rgba(240, 240, 240, 0.3)',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+  },
+  dayRow: {
+    backgroundColor: '#f0f0f0',
+  },
+  dayText: {
+    fontWeight: 'bold',
+    fontStyle: 'italic',
+    color: '#333',
   },
 });
 
