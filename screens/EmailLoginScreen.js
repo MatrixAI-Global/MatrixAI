@@ -155,11 +155,40 @@ const EmailLoginScreen = ({ navigation }) => {
         setLoading(true);
     
         try {
-            // Use Supabase directly for login
-            const { data, error } = await supabase.auth.signInWithPassword({
-                email: email.trim(),
-                password: password.trim()
-            });
+            // Implement retry logic for network issues
+            const loginWithRetry = async (retries = 3, delay = 1000) => {
+                for (let attempt = 0; attempt < retries; attempt++) {
+                    try {
+                        // Use a promise with timeout to handle network issues
+                        const loginPromise = supabase.auth.signInWithPassword({
+                            email: email.trim(),
+                            password: password.trim()
+                        });
+                        
+                        // Create a timeout promise
+                        const timeoutPromise = new Promise((_, reject) => 
+                            setTimeout(() => reject(new Error('Login request timed out')), 10000)
+                        );
+                        
+                        // Race the promises - whichever resolves/rejects first wins
+                        const result = await Promise.race([loginPromise, timeoutPromise]);
+                        return result;
+                    } catch (error) {
+                        console.log(`Login attempt ${attempt + 1} failed:`, error.message);
+                        
+                        // If this was the last attempt, throw the error
+                        if (attempt === retries - 1) throw error;
+                        
+                        // Otherwise wait before retrying
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        // Increase delay for next attempt
+                        delay *= 1.5;
+                    }
+                }
+            };
+            
+            // Attempt login with retry
+            const { data, error } = await loginWithRetry();
 
             if (error) {
                 // Check if the error is about user not registered
@@ -245,10 +274,20 @@ const EmailLoginScreen = ({ navigation }) => {
         } catch (error) {
             console.error('Error during login:', error);
             
+            // Handle specific network errors
+            let errorMessage = error.message || 'Login failed. Please try again.';
+            if (
+                error.message.includes('Network request failed') || 
+                error.message.includes('timed out') ||
+                error.message.includes('network')
+            ) {
+                errorMessage = 'Network error. Please check your internet connection and try again.';
+            }
+            
             Toast.show({
                 type: 'error',
                 text1: 'Login Failed',
-                text2: error.message || 'Login failed. Please try again.',
+                text2: errorMessage,
                 position: 'bottom'
             });
         } finally {

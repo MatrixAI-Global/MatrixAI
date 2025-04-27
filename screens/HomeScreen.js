@@ -140,7 +140,7 @@ const HomeScreen = () => {
     },
     {
       id: 'ppt',
-      title: 'Generate Presentation',
+      title: 'Presentation AI',
       description: 'Create slide decks automatically',
       icon: <MaterialCommunityIcons name="file-presentation-box" size={26} color="#FFFFFF" />,
       colors: ['#00BFA5', '#009688'],
@@ -642,7 +642,7 @@ const styles = StyleSheet.create({
   },
   toolCardContent: {
     padding: 16,
-    height: 140,
+    height: 160,
   },
   toolIconWrapper: {
     marginBottom: 12,
@@ -674,6 +674,7 @@ const styles = StyleSheet.create({
   toolTextContainer: {
     flex: 1,
     justifyContent: 'flex-start',
+    paddingBottom: 8,
   },
   toolTitle: {
     fontSize: 16,

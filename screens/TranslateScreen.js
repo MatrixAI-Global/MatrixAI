@@ -53,20 +53,19 @@ import Slider from '@react-native-community/slider'; // Import the Slider compon
       const scrollY = new Animated.Value(0);
       const playerHeight = scrollY.interpolate({
           inputRange: [0, 100],
-          outputRange: [120, 60],
+          outputRange: [120, 35],
           extrapolate: 'clamp',
       });
       const playerPadding = scrollY.interpolate({
           inputRange: [0, 200],
-          outputRange: [16, 8],
+          outputRange: [16, 1],
           extrapolate: 'clamp',
       });
     
       const [waveformHeights, setWaveformHeights] = useState([]);
       const [isTranscriptionGenerating, setIsTranscriptionGenerating] = useState(false);
-const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new Set());
+      const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new Set());
 
-      const [is2xSpeed, setIs2xSpeed] = useState(false);
       const [isRepeatMode, setIsRepeatMode] = useState(false);
       const [editingStates, setEditingStates] = useState([]);
       const [transcription, setTranscription] = useState([]);
@@ -89,6 +88,14 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
       const scrollViewRef = useRef(null);
       const [isSeeking, setIsSeeking] = useState(false);
       const userScrollTimeoutRef = useRef(null);
+      // Add state to track the user's scroll position
+      const [userScrollPosition, setUserScrollPosition] = useState(0);
+      // Add ref to track if user has scrolled since last auto-scroll
+      const hasUserScrolledRef = useRef(false);
+      // Add a mutex to prevent scroll conflicts
+      const isScrollingRef = useRef(false);
+      // Add a ref to prevent auto-scroll from happening too frequently
+      const lastAutoScrollTimeRef = useRef(0);
 
       const isTranscriptionEmpty = transcription  === '';
       const coin = require('../assets/coin.png');
@@ -98,8 +105,141 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
           word: ''
       });
 
+      // Add helper function to centralize scroll decision logic
+      const canScrollToCurrentParagraph = () => {
+        // FIRST CHECK: Is user actively scrolling?
+        // If yes, we should NOT auto-scroll
+        if (isUserScrolling) {
+          console.log("User is actively scrolling - blocking auto-scroll");
+          return false;
+        }
+        
+        // IMPORTANT: If user has manually scrolled, but we're coming back after the timeout,
+        // we SHOULD allow auto-scrolling again to resume normal behavior
+        // This ensures auto-scrolling works normally when user isn't interacting
+        
+        // If we're already in the middle of a scroll operation, don't start another
+        if (isScrollingRef.current) {
+          console.log("Already scrolling - blocking another scroll");
+          return false;
+        }
+        
+        // Check throttling (don't scroll too frequently)
+        const now = Date.now();
+        const timeSinceLastScroll = now - lastAutoScrollTimeRef.current;
+        const MIN_SCROLL_INTERVAL = 300; // Minimum ms between scrolls
+        
+        if (timeSinceLastScroll < MIN_SCROLL_INTERVAL) {
+          console.log("Scrolled too recently - blocking to prevent jitter");
+          return false;
+        }
+        
+        // All conditions pass, safe to scroll
+        return true;
+      };
+      
+      // Add helper function to perform auto-scroll with proper safeguards
+      const performAutoScroll = (targetParagraphIndex) => {
+        if (!canScrollToCurrentParagraph()) {
+          return false; // Can't scroll now
+        }
+        
+        // Update timestamp of last scroll attempt
+        lastAutoScrollTimeRef.current = Date.now();
+        
+        // Set mutex to prevent conflicts
+        isScrollingRef.current = true;
+        
+        // Update which paragraph we last scrolled to
+        setLastScrolledPara(targetParagraphIndex);
+        
+        // Use the paragraph ref for more accurate scrolling
+        if (paragraphRefs.current[targetParagraphIndex]) {
+          paragraphRefs.current[targetParagraphIndex].measureLayout(
+            scrollViewRef.current,
+            (x, y) => {
+              // Final check to make sure user hasn't started scrolling
+              if (isUserScrolling) {
+                isScrollingRef.current = false;
+                return;
+              }
+              
+              // Perform the actual scroll
+              scrollViewRef.current.scrollTo({
+                y: y - 20,
+                animated: true
+              });
+              
+              // Release the mutex after animation completes
+              setTimeout(() => {
+                isScrollingRef.current = false;
+              }, 300);
+            },
+            () => {
+              // Fallback if measurement fails
+              if (isUserScrolling) {
+                isScrollingRef.current = false;
+                return;
+              }
+              
+              // Fallback scroll
+              scrollViewRef.current.scrollTo({
+                y: targetParagraphIndex * 200,
+                animated: true
+              });
+              
+              // Release the mutex after animation
+              setTimeout(() => {
+                isScrollingRef.current = false;
+              }, 300);
+            }
+          );
+        } else {
+          // If reference not available, use fallback
+          if (isUserScrolling) {
+            isScrollingRef.current = false;
+            return false;
+          }
+          
+          // Fallback scroll
+          scrollViewRef.current.scrollTo({
+            y: targetParagraphIndex * 200,
+            animated: true
+          });
+          
+          // Release the mutex after animation
+          setTimeout(() => {
+            isScrollingRef.current = false;
+          }, 300);
+        }
+        
+        return true; // Scroll was performed
+      };
+
       useEffect(() => {
-        if (scrollViewRef.current && currentWordIndex.paraIndex !== undefined) {
+        // Don't auto-scroll in these cases:
+        // 1. If the user is manually scrolling
+        // 2. If a scroll operation is already in progress
+        // 3. If the last auto-scroll happened too recently (prevent jittering)
+        const now = Date.now();
+        const timeSinceLastScroll = now - lastAutoScrollTimeRef.current;
+        const MIN_SCROLL_INTERVAL = 300; // Minimum 300ms between auto-scrolls to prevent jitter
+        
+        // CHANGE: Removed hasUserScrolledRef.current check to allow auto-scrolling 
+        // to continue during normal playback when user isn't actively scrolling
+        if (scrollViewRef.current && 
+            currentWordIndex.paraIndex !== undefined && 
+            !isUserScrolling && 
+            !isScrollingRef.current &&
+            timeSinceLastScroll > MIN_SCROLL_INTERVAL) {
+        
+          console.log("Auto-scrolling to paragraph:", currentWordIndex.paraIndex);
+          // Update the last auto-scroll time
+          lastAutoScrollTimeRef.current = now;
+          
+          // Set the mutex to prevent user scroll interference
+          isScrollingRef.current = true;
+          
           // Calculate approximate y position based on paragraph index
           // Use a smaller offset to position the paragraph at the top with some padding
           const yOffset = currentWordIndex.paraIndex * 150 - 20; // Adjust based on paragraph height
@@ -107,8 +247,22 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
             y: Math.max(0, yOffset), // Ensure we don't scroll to negative values
             animated: true 
           });
+          
+          // Release the scroll mutex after animation completes
+          setTimeout(() => {
+            isScrollingRef.current = false;
+          }, 300); // Animation typically takes ~300ms
+        } else if (scrollViewRef.current && isUserScrolling && hasUserScrolledRef.current) {
+          // If user is actively scrolling, maintain their scroll position
+          // But only do this if we're not already in a scroll operation
+          if (!isScrollingRef.current) {
+            scrollViewRef.current.scrollTo({
+              y: userScrollPosition,
+              animated: false // Don't animate when restoring user position
+            });
+          }
         }
-      }, [currentWordIndex.paraIndex]);
+      }, [currentWordIndex.paraIndex, isUserScrolling, userScrollPosition]);
       const [wordTimings, setWordTimings] = useState([]);
       const navigation = useNavigation();
      
@@ -246,85 +400,37 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
         setPlaybackSpeed(selectedSpeed);
         setIsSpeedDropdownVisible(false);
         
-        // Determine if it's 2x speed (for backward compatibility with existing code)
-        const isSpeedFast = selectedSpeed > 1.0;
-        setIs2xSpeed(isSpeedFast);
-        
         // Clear any existing speed timer
         if (speedTimerRef.current) {
             clearInterval(speedTimerRef.current);
             speedTimerRef.current = null;
         }
         
-        // Try to use native rate control if available
+        // Use native rate control
         if (Platform.OS === 'ios') {
             try {
-                // This is a hack to access the underlying AVAudioPlayer
+                // This accesses the underlying AVAudioPlayer
                 const player = sound._player;
                 if (player && typeof player.setRate === 'function') {
                     player.setRate(selectedSpeed);
                     console.log(`Set iOS playback rate to ${selectedSpeed}`);
-                    return;
                 }
             } catch (e) {
                 console.log('iOS native rate control failed:', e);
             }
         } else if (Platform.OS === 'android') {
             try {
-                // This is a hack to access the underlying MediaPlayer
+                // This accesses the underlying MediaPlayer
                 const player = sound._player;
                 if (player && typeof player.setPlaybackParams === 'function') {
                     const params = player.getPlaybackParams();
                     params.setSpeed(selectedSpeed);
                     player.setPlaybackParams(params);
                     console.log(`Set Android playback rate to ${selectedSpeed}`);
-                    return;
                 }
             } catch (e) {
                 console.log('Android native rate control failed:', e);
             }
-        }
-        
-        // Improved fallback approach for custom speed
-        console.log('Using improved timer-based speed control fallback');
-        
-        // If switching to a faster speed and audio is playing, start the speed timer
-        if (isSpeedFast && isAudioPlaying) {
-            // For faster speed, we need to seek forward by smaller increments
-            speedTimerRef.current = setInterval(() => {
-                if (sound && isAudioPlaying) {
-                    sound.getCurrentTime((seconds) => {
-                        // Calculate new position based on selected speed
-                        // Use a smaller increment more frequently for smoother playback
-                        const incrementFactor = selectedSpeed - 1.0;
-                        const newPosition = Math.min(seconds + (0.05 * incrementFactor * 1.5), audioDuration);
-                        
-                        // Only update if we're not at the end
-                        if (newPosition < audioDuration) {
-                            sound.setCurrentTime(newPosition);
-                            setAudioPosition(newPosition);
-                            
-                            // Update the UI with the new position
-                            onAudioProgress({
-                                currentTime: newPosition,
-                                duration: audioDuration
-                            });
-                        } else {
-                            // We've reached the end, stop the timer
-                            clearInterval(speedTimerRef.current);
-                            speedTimerRef.current = null;
-                            
-                            // Also stop the audio playback
-                            sound.stop();
-                            setIsAudioPlaying(false);
-                        }
-                    });
-                } else {
-                    // If audio is not playing anymore, clear the timer
-                    clearInterval(speedTimerRef.current);
-                    speedTimerRef.current = null;
-                }
-            }, 50);
         }
     };
     
@@ -489,12 +595,21 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
     // Add a state to track if user is manually scrolling
     const [isUserScrolling, setIsUserScrolling] = useState(false);
 
-    // Add a state to track the last auto-scrolled paragraph
+    // Adding a state to track the last auto-scrolled paragraph
     const [lastScrolledPara, setLastScrolledPara] = useState(0);
+
+    // Update the inactivity timeout value to 20 seconds as requested
+    const USER_SCROLL_TIMEOUT = 20000; // 20 seconds in milliseconds
 
     // Update the onAudioProgress function to improve scrolling behavior
     const onAudioProgress = (progress) => {
         if (!progress || !progress.currentTime || !progress.duration || !wordTimings.length) return;
+        
+        // Define time variables for throttling at the start of the function
+        // so they're available throughout
+        const now = Date.now();
+        const timeSinceLastScroll = now - lastAutoScrollTimeRef.current;
+        const MIN_SCROLL_INTERVAL = 300; // Minimum 300ms between auto-scrolls
         
         const currentTime = Number(progress.currentTime.toFixed(2));
         
@@ -535,58 +650,38 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
         // This ensures we don't interrupt the user's manual scrolling
         const shouldForceScroll = isSeeking || Math.abs(currentTime - audioPosition) > 1;
         
-        if (currentParaIndex !== -1 && scrollViewRef.current) {
+        // If user is scrolling, don't perform any auto-scroll unless it's a force scroll
+        if ((isUserScrolling || hasUserScrolledRef.current) && !shouldForceScroll) {
+            // Don't auto-scroll, but still update the current paragraph and word
+        } else if (currentParaIndex !== -1 && scrollViewRef.current) {
             // Check if we should perform auto-scrolling:
             // - Not in user scrolling mode OR
             // - This is a forcing scroll operation (seeking/word click)
-            const shouldAutoScroll = !isUserScrolling || shouldForceScroll;
+            const shouldAutoScroll = (!isUserScrolling && !hasUserScrolledRef.current) || shouldForceScroll;
+            
+            // Add throttling to prevent too frequent scrolling
+            const now = Date.now();
+            const timeSinceLastScroll = now - lastAutoScrollTimeRef.current;
+            const MIN_SCROLL_INTERVAL = 300; // Minimum 300ms between auto-scrolls
             
             // Only scroll when:
             // 1. The paragraph changes OR
             // 2. After seeking OR
             // 3. We're forcing a scroll
-            if (shouldAutoScroll && (currentParaIndex !== lastScrolledPara || shouldForceScroll)) {
-                setLastScrolledPara(currentParaIndex);
+            // 4. Not currently in scrolling operation
+            // 5. Not scrolled too recently
+            if (shouldAutoScroll && 
+                (currentParaIndex !== lastScrolledPara || shouldForceScroll) && 
+                !isScrollingRef.current &&
+                (timeSinceLastScroll > MIN_SCROLL_INTERVAL || shouldForceScroll)) {
                 
-                // Get the paragraph element's position using the paragraph refs
-                if (paragraphRefs.current[currentParaIndex]) {
-                    // Measure the position of the current paragraph
-                    paragraphRefs.current[currentParaIndex].measureLayout(
-                        scrollViewRef.current,
-                        (x, y) => {
-                            // Extra check to ensure we don't scroll during user scrolling
-                            // unless it's a forced scroll operation
-                            if (isUserScrolling && !shouldForceScroll) return;
-                            
-                            // Scroll to position with a small offset (20) for better visibility
-                            scrollViewRef.current.scrollTo({
-                                y: y - 20, // Small offset from the top
-                                animated: true
-                            });
-                        },
-                        () => {
-                            // Fallback if measurement fails - use approximate position
-                            // Also respect the user's scrolling state
-                            if (isUserScrolling && !shouldForceScroll) return;
-                            
-                            console.log('Failed to measure paragraph position, using fallback');
-                            scrollViewRef.current.scrollTo({
-                                y: currentParaIndex * 200, // Approximate height per paragraph
-                                animated: true
-                            });
-                        }
-                    );
-                } else {
-                    // Fallback if ref is not available
-                    // Also respect the user's scrolling state
-                    if (isUserScrolling && !shouldForceScroll) return;
-                    
-                    console.log('Paragraph ref not available, using fallback');
-                    scrollViewRef.current.scrollTo({
-                        y: currentParaIndex * 200, // Approximate height per paragraph
-                        animated: true
-                    });
+                // If this is a forced scroll, reset the user scrolled flag
+                if (shouldForceScroll) {
+                    hasUserScrolledRef.current = false;
                 }
+                
+                // Attempt to auto-scroll using our helper function
+                performAutoScroll(currentParaIndex);
             }
         }
         
@@ -700,38 +795,8 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                                             word: firstWordNextPara.punctuated_word || firstWordNextPara.word || ''
                                         });
                                         
-                                        // Auto-scroll if needed
-                                        if (scrollViewRef.current && 
-                                            (currentParaIndex + 1) !== lastScrolledPara && 
-                                            !isUserScrolling) {
-                                            setLastScrolledPara(currentParaIndex + 1);
-                                            
-                                            // Use the paragraph ref for more accurate scrolling
-                                            if (paragraphRefs.current[currentParaIndex + 1]) {
-                                                paragraphRefs.current[currentParaIndex + 1].measureLayout(
-                                                    scrollViewRef.current,
-                                                    (x, y) => {
-                                                        scrollViewRef.current.scrollTo({
-                                                            y: y - 20,
-                                                            animated: true
-                                                        });
-                                                    },
-                                                    () => {
-                                                        // Fallback
-                                                        scrollViewRef.current.scrollTo({
-                                                            y: (currentParaIndex + 1) * 200,
-                                                            animated: true
-                                                        });
-                                                    }
-                                                );
-                                            } else {
-                                                // Fallback
-                                                scrollViewRef.current.scrollTo({
-                                                    y: (currentParaIndex + 1) * 200,
-                                                    animated: true
-                                                });
-                                            }
-                                        }
+                                        // Attempt to auto-scroll to the new paragraph
+                                        performAutoScroll(currentParaIndex + 1);
                                         
                                         // Return early since we've handled this case
                                         return;
@@ -779,38 +844,8 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                                 word: aheadParaWords[0].punctuated_word || aheadParaWords[0].word || ''
                             });
                             
-                            // Auto-scroll if needed
-                            if (scrollViewRef.current && 
-                                (currentParaIndex + paraOffset) !== lastScrolledPara && 
-                                !isUserScrolling) {
-                                setLastScrolledPara(currentParaIndex + paraOffset);
-                                
-                                // Use the paragraph ref for more accurate scrolling
-                                if (paragraphRefs.current[currentParaIndex + paraOffset]) {
-                                    paragraphRefs.current[currentParaIndex + paraOffset].measureLayout(
-                                        scrollViewRef.current,
-                                        (x, y) => {
-                                            scrollViewRef.current.scrollTo({
-                                                y: y - 20,
-                                                animated: true
-                                            });
-                                        },
-                                        () => {
-                                            // Fallback
-                                            scrollViewRef.current.scrollTo({
-                                                y: (currentParaIndex + paraOffset) * 200,
-                                                animated: true
-                                            });
-                                        }
-                                    );
-                                } else {
-                                    // Fallback
-                                    scrollViewRef.current.scrollTo({
-                                        y: (currentParaIndex + paraOffset) * 200,
-                                        animated: true
-                                    });
-                                }
-                            }
+                            // Attempt to auto-scroll to the new paragraph
+                            performAutoScroll(currentParaIndex + paraOffset);
                             
                             foundWord = true;
                             break;
@@ -906,14 +941,14 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                 newSound.setNumberOfLoops(0);
                 
                 // Apply playback rate if needed
-                if (is2xSpeed) {
+                if (playbackSpeed !== 1.0) {
                     try {
                         // Try to set the playback rate if the device supports it
                         if (Platform.OS === 'ios') {
                             // On iOS, we can try to use AVAudioPlayer's rate property
                             const player = newSound._player;
                             if (player && player.rate !== undefined) {
-                                player.rate = playbackSpeed;
+                                player.setRate(playbackSpeed);
                                 console.log(`Set iOS playback rate to ${playbackSpeed}`);
                             }
                         } else if (Platform.OS === 'android') {
@@ -1027,38 +1062,28 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
             
             setIsAudioPlaying(true);
             
-            // Start speed timer if in 2x mode
-            if (playbackSpeed > 1.0) {
-                // Create a timer that seeks forward every 50ms to simulate faster speed
-                speedTimerRef.current = setInterval(() => {
-                    if (sound && isAudioPlaying) {
-                        sound.getCurrentTime((currentTime) => {
-                            // Calculate new position based on selected speed
-                            // Use a smaller increment more frequently for smoother playback
-                            const incrementFactor = playbackSpeed - 1.0;
-                            const newPos = Math.min(currentTime + (0.05 * incrementFactor * 1.5), audioDuration);
-                            
-                            if (newPos < audioDuration) {
-                                sound.setCurrentTime(newPos);
-                                setAudioPosition(newPos);
-                                
-                                // Update the UI with the new position
-                                onAudioProgress({
-                                    currentTime: newPos,
-                                    duration: audioDuration
-                                });
-                            } else {
-                                // We've reached the end, stop the timer
-                                clearInterval(speedTimerRef.current);
-                                speedTimerRef.current = null;
-                            }
-                        });
-                    } else {
-                        // If audio is not playing anymore, clear the timer
-                        clearInterval(speedTimerRef.current);
-                        speedTimerRef.current = null;
+            // Apply playback speed if needed
+            if (playbackSpeed !== 1.0) {
+                try {
+                    // Try to set the playback rate if the device supports it
+                    if (Platform.OS === 'ios') {
+                        // On iOS, we can try to use AVAudioPlayer's rate property
+                        const player = sound._player;
+                        if (player && player.rate !== undefined) {
+                            player.setRate(playbackSpeed);
+                            console.log(`Re-applied iOS playback rate to ${playbackSpeed}`);
+                        }
+                    } else if (Platform.OS === 'android') {
+                        // On Android, we can try to use MediaPlayer's setPlaybackParams
+                        const player = sound._player;
+                        if (player && player.setPlaybackParams) {
+                            player.setPlaybackParams(player.getPlaybackParams().setSpeed(playbackSpeed));
+                            console.log(`Re-applied Android playback rate to ${playbackSpeed}`);
+                        }
                     }
-                }, 50); // Run every 50ms for smoother playback
+                } catch (e) {
+                    console.log('Setting speed not supported during playback:', e);
+                }
             }
             
             if (waveAnimationRef.current) {
@@ -1085,40 +1110,28 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
             duration: audioDuration
         });
         
-        // If we're in 2x mode and seeking, we need to restart the timer
-        if (playbackSpeed > 1.0 && isAudioPlaying) {
-            // Clear existing timer
-            if (speedTimerRef.current) {
-                clearInterval(speedTimerRef.current);
-                speedTimerRef.current = null;
-            }
-            
-            // Start a new timer from the new position
-            speedTimerRef.current = setInterval(() => {
-                if (sound && isAudioPlaying) {
-                    sound.getCurrentTime((currentTime) => {
-                        // Calculate new position based on selected speed
-                        // Use a smaller increment more frequently for smoother playback
-                        const incrementFactor = playbackSpeed - 1.0;
-                        const newPos = Math.min(currentTime + (0.05 * incrementFactor * 1.5), audioDuration);
-                        
-                        if (newPos < audioDuration) {
-                            sound.setCurrentTime(newPos);
-                            setAudioPosition(newPos);
-                            
-                            // Update the UI with the new position
-                            onAudioProgress({
-                                currentTime: newPos,
-                                duration: audioDuration
-                            });
-                        } else {
-                            // We've reached the end, stop the timer
-                            clearInterval(speedTimerRef.current);
-                            speedTimerRef.current = null;
-                        }
-                    });
+        // Re-apply playback speed after seeking
+        if (playbackSpeed !== 1.0 && isAudioPlaying) {
+            try {
+                // Try to set the playback rate if the device supports it
+                if (Platform.OS === 'ios') {
+                    // On iOS, we can try to use AVAudioPlayer's rate property
+                    const player = sound._player;
+                    if (player && player.rate !== undefined) {
+                        player.setRate(playbackSpeed);
+                        console.log(`Re-applied iOS playback rate to ${playbackSpeed} after seeking`);
+                    }
+                } else if (Platform.OS === 'android') {
+                    // On Android, we can try to use MediaPlayer's setPlaybackParams
+                    const player = sound._player;
+                    if (player && player.setPlaybackParams) {
+                        player.setPlaybackParams(player.getPlaybackParams().setSpeed(playbackSpeed));
+                        console.log(`Re-applied Android playback rate to ${playbackSpeed} after seeking`);
+                    }
                 }
-            }, 50); // Run every 50ms for smoother playback
+            } catch (e) {
+                console.log('Setting speed not supported after seeking:', e);
+            }
         }
     };
 
@@ -1455,9 +1468,11 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
             // End seeking state
             setIsSeeking(false);
             
-            // For explicit user actions on media controls, we force auto-scroll
-            // by temporarily disabling the user scrolling state
+            console.log("User used slider - explicitly overriding manual scroll");
+            // EXPLICIT USER ACTION: Override manual scroll
             setIsUserScrolling(false);
+            hasUserScrolledRef.current = false;
+            isScrollingRef.current = false;
             
             // Cancel any pending reset of user scrolling state
             if (userScrollTimeoutRef.current) {
@@ -1492,9 +1507,11 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
         // Set seeking state to true to indicate we're performing a seek operation
         setIsSeeking(true);
         
-        // For explicit user actions on media controls, we force auto-scroll
-        // by temporarily disabling the user scrolling state
+        console.log("User tapped waveform - explicitly overriding manual scroll");
+        // EXPLICIT USER ACTION: Override manual scroll flags
         setIsUserScrolling(false);
+        hasUserScrolledRef.current = false;
+        isScrollingRef.current = false;
         
         // Cancel any pending reset of user scrolling state
         if (userScrollTimeoutRef.current) {
@@ -1787,8 +1804,31 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
         
         for (let i = 0; i < words.length; i += wordsPerParagraph) {
             const paragraphWords = words.slice(i, i + wordsPerParagraph);
+            
+            // Process the words to add better punctuation
+            const processedWords = paragraphWords.map((word, idx) => {
+                // Don't modify if already has punctuation
+                if (word.endsWith(',') || word.endsWith('.') || 
+                    word.endsWith('!') || word.endsWith('?') || word.endsWith(';')) {
+                    return word;
+                }
+                
+                // Add comma at natural pauses (approximately every 8-12 words)
+                // But not at the very end of paragraph
+                if ((idx + 1) % 10 === 0 && idx !== paragraphWords.length - 1) {
+                    return word + ',';
+                }
+                
+                // Add period at the end of the paragraph
+                if (idx === paragraphWords.length - 1) {
+                    return word + '.';
+                }
+                
+                return word;
+            });
+            
             // Join words with space, trim any extra spaces
-            const paragraphText = paragraphWords.join(' ').replace(/\s+/g, ' ').trim();
+            const paragraphText = processedWords.join(' ').replace(/\s+/g, ' ').trim();
             paragraphs.push(paragraphText);
         }
         
@@ -1838,6 +1878,13 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
         [audioDuration, sound, sliderWidth]
     );
 
+    useEffect(() => {
+      // Only auto-scroll if all conditions allow
+      if (scrollViewRef.current && currentWordIndex.paraIndex !== undefined) {
+        performAutoScroll(currentWordIndex.paraIndex);
+      }
+    }, [currentWordIndex.paraIndex, isUserScrolling, hasUserScrolledRef.current]);
+
     return (
         
         <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
@@ -1883,14 +1930,14 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
             styles.audioControlsContainer2,
           {
             opacity: playerHeight.interpolate({
-              inputRange: [60, 120],
-              outputRange: [1, 0], // Visible at 120, hidden at 60
+              inputRange: [35, 120],
+              outputRange: [1, 0], // Visible at 120, hidden at 35
               extrapolate: 'clamp'
             }),
             transform: [
               {
                 scale: playerHeight.interpolate({
-                  inputRange: [60, 120],
+                  inputRange: [35, 120],
                   outputRange: [0.8, 1], // Optional: Add a scaling effect
                   extrapolate: 'clamp'
                 })
@@ -1914,11 +1961,11 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
               styles.waveformBox2,
               {
                 width: '80%', // Fixed 80% width
-                height: playerHeight._value - 40,
+                height: playerHeight._value - 20,
               }
             ]}>
               <View style={[styles.waveformContainer, {
-                height: playerHeight._value - 40,
+                height: playerHeight._value - 20,
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'center', // Center slider horizontally
@@ -1975,14 +2022,14 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
           styles.audioControlsContainer,
           {
             opacity: playerHeight.interpolate({
-              inputRange: [60, 120],
-              outputRange: [0, 1], // Visible at 60, hidden at 120
+              inputRange: [35, 120],
+              outputRange: [0, 1], // Visible at 35, hidden at 120
               extrapolate: 'clamp'
             }),
             transform: [
               {
                 scale: playerHeight.interpolate({
-                  inputRange: [60, 120],
+                  inputRange: [35, 120],
                   outputRange: [0.8, 1], // Optional: Add a scaling effect
                   extrapolate: 'clamp'
                 })
@@ -1994,12 +2041,13 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
           <Animated.View style={[
             styles.waveformBox,
             {
+            marginTop: 10,
               width: '95%', // Full width
-              height: playerHeight._value - 40,
+              height: playerHeight._value - 20,
             }
           ]}>
             <View style={[styles.waveformContainer, {
-              height: playerHeight._value - 40,
+              height: playerHeight._value - 20,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center', // Center slider horizontally
@@ -2027,8 +2075,7 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                       width: 20, 
                       backgroundColor: '#ff8c00', 
                       borderColor: '#ffb700',
-                      shadowOpacity: 0.5,
-                      shadowRadius: 4,
+                   
                     }
                   ]}
                 />
@@ -2067,8 +2114,8 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
           {/* Additional Controls */}
           <Animated.View style={[styles.controls, {
             opacity: playerHeight.interpolate({
-              inputRange: [60, 120],
-              outputRange: [0, 1], // Visible at 60, hidden at 120
+              inputRange: [35, 120],
+              outputRange: [0, 1], // Visible at 35, hidden at 120
               extrapolate: 'clamp'
             })
           }]}>
@@ -2117,7 +2164,7 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                     <TouchableWithoutFeedback onPress={() => setIsSpeedDropdownVisible(false)}>
                         <View style={styles.modalOverlay}>
                             <View style={styles.speedPickerContainer}>
-                                {[0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].map((speed) => (
+                                {[0.75, 1.0, 1.25, 1.5].map((speed) => (
                                     <TouchableOpacity
                                         key={speed}
                                         style={[
@@ -2203,42 +2250,86 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                     onScroll={(event) => {
                         const offsetY = event.nativeEvent.contentOffset.y;
                         scrollY.setValue(offsetY);
-                        // Keep track that user is actively scrolling 
+                        
+                        // IMPORTANT: User is actively scrolling - prevent ANY auto-scroll
+                        // Set the mutex to prevent auto-scroll interference
+                        isScrollingRef.current = true;
+                        
+                        // Store the user's scroll position
+                        setUserScrollPosition(offsetY);
+                        
+                        // Mark that user is actively scrolling (blocks immediate auto-scroll)
                         setIsUserScrolling(true);
+                        
+                        // Mark that the user has manually scrolled
+                        hasUserScrolledRef.current = true;
                         
                         // Cancel any pending reset of user scrolling state
                         if (userScrollTimeoutRef.current) {
                             clearTimeout(userScrollTimeoutRef.current);
                         }
                         
-                        // Set a new timeout - after 5 seconds of no scrolling, 
-                        // re-enable auto-scrolling
+                        // Set a new timeout - after USER_SCROLL_TIMEOUT milliseconds,
+                        // re-enable auto-scrolling if user doesn't scroll again
                         userScrollTimeoutRef.current = setTimeout(() => {
+                            console.log("User scroll timeout elapsed - re-enabling auto-scroll");
                             setIsUserScrolling(false);
-                        }, 5000);
+                            // Reset the hasUserScrolledRef flag to fully restore auto-scroll after timeout
+                            hasUserScrolledRef.current = false;
+                            // Release the scroll mutex after timeout
+                            isScrollingRef.current = false;
+                        }, USER_SCROLL_TIMEOUT);
                     }}
                     onScrollBeginDrag={() => {
+                        // As soon as user begins dragging, block ALL auto-scrolling
+                        console.log("User began scrolling - blocking auto-scroll");
+                        isScrollingRef.current = true;
                         setIsUserScrolling(true);
+                        hasUserScrolledRef.current = true;
+                        
                         // Cancel any pending reset of user scrolling state
                         if (userScrollTimeoutRef.current) {
                             clearTimeout(userScrollTimeoutRef.current);
                         }
                     }}
                     onScrollEndDrag={() => {
-                        // Set a timeout to reset the user scrolling state
+                        // User finished dragging, but still respect their intent
+                        console.log("User stopped dragging - still respecting manual position");
+                        
+                        // Cancel any pending reset of user scrolling state
                         if (userScrollTimeoutRef.current) {
                             clearTimeout(userScrollTimeoutRef.current);
                         }
-                        // Keep scrolling enabled for 5 seconds after user stops dragging
-                        userScrollTimeoutRef.current = setTimeout(() => setIsUserScrolling(false), 5000);
+                        
+                        // Keep scrolling enabled for USER_SCROLL_TIMEOUT after user stops dragging
+                        // This ensures the app won't immediately jump back to highlighted text
+                        userScrollTimeoutRef.current = setTimeout(() => {
+                            console.log("Scroll timeout elapsed - re-enabling auto-scroll");
+                            setIsUserScrolling(false);
+                            // Reset the hasUserScrolledRef flag to fully restore auto-scroll
+                            hasUserScrolledRef.current = false;
+                            // Release the scroll mutex after timeout
+                            isScrollingRef.current = false;
+                        }, USER_SCROLL_TIMEOUT);
                     }}
                     onMomentumScrollEnd={() => {
-                        // Set a timeout to reset the user scrolling state
+                        // Momentum scrolling ended, but still respect user's position
+                        console.log("Momentum scroll ended - still respecting user position");
+                        
+                        // Cancel any pending reset of user scrolling state
                         if (userScrollTimeoutRef.current) {
                             clearTimeout(userScrollTimeoutRef.current);
                         }
-                        // Keep scrolling enabled for 5 seconds after momentum scrolling ends
-                        userScrollTimeoutRef.current = setTimeout(() => setIsUserScrolling(false), 5000);
+                        
+                        // Keep scrolling enabled for USER_SCROLL_TIMEOUT after momentum ends
+                        // This ensures we won't jump back too quickly
+                        userScrollTimeoutRef.current = setTimeout(() => {
+                            console.log("Momentum scroll timeout elapsed - re-enabling auto-scroll");
+                            setIsUserScrolling(false);
+                            hasUserScrolledRef.current = false;
+                            // Release the scroll mutex after timeout
+                            isScrollingRef.current = false;
+                        }, USER_SCROLL_TIMEOUT);
                     }}
                     showsVerticalScrollIndicator={true}
                     bounces={true}
@@ -2296,9 +2387,13 @@ const [transcriptionGeneratedFor, setTranscriptionGeneratedFor] = useState(new S
                                                                     waveAnimationRef.current.play();
                                                                 }
                                                                 
-                                                                // For explicit word clicking, we force auto-scroll
-                                                                // by temporarily disabling the user scrolling state
+                                                                console.log("User clicked word - explicitly overriding manual scroll");
+                                                                // EXPLICIT USER ACTION: We should override manual scroll
+                                                                // and reset all scroll-blocking flags since user explicitly
+                                                                // wants to jump to this position
                                                                 setIsUserScrolling(false);
+                                                                hasUserScrolledRef.current = false;
+                                                                isScrollingRef.current = false;
                                                                 
                                                                 // Cancel any pending reset of user scrolling state
                                                                 if (userScrollTimeoutRef.current) {
@@ -2533,6 +2628,12 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         position: 'relative',
+        // Explicitly remove any shadow
+        shadowColor: 'transparent',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0,
+        shadowRadius: 0,
+        elevation: 0,
       },
      
     linePointer: {
@@ -2548,6 +2649,12 @@ const styles = StyleSheet.create({
         borderRadius: 50,
         overflow: 'hidden', // Clip the animation
         zIndex: 10, // Ensure it's above other elements for better tapping
+        // Explicitly remove any shadow
+        shadowColor: 'transparent',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0,
+        shadowRadius: 0,
+        elevation: 0,
     },
     waveAnimationContainer2: {
         position: 'absolute',
@@ -2582,6 +2689,12 @@ const styles = StyleSheet.create({
         top: 0,
         bottom: 0,
         backgroundColor: '#F2F3F7', // Acts as the mask
+        // Explicitly remove any shadow
+        shadowColor: 'transparent',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0,
+        shadowRadius: 0,
+        elevation: 0,
     },
     mask2: {
         position: 'absolute',
@@ -2591,7 +2704,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'white', // Acts as the mask
     },
     audioPlayerContainer: {
-        marginTop: 15,
+        marginTop: 1,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -2613,8 +2726,14 @@ const styles = StyleSheet.create({
        borderRadius:50,
        paddingLeft:15,
        paddingRight:15,
+       marginTop:-5,
        width: '100%', // Adjust width as needed
-
+       // Explicitly remove any shadow
+       shadowColor: 'transparent',
+       shadowOffset: { width: 0, height: 0 },
+       shadowOpacity: 0,
+       shadowRadius: 0,
+       elevation: 0,
     },
     backButton: {
         padding: 8,
@@ -2638,9 +2757,14 @@ const styles = StyleSheet.create({
         width: '80%', // Adjust width as needed
     },
     waveformBox2: {
-        
         justifyContent: 'center',
         alignItems: 'center',
+        // Explicitly remove any shadow
+        shadowColor: 'transparent',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0,
+        shadowRadius: 0,
+        elevation: 0,
     },
     waveformContainer: {
         borderRadius: 10,
@@ -2650,6 +2774,12 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingVertical: 10,
         minHeight: 80,
+        // Explicitly remove any shadow
+        shadowColor: 'transparent',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0,
+        shadowRadius: 0,
+        elevation: 0,
     },
    
     waveform: {
@@ -2691,10 +2821,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'orange',
         zIndex: 200,
         elevation: 5,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.3,
-        shadowRadius: 2,
+     
         // Add a subtle inner glow to indicate it's interactive
         borderWidth: 2,
         borderColor: 'rgba(255, 190, 100, 0.7)',
@@ -3204,10 +3331,7 @@ zIndex:101,
         padding: 16,
         borderTopLeftRadius: 16,
         borderTopRightRadius: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -3 },
-        shadowOpacity: 0.1,
-        shadowRadius: 5,
+     
         elevation: 5,
     },
     sliderContent: {
@@ -3324,9 +3448,7 @@ zIndex:101,
         justifyContent: 'center',
         alignItems: 'center',
         zIndex: 1005,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
+     
     },
     closeIcon: {
         width: 20,

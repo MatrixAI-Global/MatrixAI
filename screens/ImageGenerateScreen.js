@@ -205,37 +205,37 @@ const ImageGenerateScreen = () => {
   };
 
   const renderHistoryItem = ({ item }) => (
-    <View style={styles.historyItem}>
+    <View style={[styles.historyItem, {backgroundColor: colors.border}]}>
       <Image 
         source={{ uri: item.image_url }} 
         style={styles.historyImage}
         resizeMode="cover"
       />
-      <View style={styles.historyItemContent}>
-        <Text style={styles.historyDate}>
+      <View style={[styles.historyItemContent, {backgroundColor: colors.border}]}>
+        <Text style={[styles.historyDate, {color: colors.text}]}>
           {new Date(item.created_at).toLocaleDateString()}
         </Text>
-        <Text style={styles.historyPrompt} numberOfLines={2}>
+        <Text style={[styles.historyPrompt, {color: colors.text}]} numberOfLines={2}>
           {item.prompt_text}
         </Text>
         <View style={styles.historyActions}>
           <TouchableOpacity 
-            style={styles.historyActionButton}
+            style={[styles.historyActionButton, {backgroundColor: colors.background2}]}
             onPress={() => handleRemoveImage(item.image_id)}
           >
-            <MaterialIcons name="delete" size={20} color="#ff6b6b" />
+            <MaterialIcons name="delete" size={20} color={colors.text} />
           </TouchableOpacity>
           <TouchableOpacity 
-            style={styles.historyActionButton}
+            style={[styles.historyActionButton, {backgroundColor: colors.background2}]}
             onPress={() => handleDownloadImage(item.image_url)}
           >
-            <MaterialIcons name="file-download" size={20} color="#fff" />
+            <MaterialIcons name="file-download" size={20} color={colors.text} />
           </TouchableOpacity>
           <TouchableOpacity 
-            style={styles.historyActionButton}
+            style={[styles.historyActionButton, {backgroundColor: colors.background2}]}
             onPress={() => handleShareImage(item.image_url)}
           >
-            <MaterialIcons name="ios-share" size={20} color="#fff" />
+            <MaterialIcons name="ios-share" size={20} color={colors.text} />
           </TouchableOpacity>
         </View>
       </View>
@@ -443,11 +443,11 @@ const ImageGenerateScreen = () => {
         ]}
       >
         <View style={styles.historyHeader}>
-          <Text style={styles.historyTitle}>Generation History</Text>
+          <Text style={[styles.historyTitle, {color: colors.text}]}>Generation History</Text>
           <TouchableOpacity onPress={toggleHistory}>
             <Image 
               source={require('../assets/back.png')} 
-              style={[styles.historyCloseIcon, {tintColor: '#fff'}]} 
+              style={[styles.historyCloseIcon, {tintColor: colors.text}]} 
             />
           </TouchableOpacity>
         </View>
@@ -459,12 +459,12 @@ const ImageGenerateScreen = () => {
           </View>
         ) : error ? (
           <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
+            <Text style={[styles.errorText, {color: colors.text}]}>{error}</Text>
             <TouchableOpacity 
               style={styles.retryButton}
               onPress={() => fetchImageHistory(1)}
             >
-              <Text style={styles.retryText}>Retry</Text>
+              <Text style={[styles.retryText, {color: colors.text}]}>Retry</Text>
             </TouchableOpacity>
           </View>
         ) : imageHistory.length === 0 ? (
@@ -489,9 +489,9 @@ const ImageGenerateScreen = () => {
                     disabled={isLoading}
                   >
                     {isLoading ? (
-                      <ActivityIndicator size="small" color="#fff" />
+                      <ActivityIndicator size="small" color={colors.text} />
                     ) : (
-                      <Text style={styles.viewMoreText}>View More</Text>
+                      <Text style={[styles.viewMoreText, {color: colors.text}]}>View More</Text>
                     )}
                   </TouchableOpacity>
                 ) : null

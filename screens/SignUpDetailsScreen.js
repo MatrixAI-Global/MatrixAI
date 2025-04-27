@@ -58,38 +58,7 @@ const SignUpDetailsScreen = ({ navigation }) => {
         }
     };
 
-    // Function to update referrer's invited_members and add coins
-    const updateReferrer = async (referrerId, newUserId) => {
-        try {
-            // Get current invited_members array
-            const { data: userData, error: userError } = await supabase
-                .from('users')
-                .select('invited_members')
-                .eq('uid', referrerId)
-                .single();
-                
-            if (userError) throw userError;
-            
-            // Prepare the updated array
-            const updatedInvitedMembers = userData.invited_members || [];
-            updatedInvitedMembers.push(newUserId);
-            
-            // Update the referrer record
-            const { error: updateError } = await supabase
-                .from('users')
-                .update({ 
-                    invited_members: updatedInvitedMembers,
-                    user_coins: supabase.rpc('increment', { x: 50 }) // Increment coins by 50
-                })
-                .eq('uid', referrerId);
-                
-            if (updateError) throw updateError;
-            
-            console.log('Referrer updated successfully');
-        } catch (error) {
-            console.error('Error updating referrer:', error);
-        }
-    };
+  
 
     const handleSelectLanguage = (language) => {
         setPreferredLanguage(language);

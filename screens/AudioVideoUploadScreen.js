@@ -1288,9 +1288,7 @@ const AudioVideoUploadScreen = () => {
                 <TouchableOpacity style={styles.topButton} onPress={handleFileSelect}>
                     <Image source={uploadIcon} style={[styles.topIcon]} />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.topButton2}>
-                    <Image source={resizeIcon} style={[styles.topIcon]} />
-                </TouchableOpacity>
+             
                 <View style={styles.topHelp}>
                     <Image source={helpIcon2} style={[styles.topHelpIcon]} />
                     <Text style={[styles.helpText]}>Voice Memo Transcription Tutorial</Text>

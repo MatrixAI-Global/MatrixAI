@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,8 @@ import {
   Linking,
   Share,
   ScrollView,
+  ActivityIndicator,
+  Animated,
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import * as Animatable from 'react-native-animatable';
@@ -26,6 +28,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import LinearGradient from 'react-native-linear-gradient';
 import axios from 'axios';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import RNFS from 'react-native-fs';
@@ -36,7 +39,8 @@ import { useTheme } from '../context/ThemeContext';
 import LeftNavbarBot from '../components/LeftNavbarBot';
 import Clipboard from '@react-native-clipboard/clipboard';
 import Markdown from 'react-native-markdown-display';
-import MathView from 'react-native-math-view';
+import MathJax from 'react-native-mathjax-html-to-svg';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Function to decode base64 to ArrayBuffer
 const decode = (base64) => {
@@ -83,6 +87,36 @@ const decode = (base64) => {
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [isSendDisabled, setIsSendDisabled] = useState(false); // New state to track send button disabled state
   const swipeableRefs = useRef({});
+  const lastScrolledMessageId = useRef(null);
+
+  // Add new states and refs for scroll functionality
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [listHeight, setListHeight] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
+
+  // Add state to track keyboard visibility
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  
+  // Track keyboard visibility
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        setIsKeyboardVisible(true);
+      }
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setIsKeyboardVisible(false);
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
 
   // Set initial chat ID from route params if available - prevent infinite updates
   useEffect(() => {
@@ -137,8 +171,8 @@ const decode = (base64) => {
       if (chatId === currentChatId) {
         const remainingChats = chats.filter(chat => chat.id !== chatId);
         if (remainingChats.length > 0) {
-          // Select the first available chat
-          selectChat(remainingChats[0].id);
+          // Select the first available chat and keep the sidebar open
+          selectChat(remainingChats[0].id, false);
         } else {
           // If no chats remain, start a new one
           startNewChat();
@@ -164,91 +198,74 @@ const decode = (base64) => {
   };
 
   const fetchDeepSeekResponse = async (userMessage, retryCount = 0) => {
-    const maxRetries = 5;
-    const retryDelay = Math.min(Math.pow(2, retryCount) * 1000, 60000); // Max delay is 1 minute
-
-    setIsLoading(true);
     try {
-      // Format message history for API
-      const messageHistory = messages.map(msg => ({
-        role: msg.sender === 'bot' ? 'assistant' : 'user',
-        content: msg.text
-      }));
-
-      // Create system message with role information if available
-      let systemContent = 'You are a helpful AI assistant called Matrix AI. Do not reveal any information about the specific AI models you were built with or any personal information. Keep your responses focused only on answering the user query with accurate information. If you are asked to format data in a table, make sure to use proper markdown table format.';
+      setIsLoading(true);
       
-      // Find the current chat to get the detailed roleDescription
+      // Add a temporary loading message
+      const loadingMessageId = Date.now().toString();
+      setMessages(prev => [...prev, { id: loadingMessageId, isLoading: true, sender: 'bot' }]);
+      
+      // Get the current role context
       const currentChatObj = chats.find(chat => chat.id === currentChatId);
+      let systemContent = 'You are MatrixAI Bot, a helpful AI assistant.';
       
       if (currentRole) {
         if (currentChatObj && currentChatObj.roleDescription) {
-          // Use the detailed roleDescription for the system content
-          systemContent = `You are Matrix AI, acting as a ${currentRole}. ${currentChatObj.roleDescription} Do not reveal any information about the specific AI models you were built with or any personal information. If you are asked to format data in a table, make sure to use proper markdown table format.`;
+          systemContent = `You are MatrixAI Bot, acting as a ${currentRole}. ${currentChatObj.roleDescription}`;
         } else {
-          // Fallback to simpler system content if roleDescription isn't available
-          systemContent = `You are Matrix AI, acting as a ${currentRole}. Please provide responses with the expertise and perspective of a ${currentRole} while being helpful and informative. Do not reveal any information about the specific AI models you were built with or any personal information. If you are asked to format data in a table, make sure to use proper markdown table format.`;
+          systemContent = `You are MatrixAI Bot, acting as a ${currentRole}. Please provide responses with the expertise and perspective of a ${currentRole} while being helpful and informative.`;
         }
       }
-
-      // Prepare a prompt that includes system content and message history context
-      let userMessageContent = userMessage;
       
-      // Add system content and conversation history as context
-      if (systemContent) {
-        userMessageContent = systemContent + "\n\n" + userMessageContent;
-      }
-      
-      // Add previous messages for context if available
-      if (messageHistory.length > 0) {
-        const contextMessages = messageHistory.slice(-5); // Include last 5 messages for context
-        const contextString = contextMessages.map(msg => `${msg.role === 'assistant' ? 'AI' : 'User'}: ${msg.content}`).join('\n');
-        userMessageContent = "Previous conversation:\n" + contextString + "\n\nUser's new message: " + userMessageContent;
-      }
-
-      // Make API call
+      // Try to get a response from the DeepSeek API
       const response = await axios.post(
         'https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/createContent',
         {
-          prompt: userMessageContent
+          prompt: userMessage,
+          systemMessage: systemContent,
         },
         {
           headers: {
-            'Content-Type': 'application/json'
-          }
+            'Content-Type': 'application/json',
+          },
         }
       );
       
-      // Extract AI response
-      const botMessage = response.data.output.text;
-
-      let chatNameUpdated = false;
-      setChats(prevChats => prevChats.map(chat => {
-        if (chat.id === currentChatId && chat.name === 'New Chat' && !chatNameUpdated) {
-          chatNameUpdated = true;
-          return { ...chat, name: `Message: ${botMessage.substring(0, 20)}`, description: userMessage, role: currentRole };
-        }
-        return chat;
-      }));
-
-      setMessages((prev) => [
-        ...prev,
-        { id: Date.now().toString(), text: botMessage, sender: 'bot' },
-      ]);
-
-      // Save the bot's message to the server
-      await saveChatHistory(botMessage, 'bot');
-    } catch (error) {
-      if (retryCount < maxRetries) {
-        console.log(`Error occurred. Retrying in ${retryDelay / 1000} seconds...`);
-        setTimeout(() => fetchDeepSeekResponse(userMessage, retryCount + 1), retryDelay);
+      // Remove the loading message
+      setMessages(prev => prev.filter(msg => msg.id !== loadingMessageId));
+      
+      // Process the response
+      if (response.data && response.data.output && response.data.output.text) {
+        const botMessage = response.data.output.text;
+        
+        // Add the bot's response to messages
+        setMessages(prev => [...prev, { id: Date.now().toString(), text: botMessage, sender: 'bot' }]);
+        
+        // Save the chat history for the bot response
+        await saveChatHistory(botMessage, 'bot');
       } else {
-        console.error(error);
-        setMessages((prev) => [
-          ...prev,
-          { id: Date.now().toString(), text: 'Error fetching response. Try again later.', sender: 'bot' },
-        ]);
+        throw new Error('Invalid response format');
       }
+    } catch (error) {
+      console.error('Error fetching DeepSeek response:', error);
+      
+      // Remove the loading message
+      setMessages(prev => prev.filter(msg => !msg.isLoading));
+      
+      // If we need to handle network errors, we can retry
+      if (retryCount < 1 && (error.message.includes('timeout') || error.message.includes('network'))) {
+        console.log('Retrying due to possible network error...');
+        return fetchDeepSeekResponse(userMessage, retryCount + 1);
+      }
+      
+      // Add an error message
+      setMessages(prev => [
+        ...prev,
+        { id: Date.now().toString(), text: 'Sorry, I encountered an error. Could you try again?', sender: 'bot' },
+      ]);
+      
+      // Save the error message
+      await saveChatHistory('Sorry, I encountered an error. Could you try again?', 'bot');
     } finally {
       setIsLoading(false);
     }
@@ -328,7 +345,8 @@ const decode = (base64) => {
             await saveChatHistory(publicUrl, 'user');
             
             // If there's text, use it as the question, otherwise use a default
-            const question = "What do you see in this image?";
+            const question = inputText.trim() ? inputText : "What do you see in this image?";
+            const userMessageContent = question;
             
             // Create system message with role information if available
             let systemContent = 'You are MatrixAI Bot, a helpful AI assistant.';
@@ -346,140 +364,158 @@ const decode = (base64) => {
               }
             }
             
-            // First, use Volces API for image analysis
-            const volcesResponse = await axios.post(
-              'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
-              {
-                model: 'doubao-vision-pro-32k-241028',
-                messages: [
-                  {
-                    role: 'system',
-                    content: systemContent
-                  },
-                  {
-                    role: 'user',
-                    content: [
-                      {
-                        type: 'text',
-                        text: question
-                      },
-                      {
-                        type: 'image_url',
-                        image_url: {
-                          url: publicUrl
+            try {
+              // First, use Volces API for image analysis
+              const volcesResponse = await axios.post(
+                'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
+                {
+                  model: 'doubao-vision-pro-32k-241028',
+                  messages: [
+                    {
+                      role: 'system',
+                      content: systemContent
+                    },
+                    {
+                      role: 'user',
+                      content: [
+                        {
+                          type: 'text',
+                          text: question
+                        },
+                        {
+                          type: 'image_url',
+                          image_url: {
+                            url: publicUrl
+                          }
                         }
-                      }
-                    ]
+                      ]
+                    }
+                  ]
+                },
+                {
+                  headers: {
+                    'Authorization': 'Bearer 95fad12c-0768-4de2-a4c2-83247337ea89',
+                    'Content-Type': 'application/json'
                   }
-                ]
-              },
-              {
-                headers: {
-                  'Authorization': 'Bearer 95fad12c-0768-4de2-a4c2-83247337ea89',
-                  'Content-Type': 'application/json'
                 }
-              }
-            );
-            
-            // Extract the response from Volces API
-            const imageAnalysisResponse = volcesResponse.data.choices[0].message.content.trim();
-            
-            // Now, send this response combined with user's question to createContent API
-            const combinedPrompt = `${userMessageContent}\n\nImage analysis: ${imageAnalysisResponse} so answer the user's question with the image analysis and only answer the user's question`;
-            
-            const finalResponse = await axios.post(
-              'https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/createContent',
-              {
-                prompt: combinedPrompt
-              },
-              {
-                headers: {
-                  'Content-Type': 'application/json'
+              );
+              
+              // Extract the response from Volces API
+              const imageAnalysisResponse = volcesResponse.data.choices[0].message.content.trim();
+              
+              // Now, send this response combined with user's question to createContent API
+              const combinedPrompt = `${userMessageContent}\n\nImage analysis: ${imageAnalysisResponse} so answer the user's question with the image analysis and only answer the user's question`;
+              
+              const finalResponse = await axios.post(
+                'https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/createContent',
+                {
+                  prompt: combinedPrompt
+                },
+                {
+                  headers: {
+                    'Content-Type': 'application/json'
+                  }
                 }
-              }
-            );
-            
-            // Extract the final response
-            const finalBotMessage = finalResponse.data.output.text || imageAnalysisResponse;
-            
-            // Add the bot's response to messages
-            setMessages((prev) => [
-              ...prev,
-              { id: Date.now().toString(), text: finalBotMessage, sender: 'bot' },
-            ]);
-            
-            // Save the chat history for the bot response
-            await saveChatHistory(finalBotMessage, 'bot');
-            
-            // Clear the image and text
-            setSelectedImage(null);
-            setInputText('');
+              );
+              
+              // Extract the final response
+              const finalBotMessage = finalResponse.data.output.text || imageAnalysisResponse;
+              
+              // Add the bot's response to messages
+              setMessages((prev) => [
+                ...prev,
+                { id: Date.now().toString(), text: finalBotMessage, sender: 'bot' },
+              ]);
+              
+              // Save the chat history for the bot response
+              await saveChatHistory(finalBotMessage, 'bot');
+            } catch (error) {
+              console.error('Error in API call:', error.message);
+              
+              // Add a friendly error message
+              setMessages((prev) => [
+                ...prev,
+                { id: Date.now().toString(), text: 'Sorry, I had trouble analyzing that image. Could you try again or describe what you see in the image?', sender: 'bot' },
+              ]);
+              
+              // Save the error message to chat history
+              await saveChatHistory('Sorry, I had trouble analyzing that image. Could you try again or describe what you see in the image?', 'bot');
+            }
             
           } catch (error) {
             console.error('Error processing image:', error);
-            Alert.alert('Error', 'Failed to process image');
             
+            // Don't use Alert to avoid disrupting the UX
             setMessages((prev) => [
               ...prev,
-              { id: Date.now().toString(), text: 'Error processing image. Please try again.', sender: 'bot' },
+              { id: Date.now().toString(), text: 'Sorry, I had trouble processing that image. Could you try a different image?', sender: 'bot' },
             ]);
+            
+            // Save the error message to chat history
+            await saveChatHistory('Sorry, I had trouble processing that image. Could you try a different image?', 'bot');
           } finally {
             setIsLoading(false);
-            // Re-enable the send button after a short delay
-            setTimeout(() => {
-              setIsSendDisabled(false);
-            }, 1000);
+            setSelectedImage(null);
+            setInputText('');
+            
+            // Re-enable the send button
+            setIsSendDisabled(false);
           }
-      } else {
+        } else {
           // Regular text message handling
           try {
             setIsLoading(true);
             
             // Create message object with timestamp
-        const newMessage = {
-          id: Date.now().toString(),
-          text: inputText,
-          sender: 'user',
+            const newMessage = {
+              id: Date.now().toString(),
+              text: inputText,
+              sender: 'user',
               timestamp: new Date().toISOString()
-        };
+            };
             
             // Update local state first
-        const updatedMessages = [...messages, newMessage];
-        setMessages(updatedMessages);
+            const updatedMessages = [...messages, newMessage];
+            setMessages(updatedMessages);
             
             // Update the current chat's messages in local state
-        setChats(prevChats => prevChats.map(chat => 
-          chat.id === currentChatId ? { ...chat, messages: updatedMessages } : chat
-        ));
+            setChats(prevChats => prevChats.map(chat => 
+              chat.id === currentChatId ? { ...chat, messages: updatedMessages } : chat
+            ));
 
             // Clear input
             setInputText('');
             setIsTyping(false);
 
             // Save the user's message to Supabase
-        await saveChatHistory(inputText, 'user');
-        
-        // Process the message with an AI service
-        await fetchDeepSeekResponse(inputText);
+            await saveChatHistory(inputText, 'user');
+            
+            // Process the message with an AI service
+            await fetchDeepSeekResponse(inputText);
           } catch (error) {
             console.error('Error in message handling:', error);
-            Alert.alert('Error', 'Failed to send message');
+            
+            // Don't use Alert to avoid disrupting the UX
+            setMessages((prev) => [
+              ...prev,
+              { id: Date.now().toString(), text: 'Sorry, I encountered an error processing your message. Could you try again?', sender: 'bot' },
+            ]);
+            
+            // Save the error message to chat history
+            await saveChatHistory('Sorry, I encountered an error processing your message. Could you try again?', 'bot');
           } finally {
             setIsLoading(false);
-            // Re-enable the send button after a short delay
-            setTimeout(() => {
-              setIsSendDisabled(false);
-            }, 1000);
+            
+            // Re-enable the send button
+            setIsSendDisabled(false);
           }
-      }
-      setIsTyping(false);
+        }
       } catch (error) {
-        console.error('Error in send message:', error);
-        Alert.alert('Error', 'Failed to send message');
+        console.error('Error in handleSendMessage:', error);
+        setIsLoading(false);
+        
         // Re-enable the send button
-        setTimeout(() => {
-          setIsSendDisabled(false);
-        }, 1000);
+        setIsSendDisabled(false);
       }
     }
   };
@@ -669,6 +705,7 @@ const decode = (base64) => {
   };
 
   const toggleMessageExpansion = (messageId) => {
+    // Prevent scrolling to the end of the list when expanding a message
     setExpandedMessages(prev => ({
       ...prev,
       [messageId]: !prev[messageId]
@@ -676,7 +713,7 @@ const decode = (base64) => {
   };
   const isMathExpression = (text) => {
     // Skip if text is too long (likely not a math expression)
-    if (text.length > 100) return false;
+    if (text.length > 200) return false;
     
     // Skip if it's just a simple number
     if (/^\d+$/.test(text)) return false;
@@ -685,11 +722,58 @@ const decode = (base64) => {
     if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(text) || /^\d{1,2}\-\d{1,2}\-\d{2,4}$/.test(text)) return false;
     
     // Skip if it's likely a list item with a number (e.g., "1. Item")
-    if (/^\d+\.\s+.+/.test(text) && !text.includes('=')) return false;
+    if (/^\d+\.\s+.+/.test(text) && !text.includes('=') && !text.includes('+') && !text.includes('-')) return false;
     
     // Skip if it's likely a normal sentence with numbers
-    if (text.split(' ').length > 8 && !/[\=\+\-\*\/\^\(\)]/.test(text)) return false;
+    if (text.split(' ').length > 10 && !/[\=\+\-\*\/\^\(\)]/.test(text)) return false;
+
+    // Check for specific patterns like bullet points with derivatives (• The derivative of (g(x)) is (g'(x) = 2x + 3))
+    if (/^[•\*-]\s*The derivative of\s*\([a-z]\(x\)\)\s*is\s*\([a-z]'\(x\)\s*=/.test(text)) {
+      return true;
+    }
     
+    // Check for common derivative patterns like g'(x) = 2x + 3
+    if (/[a-z]'\(x\)\s*=/.test(text)) {
+      return true;
+    }
+
+    // Check for LaTeX delimiters - highest priority as these are explicit math
+    if (text.includes('$$') || text.includes('\\[') || text.includes('\\(') || 
+        text.match(/\$[^$]+\$/) || text.includes('\\begin{equation}')) {
+      return true;
+    }
+    
+    // Check for fraction patterns like "x^2 - 2x + 2 \over (x - 1)^2"
+    if (text.includes('\\over') || text.includes('\\frac')) {
+      return true;
+    }
+    
+    // Check for Pythagorean theorem pattern (a^2 + b^2 = c^2 or 3^2 + 4^2 = c^2)
+    if (/[a-z\d]\s*\^\s*\d+\s*[\+\-]\s*[a-z\d]\s*\^\s*\d+\s*=/.test(text)) {
+      return true;
+    }
+    
+    // Check for equation patterns with explicit notation (like Step 2: Find g'(x) and h'(x))
+    if (/[a-zA-Z]'?\([a-zA-Z]\)/.test(text) && text.length < 100) {
+      return true;
+    }
+    
+    // Check for quotient rule formulas like f'(x) = \frac{...}{...}
+    if (/f'\(x\)\s*=\s*\\frac/.test(text) || /\[f'\(x\)\s*=\s*\\frac/.test(text)) {
+      return true;
+    }
+    
+    // Check for Step notation with math content
+    if (/Step\s+\d+:.*/.test(text) && (
+        text.includes('Apply the Quotient Rule') ||
+        text.includes('Simplify the Numerator') ||
+        text.includes('g\'(x)') ||
+        text.includes('h\'(x)') ||
+        text.includes('f\'(x)')
+    )) {
+      return true;
+    }
+
     // Check for equation patterns (must have equals sign)
     const hasEquation = /\=/.test(text);
     
@@ -706,27 +790,36 @@ const decode = (base64) => {
     const hasFraction = /\d+\s*\/\s*\d+/.test(text) && !/https?:\/\//.test(text); // Exclude URLs
     
     // Check for square roots or exponents or other math functions
-    const hasAdvancedMath = /sqrt|square root|\^|x\^2|x\^3|sin\(|cos\(|tan\(|log\(|π|pi/.test(text.toLowerCase());
+    const hasAdvancedMath = /sqrt|square root|\\sqrt|\^|x\^2|x\^3|sin\(|cos\(|tan\(|log\(|π|pi|\\sum|\\int|\\lim/.test(text.toLowerCase());
     
     // Check for multiple numbers and operators (likely a calculation)
     const hasMultipleOperations = /\d+\s*[\+\-\*\/]\s*\d+\s*[\+\-\*\/]\s*\d+/.test(text);
     
     // Check for specific equation patterns
     const isEquation = /^\s*\d+\s*[\+\-\*\/]\s*\d+\s*\=/.test(text) || // 2 + 2 =
-                      /^\s*\d+\s*[\+\-\*\/\=]\s*\d+/.test(text) && text.length < 20; // Short expressions like 2+2
+                       /^\s*\d+\s*[\+\-\*\/\=]\s*\d+/.test(text) && text.length < 30;
     
     // Check for common school math formulas
     const hasCommonFormula = /(area|perimeter|volume|circumference|radius|diameter)\s*[\=:]/.test(text.toLowerCase()) ||
-                            /(a\^2\s*\+\s*b\^2\s*=\s*c\^2)|(E\s*=\s*mc\^2)|(F\s*=\s*ma)/.test(text);
+                             /(a\^2\s*\+\s*b\^2\s*=\s*c\^2)|(E\s*=\s*mc\^2)|(F\s*=\s*ma)/.test(text);
     
     // Check for equations with variables
-    const hasVariables = /[a-z]\s*[\+\-\*\/\=]\s*\d+/.test(text.toLowerCase()) || 
-                        /\d+\s*[\+\-\*\/\=]\s*[a-z]/.test(text.toLowerCase()) ||
-                        /[a-z]\s*[\+\-\*\/\=]\s*[a-z]/.test(text.toLowerCase());
+    const hasVariables = /[a-zA-Z]\s*[\+\-\*\/\=]\s*\d+/.test(text.toLowerCase()) || 
+                         /\d+\s*[\+\-\*\/\=]\s*[a-zA-Z]/.test(text.toLowerCase()) ||
+                         /[a-zA-Z]\s*[\+\-\*\/\=]\s*[a-zA-Z]/.test(text.toLowerCase());
     
     // Check for subscript notation like a_n or a_{n}
-    const hasSubscript = /[a-z]_[a-z0-9]/.test(text.toLowerCase()) ||
-                       /[a-z]_\{[^}]+\}/.test(text.toLowerCase());
+    const hasSubscript = /[a-zA-Z]_[a-zA-Z0-9]/.test(text.toLowerCase()) ||
+                         /[a-zA-Z]_\{[^}]+\}/.test(text.toLowerCase());
+    
+    // Check for square root symbols
+    const hasSquareRoot = text.includes('√') || /\\sqrt/.test(text) || text.includes('\\sqrt{');
+    
+    // Check for derivative notation
+    const hasDerivative = /f'|\s[a-z]'|\s[a-z]'\(x\)|\s[a-z]''\(x\)/.test(text);
+    
+    // Check for Step N: text followed by a mathematical function, often indicating math steps
+    const isStepWithMath = /Step\s+\d+:.*([a-z]\(x\)|[a-z]'|\(x\^2|\\frac)/.test(text);
     
     // Return true if it looks like a math expression
     return (isEquation ||
@@ -738,18 +831,53 @@ const decode = (base64) => {
             hasMultipleOperations ||
             hasCommonFormula ||
             hasVariables ||
-            hasSubscript);
+            hasSubscript ||
+            hasSquareRoot ||
+            hasDerivative ||
+            isStepWithMath);
   };
 
   // Check if text looks like it has a math expression with subscripts
   const hasMathSubscripts = (text) => {
-    return /([a-zA-Z])_(\d)|([a-zA-Z])_n|([a-zA-Z])_i|([a-zA-Z])_j|([a-zA-Z])_k|([a-zA-Z])_a|([a-zA-Z])_x|([a-zA-Z])_\{([^}]+)\}/.test(text);
+    // Check for typical subscript patterns in mathematical notation
+    return (
+      /([a-zA-Z])_(\d)/.test(text) ||       // x_2
+      /([a-zA-Z])_([a-zA-Z])/.test(text) || // x_n, a_i, etc.
+      /([a-zA-Z])_\{([^}]+)\}/.test(text)   // x_{n+1}
+    );
   };
 
   // Memoize the message rendering to prevent excessive renders
   const renderMessage = React.useCallback(({ item }) => {
     // Ensure messages is an array and data is loaded
     if (!dataLoaded || !Array.isArray(messages) || messages.length === 0) return null; 
+  
+    // Special case for loading animation
+    if (item.isLoading && item.sender === 'bot') {
+      return (
+        <View style={[
+          styles.messageWrapperOuter,
+          styles.botMessageWrapper
+        ]}>
+          <Animatable.View
+            animation="fadeInUp"
+            duration={300}
+            style={[
+              styles.messageContainer,
+              styles.botMessageContainer,
+              styles.loadingMessageContainer
+            ]}
+          >
+            <LottieView
+              source={require('../assets/dot.json')}
+              autoPlay
+              loop
+              style={styles.loadingAnimation}
+            />
+          </Animatable.View>
+        </View>
+      );
+    }
   
     const isBot = item.sender === 'bot';
     const isExpanded = expandedMessages[item.id];
@@ -779,10 +907,13 @@ const decode = (base64) => {
         });
       } catch (error) {
         console.error('Error sharing:', error);
-        Alert.alert('Error', 'Failed to share message');
       }
     };
 
+    // Check if this is the last message and if it's from the bot and if loading is active
+    const isLastMessage = messages[messages.length - 1]?.id === item.id;
+    const shouldShowLoading = isLastMessage && isBot && isLoading;
+    
     // Check if the message has an image
     if (item.image) {
       return (
@@ -807,7 +938,7 @@ const decode = (base64) => {
             </TouchableOpacity>
             {item.text && (
               <Markdown 
-                key={`markdown-${index}`}
+                key={`markdown-image-${item.id}`}
                 style={{
                   body: {
                     color: isBot ? colors.botText : '#fff',
@@ -928,7 +1059,7 @@ const decode = (base64) => {
                     if (parent.ordered) {
                       return (
                         <View key={node.key} style={styles.ordered_list_item}>
-                          <Text style={[styles.list_item_number, {color: isBot ? colors.botText : '#fff'}]}>{node.index + 1}.</Text>
+                          <Text style={[styles.list_item_number, {color: isBot ? '#2274F0' : '#fff'}]}>{node.index + 1}.</Text>
                           <View style={styles.list_item_content}>
                             {children}
                           </View>
@@ -937,7 +1068,7 @@ const decode = (base64) => {
                     }
                     return (
                       <View key={node.key} style={styles.list_item}>
-                        <Text style={[styles.list_item_bullet, {color: isBot ? colors.botText : '#fff'}]}>•</Text>
+                        <Text style={[styles.list_item_bullet, {color: isBot ? '#2274F0' : '#fff'}]}>•</Text>
                         <View style={{ flex: 1 }}>
                           {children}
                         </View>
@@ -1223,183 +1354,22 @@ const decode = (base64) => {
       }
     };
   
-    // Format specialized mathematical content (like LaTeX formatted math expressions)
-    const formatMathematicalContent = (text) => {
-      // Split by LaTeX formula delimiters
-      const parts = [];
-      let currentIndex = 0;
-      
-      // Create a regex that captures LaTeX formulas
-      const latexRegex = /(\\\[.*?\\\]|\\\(.*?\\\))/gs;
-      let match;
-      
-      // Detect Chinese mathematical content
-      const isChineseMath = /[\u4e00-\u9fa5]/.test(text) && 
-                           (text.includes('\\[') || text.includes('\\('));
-      
-      // Process the text to separate LaTeX formulas from regular text
-      while ((match = latexRegex.exec(text)) !== null) {
-        // Add text before the formula
-        if (match.index > currentIndex) {
-          const textBefore = text.substring(currentIndex, match.index);
-          const lines = textBefore.split('\n');
-          
-          lines.forEach(line => {
-            if (line.trim()) {
-              const isChineseHeading = isChineseMath && 
-                                     (/^#+\s+/.test(line) || /^###/.test(line));
-              const isChineseSubheading = isChineseMath && 
-                                        (/^-\s+\*\*/.test(line) || /^\*\*步骤/.test(line));
-              
-              parts.push({
-                text: line,
-                isHeading: isChineseHeading || /^\d+\.\s+.+/.test(line) || /.*:$/.test(line),
-                isSubheading: isChineseSubheading || /^[-•*]\s+.+/.test(line),
-                hasMathExpression: false,
-                isLatexFormula: false,
-                isChineseMath: isChineseMath,
-                isChineseHeading: isChineseHeading,
-                isChineseSubheading: isChineseSubheading
-              });
-            }
-          });
-        }
-        
-        // Add the formula
-        parts.push({
-          text: match[0],
-          isHeading: false,
-          isSubheading: false,
-          hasMathExpression: true,
-          isLatexFormula: true,
-          isChineseMath: isChineseMath
-        });
-        
-        currentIndex = match.index + match[0].length;
-      }
-      
-      // Add any remaining text
-      if (currentIndex < text.length) {
-        const textAfter = text.substring(currentIndex);
-        const lines = textAfter.split('\n');
-        
-        lines.forEach(line => {
-          if (line.trim()) {
-            const isChineseHeading = isChineseMath && 
-                                   (/^#+\s+/.test(line) || /^###/.test(line));
-            const isChineseSubheading = isChineseMath && 
-                                      (/^-\s+\*\*/.test(line) || /^\*\*步骤/.test(line));
-            
-            parts.push({
-              text: line,
-              isHeading: isChineseHeading || /^\d+\.\s+.+/.test(line) || /.*:$/.test(line),
-              isSubheading: isChineseSubheading || /^[-•*]\s+.+/.test(line),
-              hasMathExpression: isMathExpression(line),
-              isLatexFormula: false,
-              isChineseMath: isChineseMath,
-              isChineseHeading: isChineseHeading,
-              isChineseSubheading: isChineseSubheading
-            });
-          }
-        });
-      }
-      
-      return parts;
-    };
+
 
     // Render LaTeX style formulas
     const renderLatexFormula = (formula, index) => {
-      // Remove the LaTeX delimiters
-      let cleanFormula = formula.replace(/\\\[|\\\]|\\\(|\\\)/g, '');
+      // Remove the LaTeX delimiters, but preserve the content for MathJax
+      let cleanFormula = formula.replace(/\\\[|\\\]/g, '').replace(/\\\(|\\\)/g, '');
       
-      // Handle subscripts like a_{n} before other replacements
-      cleanFormula = cleanFormula.replace(/([a-zA-Z])_{([^}]+)}/g, '$1ₙ');
-      cleanFormula = cleanFormula.replace(/([a-zA-Z])_(\d)/g, (match, p1, p2) => {
-        const subscripts = {
-          '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄',
-          '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉'
-        };
-        return p1 + subscripts[p2];
-      });
-      
-      // Replace LaTeX-style commands with proper math notation
-      cleanFormula = cleanFormula
-        .replace(/\\sqrt\{([^}]+)\}/g, '√($1)')
-        .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '$1/$2')
-        .replace(/\\int/g, '∫')
-        .replace(/\\sum/g, '∑')
-        .replace(/\\prod/g, '∏')
-        .replace(/\\infty/g, '∞')
-        .replace(/\\rightarrow/g, '→')
-        .replace(/\\leftarrow/g, '←')
-        .replace(/\\Rightarrow/g, '⇒')
-        .replace(/\\Leftarrow/g, '⇐')
-        .replace(/\\alpha/g, 'α')
-        .replace(/\\beta/g, 'β')
-        .replace(/\\gamma/g, 'γ')
-        .replace(/\\delta/g, 'δ')
-        .replace(/\\epsilon/g, 'ε')
-        .replace(/\\zeta/g, 'ζ')
-        .replace(/\\eta/g, 'η')
-        .replace(/\\theta/g, 'θ')
-        .replace(/\\iota/g, 'ι')
-        .replace(/\\kappa/g, 'κ')
-        .replace(/\\lambda/g, 'λ')
-        .replace(/\\mu/g, 'μ')
-        .replace(/\\nu/g, 'ν')
-        .replace(/\\xi/g, 'ξ')
-        .replace(/\\pi/g, 'π')
-        .replace(/\\rho/g, 'ρ')
-        .replace(/\\sigma/g, 'σ')
-        .replace(/\\tau/g, 'τ')
-        .replace(/\\upsilon/g, 'υ')
-        .replace(/\\phi/g, 'φ')
-        .replace(/\\chi/g, 'χ')
-        .replace(/\\psi/g, 'ψ')
-        .replace(/\\omega/g, 'ω')
-        .replace(/\\_\{([^}]+)\}/g, '_$1')
-        .replace(/\\in/g, '∈')
-        .replace(/\\subset/g, '⊂')
-        .replace(/\\supset/g, '⊃')
-        .replace(/\\cup/g, '∪')
-        .replace(/\\cap/g, '∩')
-        .replace(/\\cdot/g, '·')
-        .replace(/\\times/g, '×')
-        .replace(/\\div/g, '÷')
-        .replace(/\\equiv/g, '≡')
-        .replace(/\\approx/g, '≈')
-        .replace(/\\neq/g, '≠')
-        .replace(/\\leq/g, '≤')
-        .replace(/\\geq/g, '≥')
-        .replace(/\\partial/g, '∂')
-        .replace(/\\nabla/g, '∇')
-        .replace(/\\forall/g, '∀')
-        .replace(/\\exists/g, '∃');
-      
-      // Check if we need to handle fractions or square roots
-      const hasFraction = /\d+\s*\/\s*\d+/.test(cleanFormula);
-      const hasSquareRoot = /√\(([^)]+)\)/.test(cleanFormula) || /√\d+/.test(cleanFormula);
-      
-      if (hasFraction) {
-        const fractionParts = parseFractionFormula(cleanFormula);
-        return (
-          <View key={`latex-formula-${index}`} style={styles.complexMathContainer}>
-            {renderFractionFormula(fractionParts)}
-          </View>
-        );
-      } else if (hasSquareRoot) {
+      // Use MathJax to properly render the LaTeX
       return (
-          <View key={`latex-formula-${index}`} style={styles.complexMathContainer}>
-            {renderSquareRoot(cleanFormula)}
-          </View>
-        );
-      } else {
-        return (
-          <View key={`latex-formula-${index}`} style={styles.complexMathContainer}>
-            <Text style={styles.complexMathText}>{cleanFormula}</Text>
-          </View>
-        );
-      }
+        <View key={`latex-formula-${index}`} style={styles.mathContainer}>
+          <MathJax
+            html={`$$${cleanFormula}$$`}
+            style={[styles.mathView, { color: colors.botText }]}
+          />
+        </View>
+      );
     };
   
     return (
@@ -1421,7 +1391,7 @@ const decode = (base64) => {
               if (line.isMarkdown) {
                 return (
                   <Markdown 
-                    key={`markdown-${index}`}
+                    key={`markdown-${index}-${line.text.substring(0, 10)}`}
                     style={{
                       body: {
                         color: isBot ? colors.botText : '#fff',
@@ -1567,7 +1537,7 @@ const decode = (base64) => {
                         if (parent.ordered) {
                           return (
                             <View key={node.key} style={styles.ordered_list_item}>
-                              <Text style={[styles.list_item_number, {color: isBot ? colors.botText : '#fff'}]}>{node.index + 1}.</Text>
+                              <Text style={[styles.list_item_number, {color: isBot ? '#2274F0' : '#fff'}]}>{node.index + 1}.</Text>
                               <View style={styles.list_item_content}>
                                 {children}
                               </View>
@@ -1576,7 +1546,7 @@ const decode = (base64) => {
                         }
                         return (
                           <View key={node.key} style={styles.list_item}>
-                            <Text style={[styles.list_item_bullet, {color: isBot ? colors.botText : '#fff'}]}>•</Text>
+                            <Text style={[styles.list_item_bullet, {color: isBot ? '#2274F0' : '#fff'}]}>•</Text>
                             <View style={{ flex: 1 }}>
                               {children}
                             </View>
@@ -1674,8 +1644,12 @@ const decode = (base64) => {
               else if (line.isHeading) {
                 return (
                   <View key={`line-${index}`} style={styles.headingContainer}>
-                    <Text style={[styles.headingPointer, {color: isBot ? colors.botText : '#fff'}]}>➤</Text>
-                    <Text style={[styles.botText, {color: isBot ? colors.botText : '#fff'}]}>{line.text}</Text>
+                    <Text style={[styles.headingPointer, {color: isBot ? '#2274F0' : '#fff'}]}>➤</Text>
+                    <Text style={[styles.botText, {
+                      color: isBot ? colors.botText : '#fff',
+                      fontWeight: 'bold',
+                      fontSize: 18
+                    }]}>{line.text}</Text>
                   </View>
                 );
               }
@@ -1684,8 +1658,12 @@ const decode = (base64) => {
               else if (line.isSubheading) {
                 return (
                   <View key={`line-${index}`} style={styles.subheadingContainer}>
-                    <Text style={[styles.subheadingPointer, {color: isBot ? colors.botText : '#fff'}]}>•</Text>
-                    <Text style={[styles.botText, {color: isBot ? colors.botText : '#fff'}]}>{line.text}</Text>
+                    <Text style={[styles.subheadingPointer, {color: isBot ? '#2274F0' : '#fff'}]}>•</Text>
+                    <Text style={[styles.botText, {
+                      color: isBot ? colors.botText : '#fff',
+                      fontWeight: 'bold',
+                      fontSize: 16
+                    }]}>{line.text}</Text>
                   </View>
                 );
               }
@@ -1748,28 +1726,6 @@ const decode = (base64) => {
     );
   }, [dataLoaded, messages, expandedMessages]);
 
-  // Also memoize the FlatList to prevent unnecessary re-renders
-  const memoizedFlatList = React.useMemo(() => (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={{ flex: 1 }}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
-    >
-      <View style={{ flex: 1, position: 'relative' }}>
-        <FlatList
-          data={messages}
-          keyExtractor={(item) => item.id}
-          renderItem={renderMessage}
-          contentContainerStyle={styles.chat}
-          onContentSizeChange={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
-          onLayout={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
-          ref={flatListRef}
-          style={{ marginBottom: showAdditionalButtons ? 135 : 30 || keyboardAvoidingView ? 100 : 0 }}
-        />
-      </View>
-    </KeyboardAvoidingView>
-  ), [messages, renderMessage, showAdditionalButtons]);
-
   useEffect(() => {
     let chatSubscription;
     
@@ -1780,30 +1736,61 @@ const decode = (base64) => {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!session?.user?.id) {
-          console.error('No authenticated user found');
+          console.log('No authenticated user found, using local chat');
           
-          // For anonymous users, create a local chat and stop trying to fetch from Supabase
-          const newChatId = chatid && chatid !== 'undefined' && chatid !== 'null' 
-            ? chatid 
-            : Date.now().toString();
+          // For anonymous users, create a local chat only if needed
+          // Try to get the last used chat from AsyncStorage
+          try {
+            const lastChatData = await AsyncStorage.getItem('lastChat');
+            
+            if (lastChatData) {
+              const lastChat = JSON.parse(lastChatData);
+              console.log('Found last chat in storage:', lastChat.id);
+              setCurrentChatId(lastChat.id);
+              setMessages(lastChat.messages || []);
+              setChats([lastChat]);
+            } else {
+              // No previous chat found, create a new one
+              const newChatId = Date.now().toString();
+              const localChatObj = {
+                id: newChatId,
+                name: 'New Chat',
+                description: '',
+                role: '',
+                roleDescription: '',
+                messages: [],
+              };
+              
+              setChats([localChatObj]);
+              setCurrentChatId(newChatId);
+              setMessages([]);
+              
+              // Save this as the last chat
+              await AsyncStorage.setItem('lastChat', JSON.stringify(localChatObj));
+            }
+          } catch (error) {
+            console.error('Error accessing AsyncStorage:', error);
+            // Fallback to creating a new chat
+            const newChatId = Date.now().toString();
+            const localChatObj = {
+              id: newChatId,
+              name: 'New Chat',
+              description: '',
+              role: '',
+              roleDescription: '',
+              messages: [],
+            };
+            
+            setChats([localChatObj]);
+            setCurrentChatId(newChatId);
+            setMessages([]);
+          }
           
-          const localChatObj = {
-            id: newChatId,
-            name: 'New Chat',
-            description: '',
-            role: '',
-            roleDescription: '',
-            messages: [],
-          };
-          
-          setChats([localChatObj]);
-          setCurrentChatId(newChatId);
-          setMessages([]);
           setDataLoaded(true);
           return; // Exit early for anonymous users
         }
         
-        // Rest of the original function continues for authenticated users
+        // Rest of the original function for authenticated users
         const userId = session.user.id;
         
         // Query all chats for this user
@@ -1855,18 +1842,15 @@ const decode = (base64) => {
               setMessages(specificChat.messages || []);
               setCurrentRole(specificChat.role || '');
             } else {
-              // If a specific chat ID was requested but not found, create a new one with that ID
-              console.log('Creating new chat with ID:', chatid);
-              startNewChat(chatid);
-              Toast.show({
-                type: 'success',
-                text1: 'New Chat Created',
-                position: 'bottom',
-                visibilityTime: 2000,
-              });
+              // If a specific chat ID was requested but not found, load the most recent one
+              const mostRecentChat = processedChats[0];
+              console.log('Chat ID not found, loading most recent chat:', mostRecentChat.id);
+              setCurrentChatId(mostRecentChat.id);
+              setMessages(mostRecentChat.messages || []);
+              setCurrentRole(mostRecentChat.role || '');
             }
           } else {
-            // No specific chat requested, load the most recent one instead of creating a new one
+            // No specific chat requested, load the most recent one
             const mostRecentChat = processedChats[0];
             console.log('Loading most recent chat:', mostRecentChat.id);
             setCurrentChatId(mostRecentChat.id);
@@ -1878,12 +1862,6 @@ const decode = (base64) => {
           console.log('No chats found, creating a new chat');
           const newChatId = Date.now().toString();
           startNewChat(newChatId);
-          Toast.show({
-            type: 'success',
-            text1: 'New Chat Created',
-            position: 'bottom',
-            visibilityTime: 2000,
-          });
         }
         
         setDataLoaded(true);
@@ -2009,17 +1987,15 @@ const decode = (base64) => {
           const remainingChats = prevChats.filter(chat => chat.id !== deletedChat.chat_id);
           
           if (remainingChats.length > 0) {
-            // Select the most recent chat
+            // Select the most recent chat and keep the sidebar open if it was open
             const newCurrentChat = remainingChats[0];
-            setCurrentChatId(newCurrentChat.id);
-            setMessages(newCurrentChat.messages || []);
-            setCurrentRole(newCurrentChat.role || '');
+            selectChat(newCurrentChat.id, false);
+            return remainingChats;
           } else {
             // No chats remain, start a new one
             startNewChat();
+            return remainingChats;
           }
-          
-          return remainingChats;
         });
       }
     };
@@ -2033,7 +2009,7 @@ const decode = (base64) => {
         chatSubscription.unsubscribe();
       }
     };
-  }, []);
+  }, [navigation, route, chatid]);
 
   // Modify the startNewChat to accept chatId parameter and ensure proper initialization
   const startNewChat = async (customChatId) => {
@@ -2138,7 +2114,7 @@ const decode = (base64) => {
   
 
   
-  const selectChat = async (chatId) => {
+  const selectChat = async (chatId, closeSidebar = true) => {
     setCurrentChatId(chatId);
     const selectedChat = chats.find(chat => chat.id === chatId);
     
@@ -2150,7 +2126,10 @@ const decode = (base64) => {
       setCurrentRole('');
     }
     
-    setIsSidebarOpen(false);
+    // Only close the sidebar if closeSidebar is true
+    if (closeSidebar) {
+      setIsSidebarOpen(false);
+    }
     
     try {
       // Get the most up-to-date chat data from Supabase
@@ -2186,19 +2165,19 @@ const decode = (base64) => {
         // Update the chat in the local state
         setChats(prevChats => prevChats.map(chat => 
           chat.id === chatId 
-            ? { 
-                ...chat, 
-                messages: processedMessages,
-                name: chatData.name,
-                description: chatData.description,
-                role: chatData.role,
-                roleDescription: chatData.role_description
-              } 
-            : chat
+          ? {
+              ...chat,
+              messages: processedMessages,
+              role: chatData.role || '',
+              name: chatData.name || chat.name,
+              description: chatData.description || chat.description,
+              roleDescription: chatData.role_description || chat.roleDescription
+            }
+          : chat
         ));
       }
     } catch (error) {
-      console.error('Error selecting chat:', error);
+      console.error('Error in selectChat:', error);
     }
   };
 
@@ -2343,66 +2322,135 @@ const decode = (base64) => {
 
   // Function to render a single line of text with math expressions highlighted
   const renderTextWithMath = (line, index) => {
-    // Check for LaTeX delimiters with $$ and $ notation
-    if (line.text.includes('$') && (line.text.includes('$$') || line.text.match(/\$[^$]+\$/))) {
-      // Extract LaTeX sections
+    const isBot = line.sender === 'bot';
+    
+    // Check for numerator expansion/simplification patterns like [(2x + 3)(x - 1) - (x^2 + 3x - 5)(1)]
+    if (/\[\s*\(\d+x.*\)\(x.*\)\s*-\s*\(x\^2.*\)\(\d+\)\s*\]/.test(line.text)) {
+      return (
+        <View key={`numerator-simplify-${index}`} style={[styles.mathContainer, {paddingVertical: 8}]}>
+          <MathJax
+            html={`$$${line.text.replace(/^\[|\]$/g, '')}$$`}
+            style={[styles.mathView, { color: isBot ? colors.botText : '#fff' }]}
+          />
+        </View>
+      );
+    }
+    
+    // Check for the intermediate algebraic steps of expanding an expression
+    if (/\[\s*\d+x\^\d+\s*[\+\-]\s*\d+x\s*[\+\-]\s*\d+\s*\]/.test(line.text)) {
+      return (
+        <View key={`expand-simplify-${index}`} style={[styles.mathContainer, {paddingVertical: 8}]}>
+          <MathJax
+            html={`$$${line.text.replace(/^\[|\]$/g, '')}$$`}
+            style={[styles.mathView, { color: isBot ? colors.botText : '#fff' }]}
+          />
+        </View>
+      );
+    }
+    
+    // Check for the final simplification step like [= x^2 - 2x + 2]
+    if (/\[\s*=\s*[a-z]\^\d+\s*[\+\-]/.test(line.text)) {
+      return (
+        <View key={`final-simplify-${index}`} style={[styles.mathContainer, {paddingVertical: 8}]}>
+          <MathJax
+            html={`$$${line.text.replace(/^\[|\]$/g, '')}$$`}
+            style={[styles.mathView, { color: isBot ? colors.botText : '#fff' }]}
+          />
+        </View>
+      );
+    }
+    
+    // Check for the specific quotient rule formula pattern
+    if (/\[f'\(x\)\s*=\s*\\frac\{.*\}\{.*\}\s*\]/.test(line.text) || 
+        /f'\(x\)\s*=\s*\\frac\{.*\}\{.*\}/.test(line.text)) {
+      return (
+        <View key={`quotient-rule-${index}`} style={[styles.mathContainer, {paddingVertical: 12}]}>
+          <MathJax
+            html={`$$${line.text.replace(/^\[|\]$/g, '')}$$`}
+            style={[styles.mathView, { color: isBot ? colors.botText : '#fff' }]}
+          />
+        </View>
+      );
+    }
+    
+    // Check for bullet points with specific derivative format as shown in example
+    if (/^[•\*-]\s*The derivative of\s*\([a-z]\(x\)\)\s*is\s*\([a-z]'\(x\)\s*=/.test(line.text)) {
+      // Extract the derivative part
+      const match = line.text.match(/^([•\*-]\s*The derivative of\s*\([a-z]\(x\)\)\s*is\s*\()([a-z]'\(x\)\s*=\s*[^)]+)(\)\.?)$/);
+      
+      if (match) {
+        const prefix = match[1];
+        const derivative = match[2];
+        const suffix = match[3];
+        
+        return (
+          <View key={`bullet-derivative-${index}`} style={styles.textLine}>
+            <Text style={[isBot ? styles.botText : styles.userText, {color: isBot ? colors.botText : '#fff'}]}>
+              {prefix}
+            </Text>
+            <View style={styles.inlineMathContainer}>
+              <MathJax
+                html={`$$${formatMathToLatex(derivative)}$$`}
+                style={[styles.mathView, { color: isBot ? colors.botText : '#fff' }]}
+              />
+            </View>
+            <Text style={[isBot ? styles.botText : styles.userText, {color: isBot ? colors.botText : '#fff'}]}>
+              {suffix}
+            </Text>
+          </View>
+        );
+      }
+    }
+
+    // Handle common derivative pattern like "g'(x) = 2x + 3"
+    if (/^[a-z]'\(x\)\s*=/.test(line.text)) {
+      return (
+        <View key={`derivative-${index}`} style={styles.mathContainer}>
+          <MathJax
+            html={`$$${formatMathToLatex(line.text)}$$`}
+            style={[styles.mathView, { color: isBot ? colors.botText : '#fff' }]}
+          />
+        </View>
+      );
+    }
+    
+    // Check for LaTeX-style formulas
+    if (line.text.startsWith('\\[') || line.text.startsWith('\\(') || 
+        line.text.startsWith('$$') || line.text.startsWith('\\begin{equation}')) {
+      return renderLatexFormula(line.text, index);
+    }
+    
+    // Process dollar sign delimited LaTeX (like $x^2$)
+    if (line.text.includes('$')) {
       const parts = [];
+      const dollarRegex = /\$(.*?)\$/g;
       let lastIndex = 0;
+      let match;
       
-      // First handle display math ($$...$$)
-      const displayRegex = /\$\$(.*?)\$\$/g;
-      let displayMatch;
-      
-      while ((displayMatch = displayRegex.exec(line.text)) !== null) {
-        // Add text before the math
-        if (displayMatch.index > lastIndex) {
+      while ((match = dollarRegex.exec(line.text)) !== null) {
+        // Add text before the formula
+        if (match.index > lastIndex) {
           parts.push({
             type: 'text',
-            content: line.text.substring(lastIndex, displayMatch.index)
+            content: line.text.substring(lastIndex, match.index)
           });
         }
         
-        // Add the display math
+        // Add the formula
         parts.push({
-          type: 'display-math',
-          content: displayMatch[1]
+          type: 'inline-math',
+          content: match[1]
         });
         
-        lastIndex = displayMatch.index + displayMatch[0].length;
+        lastIndex = match.index + match[0].length;
       }
       
-      // Then handle inline math ($...$)
+      // Add any remaining text
       if (lastIndex < line.text.length) {
-        const remainingText = line.text.substring(lastIndex);
-        const inlineRegex = /\$(.*?)\$/g;
-        let inlineMatch;
-        let inlineLastIndex = 0;
-        
-        while ((inlineMatch = inlineRegex.exec(remainingText)) !== null) {
-          // Add text before the math
-          if (inlineMatch.index > inlineLastIndex) {
-            parts.push({
-              type: 'text',
-              content: remainingText.substring(inlineLastIndex, inlineMatch.index)
-            });
-          }
-          
-          // Add the inline math
-          parts.push({
-            type: 'inline-math',
-            content: inlineMatch[1]
-          });
-          
-          inlineLastIndex = inlineMatch.index + inlineMatch[0].length;
-        }
-        
-        // Add any remaining text
-        if (inlineLastIndex < remainingText.length) {
-          parts.push({
-            type: 'text',
-            content: remainingText.substring(inlineLastIndex)
-          });
-        }
+        parts.push({
+          type: 'text',
+          content: line.text.substring(lastIndex)
+        });
       }
       
       return (
@@ -2420,20 +2468,9 @@ const decode = (base64) => {
             } else if (part.type === 'inline-math') {
               return (
                 <View key={`inline-math-${index}-${partIndex}`} style={styles.inlineMathContainer}>
-                  <MathView
-                    math={part.content}
-                    style={[styles.mathView, { color: isBot ? colors.botText : '#333333' }]}
-                    resizeMode="cover"
-                  />
-                </View>
-              );
-            } else if (part.type === 'display-math') {
-              return (
-                <View key={`display-math-${index}-${partIndex}`} style={styles.displayMathContainer}>
-                  <MathView
-                    math={part.content}
-                    style={[styles.mathView, { color: isBot ? colors.botText : '#333333' }]}
-                    resizeMode="cover"
+                  <MathJax
+                    html={`$$${part.content}$$`}
+                    style={[styles.mathView, { color: isBot ? colors.botText : '#fff' }]}
                   />
                 </View>
               );
@@ -2444,55 +2481,155 @@ const decode = (base64) => {
       );
     }
     
-    // Add support for subscript notation
-    if (hasMathSubscripts(line.text)) {
-      // Process subscripts and use MathView for rendering
-      const mathText = line.text
-        .replace(/([a-zA-Z])_(\d)/g, '$1_{$2}')
-        .replace(/([a-zA-Z])_n/g, '$1_{n}')
-        .replace(/([a-zA-Z])_i/g, '$1_{i}')
-        .replace(/([a-zA-Z])_j/g, '$1_{j}')
-        .replace(/([a-zA-Z])_k/g, '$1_{k}')
-        .replace(/([a-zA-Z])_a/g, '$1_{a}')
-        .replace(/([a-zA-Z])_x/g, '$1_{x}')
-        .replace(/([a-zA-Z])_\{([^}]+)\}/g, '$1_{$2}');
+    // Check for function notation like f'(x) or h'(x)
+    if (/[a-z]'?\([a-z]\)/.test(line.text)) {
+      // Format it as LaTeX
+      let latexFormula = line.text
+        .replace(/([a-z])'\(([a-z])\)/g, '$1^{\\prime}($2)')
+        .replace(/([a-z])''\(([a-z])\)/g, '$1^{\\prime\\prime}($2)');
       
       return (
-        <View key={`math-line-${index}`} style={styles.mathContainer}>
-          <MathView
-            math={mathText}
-            style={[styles.mathView, { color: isBot ? colors.botText : '#333333' }]}
-            resizeMode="cover"
+        <View key={`function-notation-${index}`} style={styles.mathContainer}>
+          <MathJax
+            html={`$$${latexFormula}$$`}
+            style={[styles.mathView, { color: isBot ? colors.botText : '#fff' }]}
           />
         </View>
       );
     }
     
+    // Check for step notation with math formulas
+    if (/Step\s+\d+:.*/.test(line.text) && (
+        line.text.includes('(x)') || 
+        line.text.includes('=') || 
+        line.text.includes('^') || 
+        line.text.includes('\\frac')
+       )) {
+      // Don't convert it to LaTeX, but identify parts that should be in LaTeX
+      const parts = [];
+      const stepRegex = /(Step\s+\d+:)\s*(.*)/;
+      const match = line.text.match(stepRegex);
+      
+      if (match) {
+        const stepLabel = match[1];
+        const mathContent = match[2];
+        
+        parts.push({
+          type: 'text',
+          content: stepLabel + ' '
+        });
+        
+        parts.push({
+          type: 'inline-math',
+          content: formatMathToLatex(mathContent)
+        });
+        
+        return (
+          <View key={`step-math-${index}`} style={styles.textLine}>
+            {parts.map((part, partIndex) => {
+              if (part.type === 'text') {
+                return (
+                  <Text 
+                    key={`text-part-${index}-${partIndex}`} 
+                    style={[isBot ? styles.botText : styles.userText, 
+                           {color: isBot ? colors.botText : '#fff', fontWeight: 'bold'}]}
+                  >
+                    {part.content}
+                  </Text>
+                );
+              } else if (part.type === 'inline-math') {
+                return (
+                  <View key={`inline-math-${index}-${partIndex}`} style={styles.inlineMathContainer}>
+                    <MathJax
+                      html={`$$${part.content}$$`}
+                      style={[styles.mathView, { color: isBot ? colors.botText : '#fff' }]}
+                    />
+                  </View>
+                );
+              }
+              return null;
+            })}
+          </View>
+        );
+      }
+    }
+    
+    // Add support for subscript notation
+    if (hasMathSubscripts(line.text)) {
+      // Process subscripts and use MathJax for rendering
+      const mathText = line.text
+        .replace(/([a-zA-Z])_(\d)/g, '$1_{$2}')
+        .replace(/([a-zA-Z])_([a-zA-Z])/g, '$1_{$2}')
+        .replace(/([a-zA-Z])_\{([^}]+)\}/g, '$1_{$2}');
+      
+      return (
+        <View key={`math-line-${index}`} style={styles.mathContainer}>
+          <MathJax
+            html={`$$${mathText}$$`}
+            style={[styles.mathView, { color: isBot ? colors.botText : '#fff' }]}
+          />
+        </View>
+      );
+    }
+    
+    // Enhanced pattern matching for mathematical formulas
     // Check for specific patterns like Pythagorean theorem (a^2 + b^2 = c^2)
-    if (/[a-z]\^2\s*[\+\-]\s*[a-z]\^2\s*=\s*[a-z]\^2/.test(line.text) ||
+    if (/[a-z\d]\s*\^\s*\d+\s*[\+\-]\s*[a-z\d]\s*\^\s*\d+\s*=/.test(line.text) ||
         /\d+\^2\s*[\+\-]\s*\d+\^2\s*=\s*[a-z]\^2/.test(line.text) ||
+        /\d+\s*\^\s*2\s*\+\s*\d+\s*\^\s*2\s*=\s*[a-z]\s*\^\s*2/.test(line.text) ||
+        /[a-z\d]\s*\^\s*[a-z\d]\s*[\+\-]\s*[a-z\d]\s*\^\s*[a-z\d]/.test(line.text) ||
         /\d+\s*\+\s*\d+\s*=\s*[a-z]\^2/.test(line.text) ||
-        /[a-z]\^2\s*[\+\-]\s*[a-z]\^2\s*=/.test(line.text)) {
+        /[a-z]\^2\s*[\+\-]\s*[a-z]\^2\s*=/.test(line.text) ||
+        /[a-z\d]\^[a-z\d]/.test(line.text) && /[\+\-\=]/.test(line.text)) {
       // Format it as LaTeX
       let latexFormula = line.text
-        .replace(/([a-z])\^(\d+)/g, '$1^{$2}')
-        .replace(/(\d+)\^(\d+)/g, '$1^{$2}')
+        .replace(/([a-z\d])\s*\^\s*(\d+)/g, '$1^{$2}')
+        .replace(/([a-z\d])\s*\^\s*([a-z\d])/g, '$1^{$2}')
         .replace(/sqrt\(([^)]+)\)/g, '\\sqrt{$1}')
         .replace(/√\s*([a-z0-9]+)/g, '\\sqrt{$1}');
       
       return (
         <View key={`pythagorean-${index}`} style={styles.mathContainer}>
-          <MathView
-            math={latexFormula}
-            style={[styles.mathView, { color: isBot ? colors.botText : '#333333' }]}
-            resizeMode="cover"
+          <MathJax
+            html={`$$${latexFormula}$$`}
+            style={[styles.mathView, { color: isBot ? colors.botText : '#fff' }]}
+          />
+        </View>
+      );
+    }
+
+    // Special case for c = sqrt{25} = 5 pattern
+    if (/[a-z]\s*=\s*\\?sqrt\{?\d+\}?\s*=\s*\d+/.test(line.text) || 
+        /[a-z]\s*=\s*\\?sqrt\{?\d+\}?/.test(line.text) ||
+        /[a-z]\s*=\s*√\d+/.test(line.text)) {
+      let latexFormula = line.text
+        .replace(/sqrt\{?(\d+)\}?/g, '\\sqrt{$1}')
+        .replace(/√\s*(\d+)/g, '\\sqrt{$1}');
+      
+      return (
+        <View key={`sqrt-result-${index}`} style={styles.mathContainer}>
+          <MathJax
+            html={`$$${latexFormula}$$`}
+            style={[styles.mathView, { color: isBot ? colors.botText : '#fff' }]}
           />
         </View>
       );
     }
     
-    // Use regex to find math expressions in the text
-    const mathRegex = /(\d+\s*[\+\-\*\/\=\(\)\[\]\{\}\^×÷]\s*\d+)|(\b\d+\s*[×÷=]\s*\d+\b)|(sqrt\([^)]+\))|(sin\([^)]+\))|(cos\([^)]+\))|(tan\([^)]+\))|(log\([^)]+\))/g;
+    // Specific case for fractions in quotient rule formula
+    if (/\\frac\{.*\}\{.*\}/.test(line.text) || line.text.includes('\\over')) {
+      return (
+        <View key={`fraction-formula-${index}`} style={styles.mathContainer}>
+          <MathJax
+            html={`$$${line.text}$$`}
+            style={[styles.mathView, { color: isBot ? colors.botText : '#fff' }]}
+          />
+        </View>
+      );
+    }
+    
+    // Enhance the regex to catch more mathematical expressions
+    const mathRegex = /(\\?[a-z]\^[a-z\d]|[a-z\d]\^\d|\\?sqrt\{?[^}]+\}?|\\frac\{[^}]+\}\{[^}]+\}|\d+\s*[\+\-\*\/×÷\=\(\)\[\]\{\}\^]\s*\d+|sin\([^)]+\)|cos\([^)]+\)|tan\([^)]+\)|log\([^)]+\)|[a-z]'|[a-z]'\([a-z]\))/g;
     const matches = line.text.match(mathRegex) || [];
     
     // If we found math expressions, split and format them
@@ -2518,10 +2655,9 @@ const decode = (base64) => {
           
           elements.push(
             <View key={`math-part-${index}-${i}`} style={styles.mathContainer}>
-              <MathView
-                math={latexExpression}
-                style={[styles.mathView, { color: isBot ? colors.botText : '#333333' }]}
-                resizeMode="cover"
+              <MathJax
+                html={`$$${latexExpression}$$`}
+                style={[styles.mathView, { color: isBot ? colors.botText : '#fff' }]}
               />
             </View>
           );
@@ -2531,6 +2667,21 @@ const decode = (base64) => {
       return (
         <View key={`line-${index}`} style={styles.textLine}>
           {elements}
+        </View>
+      );
+    }
+    
+    // Check if the entire line might be a math formula
+    if (/[a-z\d]\s*[\+\-\*\/×÷\=\^]\s*[a-z\d]/.test(line.text) && 
+        (line.text.includes('^') || line.text.includes('=') || line.text.includes('+') || line.text.includes('-'))) {
+      const latexFormula = formatMathToLatex(line.text);
+      
+      return (
+        <View key={`full-math-${index}`} style={styles.mathContainer}>
+          <MathJax
+            html={`$$${latexFormula}$$`}
+            style={[styles.mathView, { color: isBot ? colors.botText : '#fff' }]}
+          />
         </View>
       );
     }
@@ -2547,184 +2698,149 @@ const decode = (base64) => {
   };
   
   // Parse a math formula to identify fractions
-  const parseFractionFormula = (formula) => {
-    // Split the formula into parts - operators, numbers, and fractions
-    const fractionRegex = /(\d+)\s*\/\s*(\d+)/g;
-    const parts = [];
-    let lastIndex = 0;
-    let match;
-    
-    while ((match = fractionRegex.exec(formula)) !== null) {
-      // Add the text before the fraction
-      if (match.index > lastIndex) {
-        parts.push({
-          type: 'text',
-          content: formula.substring(lastIndex, match.index).trim()
-        });
-      }
-      
-      // Add the fraction
-      parts.push({
-        type: 'fraction',
-        numerator: match[1].trim(),
-        denominator: match[2].trim()
-      });
-      
-      lastIndex = match.index + match[0].length;
-    }
-    
-    // Add any remaining text
-    if (lastIndex < formula.length) {
-      parts.push({
-        type: 'text',
-        content: formula.substring(lastIndex).trim()
-      });
-    }
-    
-    return parts.length > 0 ? parts : [{ type: 'text', content: formula }];
-  };
+
   
   // Render a formula with proper fractions
-  const renderFractionFormula = (parts) => {
-    return (
-      <View style={styles.formulaContainer}>
-        {parts.map((part, i) => {
-          if (part.type === 'text') {
-            return (
-              <Text key={`formula-part-${i}`} style={[styles.mathText, { color: isBot ? colors.botText : '#fff' }]}>
-                {part.content}
-              </Text>
-            );
-          } else if (part.type === 'fraction') {
-            return (
-              <View key={`fraction-${i}`} style={styles.fractionContainer}>
-                <Text style={[styles.numerator, { color: isBot ? colors.botText : '#fff' }]}>{part.numerator}</Text>
-                <View style={[styles.fractionLine, { backgroundColor: isBot ? colors.botText : '#fff' }]} />
-                <Text style={[styles.denominator, { color: isBot ? colors.botText : '#fff' }]}>{part.denominator}</Text>
-              </View>
-            );
-          }
-          return null;
-        })}
-      </View>
-    );
-  };
+
   
   // Render square root notation using MathView
-  const renderSquareRoot = (formula) => {
-    // Extract the content inside the square root
-    const rootMatch = formula.match(/√\(([^)]+)\)/);
-    const rootContent = rootMatch ? rootMatch[1] : formula.replace(/√/g, '').trim();
-    
-    return (
-      <View style={styles.sqrtContainer}>
-        <MathView
-          math={`\\sqrt{${rootContent}}`}
-          style={[styles.mathView, { color: isBot ? colors.botText : '#333333' }]}
-          resizeMode="cover"
-        />
-      </View>
-    );
-  };
+  
   
   // New function to convert regular math expressions to LaTeX format
   const formatMathToLatex = (expression) => {
+    // Handle the raw LaTeX expression - if it's already in LaTeX format, return it as is
+    if (expression.includes('\\') && !expression.match(/\\+$/)) {
+      return expression;
+    }
+    
     let latex = expression;
     
-    // First check for Pythagorean theorem patterns (a^2 + b^2 = c^2) or (3^2 + 4^2 = c^2)
-    if (/[a-z]\^2\s*[\+\-]\s*[a-z]\^2\s*=\s*[a-z]\^2/.test(expression) || 
-        /\d+\^2\s*[\+\-]\s*\d+\^2\s*=\s*[a-z]\^2/.test(expression)) {
-      latex = latex
-        .replace(/([a-z])\^(\d+)/g, '$1^{$2}')
-        .replace(/(\d+)\^(\d+)/g, '$1^{$2}');
+    // Handle derivative notation with more precision
+    latex = latex.replace(/([a-z])'\(([a-z])\)/g, '$1^{\\prime}($2)')
+                   .replace(/([a-z])''\(([a-z])\)/g, '$1^{\\prime\\prime}($2)')
+                   .replace(/([a-z])'/g, '$1^{\\prime}');
+  
+    // Handle specific pattern g'(x) = 2x + 3
+    if (/[a-z]'\(x\)\s*=\s*\d+x\s*[\+\-]\s*\d+/.test(expression)) {
+      latex = latex.replace(/([a-z])'\(x\)\s*=\s*(\d+)x\s*([\+\-])\s*(\d+)/g, 
+                            '$1^{\\prime}(x) = $2x $3 $4');
       return latex;
     }
     
-    // Handle simple calculations like "9 + 16 = c^2"
-    if (/\d+\s*[\+\-\*\/]\s*\d+\s*=\s*[a-z]\^2/.test(expression)) {
-      latex = latex.replace(/([a-z])\^(\d+)/g, '$1^{$2}');
+    // Handle simple derivative like h'(x) = 1
+    if (/[a-z]'\(x\)\s*=\s*\d+/.test(expression)) {
+      latex = latex.replace(/([a-z])'\(x\)\s*=\s*(\d+)/g, 
+                            '$1^{\\prime}(x) = $2');
       return latex;
     }
     
-    // Handle result formulas like "c^2 = 25" or "c = sqrt{25} = 5"
-    if (/[a-z]\^2\s*=\s*\d+/.test(expression) || 
-        /[a-z]\s*=\s*\\?sqrt\{?\d+\}?\s*=/.test(expression)) {
+    // Handle equations with exponents like a^2 + b^2 = c^2
+    if (/[a-z\d]\s*\^\s*\d+\s*[\+\-]\s*[a-z\d]\s*\^\s*\d+\s*=\s*[a-z\d]\s*\^\s*\d+/.test(expression)) {
       latex = latex
-        .replace(/([a-z])\^(\d+)/g, '$1^{$2}')
-        .replace(/sqrt\{?(\d+)\}?/g, '\\sqrt{$1}');
+        .replace(/([a-z\d])\s*\^\s*(\d+)/g, '$1^{$2}')
+        .replace(/(\d+)\s*\^\s*(\d+)/g, '$1^{$2}');
+      return latex;
+    }
+    
+    // Handle simple arithmetic expressions with equals sign (3^2 + 4^2 = c^2)
+    if (/\d+\s*[\^]\s*\d+\s*[\+\-]\s*\d+\s*[\^]\s*\d+\s*=\s*[a-z]\s*[\^]\s*\d+/.test(expression)) {
+      latex = latex
+        .replace(/([a-z0-9])\s*\^(\s*\d+)/g, '$1^{$2}')
+        .replace(/(\d+)\s*\^(\s*\d+)/g, '$1^{$2}');
+      return latex;
+    }
+    
+    // Handle result formulas (c^2 = 25 or c = sqrt{25} = 5)
+    if (/[a-z]\s*\^2\s*=\s*\d+/.test(expression) || 
+        /[a-z]\s*=\s*\\?sqrt\{?\d+\}?\s*=\s*\d+/.test(expression) ||
+        /[a-z]\s*=\s*\\?sqrt\{?\d+\}?/.test(expression)) {
+      latex = latex
+        .replace(/([a-z])\s*\^(\s*\d+)/g, '$1^{$2}')
+        .replace(/sqrt\{?(\d+)\}?/g, '\\sqrt{$1}')
+        .replace(/√(\d+)/g, '\\sqrt{$1}');
+      return latex;
+    }
+    
+    // Handle simple arithmetic expressions (9 + 16 = 25)
+    if (/\d+\s*[\+\-\*\/]\s*\d+\s*=\s*\d+/.test(expression)) {
       return latex;
     }
     
     // Convert regular math operations to LaTeX
-    latex = latex.replace(/\*/g, '\\times ');
-    latex = latex.replace(/\//g, '\\div ');
-    latex = latex.replace(/sqrt\(([^)]+)\)/g, '\\sqrt{$1}');
-    latex = latex.replace(/square root of (\d+)/gi, '\\sqrt{$1}');
-    latex = latex.replace(/square root/gi, '\\sqrt{}');
+    latex = latex.replace(/\*/g, '\\times ')
+                 .replace(/\//g, '\\div ')
+                 .replace(/sqrt\(([^)]+)\)/g, '\\sqrt{$1}')
+                 .replace(/square root of (\d+)/gi, '\\sqrt{$1}')
+                 .replace(/square root/gi, '\\sqrt{}')
+                 .replace(/√(\d+)/g, '\\sqrt{$1}');
     
     // Convert fractions
     latex = latex.replace(/(\d+)\s*\/\s*(\d+)/g, '\\frac{$1}{$2}');
     
     // Convert trigonometric functions
-    latex = latex.replace(/sin\(([^)]+)\)/g, '\\sin($1)');
-    latex = latex.replace(/cos\(([^)]+)\)/g, '\\cos($1)');
-    latex = latex.replace(/tan\(([^)]+)\)/g, '\\tan($1)');
+    latex = latex.replace(/sin\(([^)]+)\)/g, '\\sin($1)')
+                 .replace(/cos\(([^)]+)\)/g, '\\cos($1)')
+                 .replace(/tan\(([^)]+)\)/g, '\\tan($1)');
     
     // Convert logarithmic functions
     latex = latex.replace(/log\(([^)]+)\)/g, '\\log($1)');
     
-    // Replace ^ with LaTeX power notation
-    latex = latex.replace(/\^(\d+)/g, '^{$1}');
-    latex = latex.replace(/([a-zA-Z0-9])\^([a-zA-Z0-9])/g, '$1^{$2}');
+    // Replace ^ with LaTeX power notation - make this more robust
+    latex = latex.replace(/([a-zA-Z0-9])\s*\^\s*(\d+)/g, '$1^{$2}')
+                 .replace(/([a-zA-Z0-9])\s*\^\s*([a-zA-Z0-9])/g, '$1^{$2}');
     
     // Format pi
     latex = latex.replace(/\bpi\b/gi, '\\pi ');
     
-    // Replace special quad and rightarrow symbols
-    latex = latex.replace(/\\quad/g, '\\,');
-    latex = latex.replace(/\\rightarrow/g, '\\to');
+    // Handle the specific quotient rule formula pattern
+    if (/f'\(x\)\s*=\s*\\frac\{.*\}\{.*\}/.test(expression)) {
+      // It's already in LaTeX format, just return it
+      return expression;
+    }
+    
+    // Handle the alternative notation with square brackets
+    if (/\[f'\(x\)\s*=\s*\\frac\{.*\}\{.*\}\s*\]/.test(expression)) {
+      // Remove the square brackets and return
+      return expression.replace(/^\[|\]$/g, '');
+    }
+    
+    // Handle non-LaTeX fraction notation for quotient rule 
+    if (/f'\(x\)\s*=\s*\(\d+x.*\)\(x.*\) - \(x\^2.*\)\(\d+\)/.test(expression)) {
+      // Convert to proper LaTeX fraction
+      const parts = expression.match(/f'\(x\)\s*=\s*(.+?) - (.+?)\/(.+)/);
+      if (parts) {
+        return `f^{\\prime}(x) = \\frac{${parts[1]} - ${parts[2]}}{${parts[3]}}`;
+      }
+    }
+    
+    // Handle algebraic expansion pattern [(2x + 3)(x - 1) - (x^2 + 3x - 5)(1)]
+    if (/\[\s*\(\d+x.*\)\(x.*\)\s*-\s*\(x\^2.*\)\(\d+\)\s*\]/.test(expression)) {
+      // Already in a good format for LaTeX, just replace square brackets
+      return expression.replace(/^\[|\]$/g, '');
+    }
+    
+    // Handle intermediate steps of expansion (e.g., [2x^2 - 2x + 3x - 3])
+    if (/\[\s*\d+x\^\d+\s*[\+\-]\s*\d+x\s*[\+\-]/.test(expression)) {
+      // Already in a good format for LaTeX, just replace square brackets
+      let formula = expression.replace(/^\[|\]$/g, '');
+      // Format the exponents properly
+      formula = formula.replace(/(\d+)x\^(\d+)/g, '$1x^{$2}');
+      return formula;
+    }
+    
+    // Handle final simplification step [= x^2 - 2x + 2]
+    if (/\[\s*=\s*[a-z]\^\d+\s*[\+\-]/.test(expression)) {
+      // Already in a good format for LaTeX, just replace square brackets
+      let formula = expression.replace(/^\[|\]$/g, '');
+      // Format the exponents properly
+      formula = formula.replace(/([a-z])\^(\d+)/g, '$1^{$2}');
+      return formula;
+    }
     
     return latex;
   };
   
-  // Function to format math expressions to LaTeX format
-  const formatMathExpression = (expression) => {
-    // Convert to LaTeX format
-    let latex = expression;
-    
-    // Replace * with × for multiplication
-    latex = latex.replace(/\*/g, '\\times ');
-    
-    // Format fractions
-    latex = latex.replace(/(\d+)\s*\/\s*(\d+)/g, '\\frac{$1}{$2}');
-    
-    // Format square roots
-    latex = latex.replace(/sqrt\(([^)]+)\)/g, '\\sqrt{$1}');
-    latex = latex.replace(/square root of (\d+)/gi, '\\sqrt{$1}');
-    latex = latex.replace(/square root/gi, '\\sqrt{}');
-    
-    // Format pi
-    latex = latex.replace(/\bpi\b/gi, '\\pi ');
-    
-    // Format trigonometric functions
-    latex = latex.replace(/\b(sin|cos|tan)\(/g, '\\$1(');
-    
-    // Format logarithmic functions
-    latex = latex.replace(/\blog\(/g, '\\log(');
-    
-    // Handle exponents
-    latex = latex.replace(/\^2/g, '^{2}');
-    latex = latex.replace(/\^3/g, '^{3}');
-    latex = latex.replace(/\^(\d+)/g, '^{$1}');
-    
-    // Check if the expression has fractions
-    const hasFraction = /\\frac\{.+\}\{.+\}/.test(latex);
-    
-    // Check if the expression has square roots
-    const hasSquareRoot = /\\sqrt\{.+\}/.test(latex);
-    
-    return { formattedMath: latex, hasFraction, hasSquareRoot };
-  };
+ 
 
   // Function to handle image tap and show fullscreen view
   const handleImageTap = (imageUri) => {
@@ -2887,6 +3003,41 @@ const decode = (base64) => {
     );
   });
 
+  // Add these functions for scroll behavior
+  const scrollToBottom = () => {
+    if (flatListRef.current && messages.length > 0) {
+      flatListRef.current.scrollToEnd({ animated: true });
+    }
+  };
+  
+  const handleScroll = (event) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    const contentSizeHeight = event.nativeEvent.contentSize.height;
+    const layoutHeight = event.nativeEvent.layoutMeasurement.height;
+    
+    // Show the scroll button if not near the bottom
+    setShowScrollToBottom(offsetY < contentSizeHeight - layoutHeight - 50);
+    
+    // Save heights for later use
+    setListHeight(layoutHeight);
+    setContentHeight(contentSizeHeight);
+  };
+  
+  // Add an effect to scroll to bottom when messages change
+  useEffect(() => {
+    if (messages.length > 0) {
+      // Small delay to ensure content is rendered
+      setTimeout(scrollToBottom, 100);
+    }
+  }, [messages]);
+
+  // Scroll to bottom when keyboard opens
+  useEffect(() => {
+    if (isKeyboardVisible && messages.length > 0) {
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    }
+  }, [isKeyboardVisible, messages.length]);
+
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
       
@@ -2930,7 +3081,27 @@ const decode = (base64) => {
 
       {/* Chat List */}
       <Animatable.View animation="fadeIn" duration={1000} style={{ flex: 1 }}>
-        {memoizedFlatList}
+        {messages.length > 0 ? (
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            keyExtractor={(item) => item.id}
+            renderItem={renderMessage}
+            contentContainerStyle={styles.messagesContainer}
+            style={styles.messagesList}
+            onScroll={handleScroll}
+            scrollEventThrottle={400}
+            onContentSizeChange={() => {
+              if (messages.length > 0 && !showScrollToBottom) {
+                scrollToBottom();
+              }
+            }}
+          />
+        ) : (
+          <View style={styles.emptyStateContainer}>
+            {/* ... existing empty state code ... */}
+          </View>
+        )}
 
         {/* Placeholder for New Chat */}
         {messages.length === 0 && dataLoaded && (
@@ -3030,22 +3201,6 @@ const decode = (base64) => {
         style={styles.keyboardAvoidingView}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
       >
-
-{isLoading && (
-        <View style={[styles.loadingContainer, { 
-          bottom: showAdditionalButtons && selectedImage ? -60 : 
-                 showAdditionalButtons ? 25 : 
-                 selectedImage ? -60 : 
-                 -85 
-        }]}>
-          <LottieView
-            source={require('../assets/dot.json')}
-            autoPlay
-            loop
-            style={styles.loadingAnimation}
-          />
-        </View>
-      )}
         <View style={styles.inputContentContainer}>
           {!selectedImage && (
             <View style={styles.NewChat}>
@@ -3071,42 +3226,55 @@ const decode = (base64) => {
           </TouchableOpacity>
         </View>
       )}
-
-          <View style={styles.chatBoxContainer}>
-            <TextInput
-              style={[styles.textInput, { textAlignVertical: 'top' }]}
-              placeholder={selectedImage ? "Add a caption..." : "Send a message..."}
-              placeholderTextColor="#ccc"
-              value={inputText}
-              onChangeText={handleInputChange}
-              onSubmitEditing={() => {
-                handleSendMessage();
-                Keyboard.dismiss();
-              }}
-              multiline={true}
-              numberOfLines={3}
-              maxLength={2000}
-              scrollEnabled={true}
-              returnKeyType="send"
-              blurOnSubmit={Platform.OS === 'ios' ? false : true}
-            />
-            <TouchableOpacity onPress={handleAttach} style={styles.sendButton}>
-              {showAdditionalButtons ? (
-                <Ionicons name="close" size={28} color="#4C8EF7" />
-              ) : (
-                <MaterialCommunityIcons name="plus" size={28} color="#4C8EF7" />
-              )}
-            </TouchableOpacity>
-                   
-            <TouchableOpacity 
-              onPress={handleSendMessage} 
-              style={[styles.sendButton, isSendDisabled && styles.disabledButton]} 
-              disabled={isSendDisabled}
-            >
-              <Ionicons name="send" size={24} color={isSendDisabled ? "#ccc" : "#4C8EF7"} />
-            </TouchableOpacity>
-          </View>
-
+<View style={styles.chatBoxContainer2}>
+           <LinearGradient
+             colors={['transparent', 'transparent', colors.background2, colors.background2]}
+             locations={[0, 0.5, 0.5, 1]}
+             style={{
+               height:60,
+               width: '100%',
+               overflow: 'visible'
+             }}>
+            <View style={styles.chatBoxContainer}>
+              <TextInput
+                style={[styles.textInput, { textAlignVertical: 'top' }]}
+                placeholder={selectedImage ? "Add a caption..." : "Send a message..."}
+                placeholderTextColor="#ccc"
+                value={inputText}
+                onChangeText={handleInputChange}
+                onSubmitEditing={() => {
+                  handleSendMessage();
+                  Keyboard.dismiss();
+                }}
+                multiline={true}
+                numberOfLines={3}
+                maxLength={2000}
+                scrollEnabled={true}
+                returnKeyType="send"
+                blurOnSubmit={Platform.OS === 'ios' ? false : true}
+              />
+              <TouchableOpacity onPress={handleAttach} style={styles.sendButton}>
+                {showAdditionalButtons ? (
+                  <Ionicons name="close" size={28} color="#4C8EF7" />
+                ) : (
+                  <MaterialCommunityIcons name="plus" size={28} color="#4C8EF7" />
+                )}
+              </TouchableOpacity>
+                     
+              <TouchableOpacity 
+                onPress={handleSendMessage} 
+                style={[styles.sendButton, isSendDisabled && styles.disabledButton]} 
+                disabled={isSendDisabled}
+              >
+                {isSendDisabled ? (
+                  <ActivityIndicator size="small" color="#4C8EF7" />
+                ) : (
+                  <Ionicons name="send" size={24} color="#4C8EF7" />
+                )}
+              </TouchableOpacity>
+            </View>
+           </LinearGradient>
+            </View>
           {showAdditionalButtons && (
             <View style={[styles.additionalButtonsContainer, {backgroundColor: colors.background2}]  }>
               <View style={styles.buttonRow}>
@@ -3169,6 +3337,16 @@ const decode = (base64) => {
           </TouchableOpacity>
         </View>
       </Modal>
+
+      {/* Scroll to bottom button */}
+      {showScrollToBottom && (
+        <TouchableOpacity 
+          style={styles.scrollToBottomButton}
+          onPress={scrollToBottom}
+        >
+          <Text style={styles.scrollToBottomIcon}>↓</Text>
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 };
@@ -3227,12 +3405,11 @@ const styles = StyleSheet.create({
     resizeMode: 'contain',
   },
   keyboardAvoidingView: {
-    position: 'absolute',
-    bottom: 0,
-    marginBottom: 15,
+    width: '100%',
     left: 0,
     right: 0,
-    width: '100%',
+    bottom: 0,
+    zIndex: 10,
   },
   inputContentContainer: {
     width: '100%',
@@ -3249,7 +3426,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     backgroundColor: '#fff',
   },
-  
+  chatBoxContainer2: {
+   height: 40, // Set a specific height to properly show the gradient
+   width: '100%',
+   overflow: 'visible',
+  },
   NewChat: {
     alignSelf: 'center',
     backgroundColor: '#4C8EF7',
@@ -3279,7 +3460,7 @@ const styles = StyleSheet.create({
    padding: 5,
   },
   disabledButton: {
-    opacity: 0.5,
+    opacity: 1, // Changed from 0.5 to 1 to make activity indicator fully visible
   },
   
   // WhatsApp style image preview container
@@ -3341,6 +3522,7 @@ const styles = StyleSheet.create({
   },
   chat: {
     paddingVertical: 10,
+    flexGrow: 1,
   },
  
 
@@ -3401,15 +3583,27 @@ const styles = StyleSheet.create({
 
 
   loadingContainer: {
-    position: 'absolute',
-  
-    left: -70,
+    position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
+    marginVertical: 10,
+    alignSelf: 'flex-start',
+    width: '70%',
+    backgroundColor: '#F0F8FF',
+    borderRadius: 20,
+    padding: 10,
+  },
+  loadingMessageContainer: {
+    backgroundColor: '#F0F8FF',
+    minHeight: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 'auto',
+    maxWidth: '70%',
   },
   loadingAnimation: {
-    width: 300,
-    height: 300,
+    width: 100,
+    height: 50,
   },
   botText: {
     fontSize: 16,
@@ -3623,11 +3817,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
-paddingVertical:10,
+    paddingVertical: 10,
     backgroundColor: '#fff',
     paddingHorizontal: 20,
-    marginBottom:-10,
-
+    marginBottom: -10,
+    zIndex: 5,
   },
   buttonRow: {
     flexDirection: 'row',
@@ -3739,14 +3933,16 @@ paddingVertical:10,
   mathContainer: {
     backgroundColor: '#F8F9FA',
     borderRadius: 8,
-    padding: 2,
-    marginVertical: 4,
+    padding: 8,
+    marginVertical: 6,
     borderWidth: 1,
     borderColor: '#E0E0E0',
     alignSelf: 'flex-start',
+    width: '100%',
     maxWidth: '100%',
-    flexWrap: 'wrap',
-    flexShrink: 1,
+    overflow: 'hidden',
+    minHeight: 40,
+    justifyContent: 'center',
   },
   mathText: {
     fontFamily: 'monospace',
@@ -3760,7 +3956,7 @@ paddingVertical:10,
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: 8,
- width:'80%',
+    width:'80%',
     padding: 8,
     borderRadius: 8,
     borderWidth: 1,
@@ -3770,7 +3966,7 @@ paddingVertical:10,
     fontWeight: 'bold',
     fontSize: 18,
     marginRight: 8,
-    color: '#1976D2',
+    color: '#2274F0', // Changed to the requested color
   },
   headingText: {
     fontWeight: 'bold',
@@ -3781,14 +3977,14 @@ paddingVertical:10,
   subheadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-   
-  width:'80%',
+    width:'80%',
+    marginVertical: 6, // Added margin for better spacing
   },
   subheadingPointer: {
     fontWeight: 'bold',
     fontSize: 12,
     marginRight: 8,
-    color: '#007bff',
+    color: '#2274F0', // Changed to the requested color
   },
   subheadingText: {
     fontWeight: 'bold',
@@ -3886,7 +4082,6 @@ paddingVertical:10,
     maxWidth: '100%',
     flexWrap: 'wrap',
     flexShrink: 1,
-    overflow: 'hidden',
   },
   complexMathText: {
     fontFamily: 'monospace',
@@ -4187,9 +4382,7 @@ paddingVertical:10,
   },
   // MathView styles
   mathView: {
-    minHeight: 30,
-    alignSelf: 'center',
-    margin: 5,
+    fontSize: 18,
   },
   mathContainer: {
     marginVertical: 5,
@@ -4221,6 +4414,57 @@ paddingVertical:10,
     fontWeight: 'bold',
     fontStyle: 'italic',
     color: '#333',
+  },
+  scrollToBottomButton: {
+    position: 'absolute',
+    right: 15,
+    bottom: 80, // Adjust based on your input bar height
+    backgroundColor: '#4C8EF7',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    zIndex: 999,
+  },
+  scrollToBottomIcon: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  emptyStateButton: {
+    backgroundColor: '#4C8EF7',
+    padding: 10,
+    borderRadius: 5,
+  },
+  emptyStateButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  messagesContainer: {
+    paddingVertical: 10,
+    paddingBottom: 80, // Add fixed padding for input area
+  },
+  messagesList: {
+    flex: 1,
   },
 });
 

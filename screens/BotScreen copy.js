@@ -111,8 +111,10 @@ const BotScreen2 = ({ navigation, route }) => {
   const [showAdditionalButtons, setShowAdditionalButtons] = useState(false); // New state for additional buttons
   const [isSendDisabled, setIsSendDisabled] = useState(false); // New state to track send button disabled state
   const swipeableRefs = useRef({});
+  const lastScrolledMessageId = useRef(null);
 
   const toggleMessageExpansion = (messageId) => {
+    // Prevent scrolling to the end of the list when expanding a message
     setExpandedMessages(prev => ({
       ...prev,
       [messageId]: !prev[messageId]
@@ -490,10 +492,15 @@ const BotScreen2 = ({ navigation, route }) => {
     if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(text) || /^\d{1,2}\-\d{1,2}\-\d{2,4}$/.test(text)) return false;
     
     // Skip if it's likely a list item with a number (e.g., "1. Item")
-    if (/^\d+\.\s+.+/.test(text)) return false;
+    if (/^\d+\.\s+.+/.test(text) && !text.includes('=')) return false;
     
     // Skip if it's likely a normal sentence with numbers
-    if (text.split(' ').length > 8 && !/\=/.test(text)) return false;
+    if (text.split(' ').length > 8 && !/[\=\+\-\*\/\^\(\)]/.test(text)) return false;
+    
+    // Check for Pythagorean theorem pattern (3^2 + 4^2 = c^2)
+    if (/\d+\s*\^\s*\d+\s*[\+\-]\s*\d+\s*\^\s*\d+\s*=/.test(text)) {
+      return true;
+    }
     
     // Check for equation patterns (must have equals sign)
     const hasEquation = /\=/.test(text);
@@ -511,14 +518,23 @@ const BotScreen2 = ({ navigation, route }) => {
     const hasFraction = /\d+\s*\/\s*\d+/.test(text) && !/https?:\/\//.test(text); // Exclude URLs
     
     // Check for square roots or exponents or other math functions
-    const hasAdvancedMath = /sqrt|square root|\^|x\^2|x\^3|sin\(|cos\(|tan\(|log\(/.test(text.toLowerCase());
+    const hasAdvancedMath = /sqrt|square root|\^|x\^2|x\^3|sin\(|cos\(|tan\(|log\(|π|pi/.test(text.toLowerCase());
     
     // Check for multiple numbers and operators (likely a calculation)
     const hasMultipleOperations = /\d+\s*[\+\-\*\/]\s*\d+\s*[\+\-\*\/]\s*\d+/.test(text);
     
     // Check for specific equation patterns
     const isEquation = /^\s*\d+\s*[\+\-\*\/]\s*\d+\s*\=/.test(text) || // 2 + 2 =
-                      /^\s*\d+\s*[\+\-\*\/\=]\s*\d+/.test(text) && text.length < 20; // Short expressions like 2+2
+                       /^\s*\d+\s*[\+\-\*\/\=]\s*\d+/.test(text) && text.length < 20; // Short expressions like 2+2
+    
+    // Check for common school math formulas
+    const hasCommonFormula = /(area|perimeter|volume|circumference|radius|diameter)\s*[\=:]/.test(text.toLowerCase()) ||
+                             /(a\^2\s*\+\s*b\^2\s*=\s*c\^2)|(E\s*=\s*mc\^2)|(F\s*=\s*ma)/.test(text);
+    
+    // Check for equations with variables
+    const hasVariables = /[a-z]\s*[\+\-\*\/\=]\s*\d+/.test(text.toLowerCase()) || 
+                         /\d+\s*[\+\-\*\/\=]\s*[a-z]/.test(text.toLowerCase()) ||
+                         /[a-z]\s*[\+\-\*\/\=]\s*[a-z]/.test(text.toLowerCase());
     
     // Return true if it looks like a math expression
     return (isEquation ||
@@ -527,7 +543,9 @@ const BotScreen2 = ({ navigation, route }) => {
             (isCommonMathExpression && (hasOperators || hasEquation)) ||
             hasFraction || 
             hasAdvancedMath ||
-            hasMultipleOperations);
+            hasMultipleOperations ||
+            hasCommonFormula ||
+            hasVariables);
   };
 
   // Function to process and format the message text
@@ -946,68 +964,44 @@ const BotScreen2 = ({ navigation, route }) => {
 
     // Function to render text with math expressions
     const renderTextWithMath = (line, index) => {
-      const isBot = item.sender === 'bot';
+      const isBot = line.sender === 'bot';
       
-      // Check for LaTeX delimiters
-      if (line.text.includes('$') && (line.text.includes('$$') || line.text.match(/\$[^$]+\$/))) {
-        // Extract LaTeX sections
+      // Check for LaTeX-style formulas
+      if (line.text.startsWith('\\[') || line.text.startsWith('\\(')) {
+        return renderLatexFormula(line.text, index, line.sender);
+      }
+      
+      // Process dollar sign delimited LaTeX (like $x^2$)
+      if (line.text.includes('$')) {
         const parts = [];
+        const dollarRegex = /\$(.*?)\$/g;
         let lastIndex = 0;
+        let match;
         
-        // First handle display math ($$...$$)
-        const displayRegex = /\$\$(.*?)\$\$/g;
-        let displayMatch;
-        
-        while ((displayMatch = displayRegex.exec(line.text)) !== null) {
-          // Add text before the math
-          if (displayMatch.index > lastIndex) {
+        while ((match = dollarRegex.exec(line.text)) !== null) {
+          // Add text before the formula
+          if (match.index > lastIndex) {
             parts.push({
               type: 'text',
-              content: line.text.substring(lastIndex, displayMatch.index)
+              content: line.text.substring(lastIndex, match.index)
             });
           }
           
-          // Add the display math
+          // Add the formula
           parts.push({
-            type: 'display-math',
-            content: displayMatch[1]
+            type: 'inline-math',
+            content: match[1]
           });
           
-          lastIndex = displayMatch.index + displayMatch[0].length;
+          lastIndex = match.index + match[0].length;
         }
         
-        // Then handle inline math ($...$)
+        // Add any remaining text
         if (lastIndex < line.text.length) {
-          const remainingText = line.text.substring(lastIndex);
-          const inlineRegex = /\$(.*?)\$/g;
-          let inlineMatch;
-          let inlineLastIndex = 0;
-          
-          while ((inlineMatch = inlineRegex.exec(remainingText)) !== null) {
-            // Add text before the math
-            if (inlineMatch.index > inlineLastIndex) {
-              parts.push({
-                type: 'text',
-                content: remainingText.substring(inlineLastIndex, inlineMatch.index)
-              });
-            }
-            
-            // Add the inline math
-            parts.push({
-              type: 'inline-math',
-              content: inlineMatch[1]
-            });
-            
-            inlineLastIndex = inlineMatch.index + inlineMatch[0].length;
-          }
-          
-          // Add any remaining text
-          if (inlineLastIndex < remainingText.length) {
-            parts.push({
-              type: 'text',
-              content: remainingText.substring(inlineLastIndex)
-            });
-          }
+          parts.push({
+            type: 'text',
+            content: line.text.substring(lastIndex)
+          });
         }
         
         return (
@@ -1076,17 +1070,35 @@ const BotScreen2 = ({ navigation, route }) => {
       // Check for specific patterns like Pythagorean theorem (a^2 + b^2 = c^2)
       if (/[a-z]\^2\s*[\+\-]\s*[a-z]\^2\s*=\s*[a-z]\^2/.test(line.text) ||
           /\d+\^2\s*[\+\-]\s*\d+\^2\s*=\s*[a-z]\^2/.test(line.text) ||
+          /\d+\s*\^\s*2\s*\+\s*\d+\s*\^\s*2\s*=\s*[a-z]\s*\^\s*2/.test(line.text) ||
           /\d+\s*\+\s*\d+\s*=\s*[a-z]\^2/.test(line.text) ||
           /[a-z]\^2\s*[\+\-]\s*[a-z]\^2\s*=/.test(line.text)) {
         // Format it as LaTeX
         let latexFormula = line.text
-          .replace(/([a-z])\^(\d+)/g, '$1^{$2}')
-          .replace(/(\d+)\^(\d+)/g, '$1^{$2}')
+          .replace(/([a-z])\s*\^\s*(\d+)/g, '$1^{$2}')
+          .replace(/(\d+)\s*\^\s*(\d+)/g, '$1^{$2}')
           .replace(/sqrt\(([^)]+)\)/g, '\\sqrt{$1}')
           .replace(/√\s*([a-z0-9]+)/g, '\\sqrt{$1}');
         
         return (
           <View key={`pythagorean-${index}`} style={styles.mathContainer}>
+            <MathView
+              math={latexFormula}
+              style={[styles.mathView, { color: colors.botText }]}
+              resizeMode="cover"
+            />
+          </View>
+        );
+      }
+
+      // Special case for c = sqrt{25} = 5 pattern
+      if (/[a-z]\s*=\s*\\?sqrt\{?\d+\}?\s*=\s*\d+/.test(line.text) || 
+          /[a-z]\s*=\s*\\?sqrt\{?\d+\}?/.test(line.text)) {
+        let latexFormula = line.text
+          .replace(/sqrt\{?(\d+)\}?/g, '\\sqrt{$1}');
+        
+        return (
+          <View key={`sqrt-result-${index}`} style={styles.mathContainer}>
             <MathView
               math={latexFormula}
               style={[styles.mathView, { color: colors.botText }]}
@@ -1144,7 +1156,10 @@ const BotScreen2 = ({ navigation, route }) => {
       if (line.isChineseHeading) {
         return (
           <View key={`chinese-heading-${index}`} style={styles.chineseHeadingContainer}>
-            <Text style={[styles.chineseHeadingText, {color: isBot ? colors.botText : '#333333'}]}>
+            <Text style={[styles.chineseHeadingText, {
+              color: isBot ? colors.botText : '#333333',
+              fontWeight: 'bold'
+            }]}>
               {line.text.replace(/^##+\s+|\d+\.\s+/, '')}
             </Text>
           </View>
@@ -1155,8 +1170,11 @@ const BotScreen2 = ({ navigation, route }) => {
       if (line.isChineseSubheading) {
         return (
           <View key={`chinese-subheading-${index}`} style={styles.chineseSubheadingContainer}>
-            <Text style={[styles.chineseSubheadingPointer, {color: isBot ? colors.botText : '#333333'}]}>•</Text>
-            <Text style={[styles.chineseSubheadingText, {color: isBot ? colors.botText : '#333333'}]}>
+            <Text style={[styles.chineseSubheadingPointer, {color: '#2274F0'}]}>•</Text>
+            <Text style={[styles.chineseSubheadingText, {
+              color: isBot ? colors.botText : '#333333',
+              fontWeight: 'bold'
+            }]}>
               {line.text.replace(/^[•·◦◆■◉○●][\s]+|^\d+[、.．][\s]+|^[一二三四五六七八九十]、/, '')}
             </Text>
           </View>
@@ -1178,27 +1196,26 @@ const BotScreen2 = ({ navigation, route }) => {
     const formatMathToLatex = (expression) => {
       let latex = expression;
       
-      // First check for Pythagorean theorem patterns (a^2 + b^2 = c^2) or (3^2 + 4^2 = c^2)
-      if (/[a-z]\^2\s*[\+\-]\s*[a-z]\^2\s*=\s*[a-z]\^2/.test(expression) || 
-          /\d+\^2\s*[\+\-]\s*\d+\^2\s*=\s*[a-z]\^2/.test(expression)) {
+      // Handle simple arithmetic expressions with equals sign (3^2 + 4^2 = c^2)
+      if (/\d+\s*[\^]\s*\d+\s*[\+\-]\s*\d+\s*[\^]\s*\d+\s*=\s*[a-z]\s*[\^]\s*\d+/.test(expression)) {
         latex = latex
-          .replace(/([a-z])\^(\d+)/g, '$1^{$2}')
-          .replace(/(\d+)\^(\d+)/g, '$1^{$2}');
+          .replace(/([a-z0-9])\s*\^(\s*\d+)/g, '$1^{$2}')
+          .replace(/(\d+)\s*\^(\s*\d+)/g, '$1^{$2}');
         return latex;
       }
       
-      // Handle simple calculations like "9 + 16 = c^2"
-      if (/\d+\s*[\+\-\*\/]\s*\d+\s*=\s*[a-z]\^2/.test(expression)) {
-        latex = latex.replace(/([a-z])\^(\d+)/g, '$1^{$2}');
-        return latex;
-      }
-      
-      // Handle result formulas like "c^2 = 25" or "c = sqrt{25} = 5"
-      if (/[a-z]\^2\s*=\s*\d+/.test(expression) || 
-          /[a-z]\s*=\s*\\?sqrt\{?\d+\}?\s*=/.test(expression)) {
+      // Handle result formulas (c^2 = 25 or c = sqrt{25} = 5)
+      if (/[a-z]\s*\^2\s*=\s*\d+/.test(expression) || 
+          /[a-z]\s*=\s*\\?sqrt\{?\d+\}?\s*=\s*\d+/.test(expression) ||
+          /[a-z]\s*=\s*\\?sqrt\{?\d+\}?/.test(expression)) {
         latex = latex
-          .replace(/([a-z])\^(\d+)/g, '$1^{$2}')
+          .replace(/([a-z])\s*\^(\s*\d+)/g, '$1^{$2}')
           .replace(/sqrt\{?(\d+)\}?/g, '\\sqrt{$1}');
+        return latex;
+      }
+      
+      // Handle simple arithmetic expressions (9 + 16 = 25)
+      if (/\d+\s*[\+\-\*\/]\s*\d+\s*=\s*\d+/.test(expression)) {
         return latex;
       }
       
@@ -1221,15 +1238,11 @@ const BotScreen2 = ({ navigation, route }) => {
       latex = latex.replace(/log\(([^)]+)\)/g, '\\log($1)');
       
       // Replace ^ with LaTeX power notation
-      latex = latex.replace(/\^(\d+)/g, '^{$1}');
-      latex = latex.replace(/([a-zA-Z0-9])\^([a-zA-Z0-9])/g, '$1^{$2}');
+      latex = latex.replace(/([a-zA-Z0-9])\s*\^(\s*\d+)/g, '$1^{$2}');
+      latex = latex.replace(/([a-zA-Z0-9])\s*\^([a-zA-Z0-9])/g, '$1^{$2}');
       
       // Format pi
       latex = latex.replace(/\bpi\b/gi, '\\pi ');
-      
-      // Replace special quad and rightarrow symbols
-      latex = latex.replace(/\\quad/g, '\\,');
-      latex = latex.replace(/\\rightarrow/g, '\\to');
       
       return latex;
     };
@@ -1491,7 +1504,7 @@ const BotScreen2 = ({ navigation, route }) => {
                                   if (parent.ordered) {
                                     return (
                                       <View key={node.key} style={styles.ordered_list_item}>
-                                        <Text style={[styles.list_item_number, {color: colors.botText}]}>{node.index + 1}.</Text>
+                                        <Text style={[styles.list_item_number, {color: '#2274F0'}]}>{node.index + 1}.</Text>
                                         <View style={styles.list_item_content}>
                                           {children}
                                         </View>
@@ -1500,7 +1513,7 @@ const BotScreen2 = ({ navigation, route }) => {
                                   }
                                   return (
                                     <View key={node.key} style={styles.list_item}>
-                                      <Text style={[styles.list_item_bullet, {color: colors.botText}]}>•</Text>
+                                      <Text style={[styles.list_item_bullet, {color: '#2274F0'}]}>•</Text>
                                       <View style={{ flex: 1 }}>
                                         {children}
                                       </View>
@@ -1526,7 +1539,10 @@ const BotScreen2 = ({ navigation, route }) => {
                         } else if (line.isChineseHeading) {
                           return (
                             <View key={`chinese-heading-${index}`} style={styles.chineseHeadingContainer}>
-                              <Text style={[styles.chineseHeadingText, {color: isBot ? colors.botText : '#333333'}]}>
+                              <Text style={[styles.chineseHeadingText, {
+                                color: isBot ? colors.botText : '#333333',
+                                fontWeight: 'bold'
+                              }]}>
                                 {line.text.replace(/^##+\s+|\d+\.\s+/, '')}
                               </Text>
                             </View>
@@ -1534,8 +1550,11 @@ const BotScreen2 = ({ navigation, route }) => {
                         } else if (line.isChineseSubheading) {
                           return (
                             <View key={`chinese-subheading-${index}`} style={styles.chineseSubheadingContainer}>
-                              <Text style={[styles.chineseSubheadingPointer, {color: isBot ? colors.botText : '#333333'}]}>•</Text>
-                              <Text style={[styles.chineseSubheadingText, {color: isBot ? colors.botText : '#333333'}]}>
+                              <Text style={[styles.chineseSubheadingPointer, {color: '#2274F0'}]}>•</Text>
+                              <Text style={[styles.chineseSubheadingText, {
+                                color: isBot ? colors.botText : '#333333',
+                                fontWeight: 'bold'
+                              }]}>
                                 {line.text.replace(/^[•·◦◆■◉○●][\s]+|^\d+[、.．][\s]+|^[一二三四五六七八九十]、/, '')}
                               </Text>
                             </View>
@@ -1543,8 +1562,11 @@ const BotScreen2 = ({ navigation, route }) => {
                         } else if (line.isChineseSubSubheading) {
                           return (
                             <View key={`chinese-subsubheading-${index}`} style={styles.chineseSubSubheadingContainer}>
-                              <Text style={[styles.chineseSubSubheadingPointer, {color: colors.botText}]}>-</Text>
-                              <Text style={[styles.chineseSubSubheadingText, {color: colors.botText}]}>
+                              <Text style={[styles.chineseSubSubheadingPointer, {color: '#2274F0'}]}>-</Text>
+                              <Text style={[styles.chineseSubSubheadingText, {
+                                color: colors.botText,
+                                fontWeight: 'bold'
+                              }]}>
                                 {line.text.trim()}
                               </Text>
                             </View>
@@ -1819,15 +1841,21 @@ const BotScreen2 = ({ navigation, route }) => {
         <KeyboardAvoidingView 
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={{ flex: 1 }}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 90}
         >
           <FlatList
             data={messages}
             keyExtractor={(item) => item.id}
             renderItem={renderMessage}
             contentContainerStyle={[styles.chat,]}
-            onContentSizeChange={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
-            onLayout={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100)}
+            // Only scroll to end when new messages arrive, not when expanding
+            onContentSizeChange={() => {
+              if (messages.length > 0 && messages[messages.length - 1].sender === 'bot' && messages[messages.length - 1].id !== lastScrolledMessageId.current) {
+                lastScrolledMessageId.current = messages[messages.length - 1].id;
+                setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+              }
+            }}
+            // Remove automatic scrolling on layout
             ref={flatListRef}
             style={{ marginBottom: showAdditionalButtons ? 220 : 120 }}
             ListEmptyComponent={
@@ -1843,7 +1871,7 @@ const BotScreen2 = ({ navigation, route }) => {
         <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardAvoidingView}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 10}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 60}
       >
       {/* Loading Animation */}
       {isLoading && (
@@ -2441,7 +2469,7 @@ marginBottom:-10,
     fontWeight: 'bold',
     fontSize: 18,
     marginRight: 8,
-    color: '#1976D2',
+    color: '#2274F0', // Changed to blue color
   },
   headingText: {
     fontWeight: 'bold',
@@ -2459,7 +2487,7 @@ marginBottom:-10,
     fontWeight: 'bold',
     fontSize: 12,
     marginRight: 8,
-    color: '#2196F3',
+    color: '#2274F0', // Changed to blue color
   },
   subheadingText: {
     fontWeight: 'bold',
@@ -2681,13 +2709,14 @@ marginBottom:-10,
     textAlign: 'center',
   },
   chineseHeadingContainer: {
-    marginVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 8,
+    width: '100%',
     padding: 8,
-    backgroundColor: '#E3F2FD',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#BBDEFB',
-    width: '100%',
+    borderColor: '#E0E0E0',
   },
   chineseHeadingText: {
     fontSize: 18,
@@ -2697,13 +2726,14 @@ marginBottom:-10,
   chineseSubheadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 6,
-    paddingLeft: 16,
+    marginVertical: 4,
+    width: '100%',
   },
   chineseSubheadingPointer: {
-    fontSize: 16,
+    fontWeight: 'bold',
+    fontSize: 12,
     marginRight: 8,
-    color: '#2196F3',  // This will be overridden by inline style with colors.botText
+    color: '#2274F0', // Changed to blue color
   },
   chineseSubheadingText: {
     fontSize: 16,
@@ -2738,9 +2768,10 @@ marginBottom:-10,
     paddingLeft: 32,
   },
   chineseSubSubheadingPointer: {
-    fontSize: 14,
+    fontWeight: 'bold',
+    fontSize: 12,
     marginRight: 8,
-    color: '#666',
+    color: '#2274F0', // Changed to blue color
   },
   chineseSubSubheadingText: {
     fontSize: 14,

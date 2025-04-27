@@ -22,6 +22,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import * as Animatable from 'react-native-animatable';
 import LottieView from "lottie-react-native";
 import { useAuthUser } from '../hooks/useAuthUser';
+import { useFocusEffect } from '@react-navigation/native';
 const { width, height } = Dimensions.get("window");
 
 const CreateImagesScreen2 = ({ route, navigation }) => {
@@ -41,6 +42,25 @@ const CreateImagesScreen2 = ({ route, navigation }) => {
   const imageOpacity = useRef(new Animated.Value(0)).current;
   const imageScale = useRef(new Animated.Value(0.95)).current;
   const { uid } = useAuthUser();
+
+  // Clear data when screen loses focus and reset when it gains focus
+  useFocusEffect(
+    React.useCallback(() => {
+      // This runs when the screen comes into focus
+      fetchAndStoreImages();
+      
+      // This runs when the screen goes out of focus
+      return () => {
+        // Clear state when navigating away
+        setImageUrls([]);
+        setGridImages([null, null, null, null]);
+        setSelectedImage(null);
+        setError(null);
+        // Clear stored images
+        AsyncStorage.removeItem("generatedImages");
+      };
+    }, [message])
+  );
 
   useEffect(() => {
     // Start shimmer animation
@@ -84,6 +104,14 @@ const CreateImagesScreen2 = ({ route, navigation }) => {
         }),
       ])
     ).start();
+    
+    // Clear all data when component unmounts
+    return () => {
+      setImageUrls([]);
+      setGridImages([null, null, null, null]);
+      setSelectedImage(null);
+      AsyncStorage.removeItem("generatedImages");
+    };
   }, [shimmerValue, pulseAnim, loadingDots]);
 
   const fetchAndStoreImages = async (refreshing = false) => {
@@ -156,14 +184,6 @@ const CreateImagesScreen2 = ({ route, navigation }) => {
     }
   };
 
-  useEffect(() => {
-    if (message) fetchAndStoreImages();
-
-    return () => {
-      // Don't clear storage on unmount to allow re-opening the screen
-    };
-  }, [message]);
-
   const fadeInImage = () => {
     Animated.parallel([
       Animated.timing(imageOpacity, {
@@ -229,7 +249,7 @@ const CreateImagesScreen2 = ({ route, navigation }) => {
         style={styles.header}
       >
         <TouchableOpacity 
-          style={styles.backButton} 
+          style={[styles.backButton, {backgroundColor: colors.primary}]} 
           onPress={() => navigation.goBack()}
         >
           <MaterialIcons name="arrow-back" size={24} color="#fff" />
@@ -507,10 +527,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 32,
     marginBottom: 8,
+    paddingHorizontal: 16,
   },
   tryAgainButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center', 
     backgroundColor: "rgba(255,255,255,0.9)",
     paddingVertical: 12,
     paddingHorizontal: 20,
@@ -526,6 +548,7 @@ const styles = StyleSheet.create({
   downloadButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: "#4F74FF",
     paddingVertical: 12,
     paddingHorizontal: 20,

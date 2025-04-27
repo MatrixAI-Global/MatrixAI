@@ -64,7 +64,7 @@ const Header2 = ({ navigation, uid, openDrawer }) => {
     console.log("Current coin count:", coinCount);
 
     return (
-        <View style={styles.header}>
+        <View style={[styles.header, {backgroundColor: 'transparent'}]}>
             {/* Menu Icon */}
          
 

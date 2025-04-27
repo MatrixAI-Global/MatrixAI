@@ -17,6 +17,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { clearLanguagePreference } from '../utils/languageUtils';
 import { useTheme } from '../context/ThemeContext';
 import { clearThemePreference } from '../utils/themeUtils';
+import { getProStatus, clearProStatus } from '../utils/proStatusUtils';
 import { ThemedView, ThemedText, ThemedCard } from '../components/ThemedView';
 import FuturisticSwitch from '../components/FuturisticSwitch';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -122,37 +123,72 @@ const ProfileScreen = ({ navigation }) => {
                 style: 'destructive',
                 onPress: async () => {
                     try {
+                        // First clear Pro status to prevent errors
+                        await clearProStatus();
+                        
                         // Clear language preference
                         await clearLanguagePreference();
                         
                         // Clear theme preference
                         await clearThemePreference();
                         
-                        // Clear pro status
-                        await clearProStatus();
-                        
-                        // Remove user login status from AsyncStorage
-                        await AsyncStorage.multiRemove([
+                        // Remove all authentication related data from AsyncStorage
+                        const keysToRemove = [
                             'userLoggedIn',
                             'uid',
                             'referralCode',
                             'supabase-session',
-                            // Add any other keys you want to clear
-                        ]);
+                            'coins_count',
+                            'pro_status',
+                            'theme_preference',
+                            'language_preference'
+                        ];
+                        
+                        // Get all keys from AsyncStorage to find any additional auth-related ones
+                        const allKeys = await AsyncStorage.getAllKeys();
+                        const authRelatedKeys = allKeys.filter(key => 
+                            key.includes('supabase') || 
+                            key.includes('auth') || 
+                            key.includes('user') ||
+                            key.includes('token') ||
+                            key.includes('session')
+                        );
+                        
+                        // Combine all keys to be removed
+                        const allKeysToRemove = [...new Set([...keysToRemove, ...authRelatedKeys])];
+                        
+                        // Clear all relevant keys
+                        await AsyncStorage.multiRemove(allKeysToRemove);
                         
                         // Sign out from Supabase
-                        await supabase.auth.signOut();
+                        const { error } = await supabase.auth.signOut();
+                        if (error) throw error;
                         
-                        // Restart the app
+                        // Add a small delay to ensure all operations complete
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        
+                        console.log('User logged out successfully. Restarting app...');
+                        
+                        // Use RNRestart to completely restart the app
                         RNRestart.Restart();
-                        
-                        console.log('User logged out successfully');
                     } catch (error) {
                         console.error('Error logging out:', error);
-                        Alert.alert(
-                            t('logoutError'),
-                            t('logoutErrorMessage')
-                        );
+                        
+                        // If there's an error, try a more aggressive approach
+                        try {
+                            // Clear all AsyncStorage as a last resort
+                            await AsyncStorage.clear();
+                            console.log('AsyncStorage cleared completely');
+                            
+                            // Force app restart
+                            RNRestart.Restart();
+                        } catch (finalError) {
+                            console.error('Critical error during logout:', finalError);
+                            Alert.alert(
+                                t('logoutError'),
+                                t('logoutErrorMessage')
+                            );
+                        }
                     }
                 },
             },

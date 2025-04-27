@@ -103,12 +103,12 @@ const Header = ({ navigation, uid, openDrawer }) => {
     console.log("Current coin count:", coinCount);
 
     return (
-        <View style={[styles.header, {backgroundColor: colors.background}]  }>
+        <View style={[styles.header, {backgroundColor: 'transparent'}]  }>
             {/* Menu Icon */}
          
 
             {/* Welcome Text with Profile Picture */}
-            <View style={[styles.rowContainer, {backgroundColor: colors.background}]  }>
+            <View style={[styles.rowContainer, {backgroundColor: 'transparent'}]  }>
                 <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
                     <Image 
                         source={dpUrl ? { uri: dpUrl } : require('../assets/Avatar/Cat.png')} 

@@ -24,6 +24,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import * as Animatable from 'react-native-animatable';
 import LottieView from "lottie-react-native";
 import { useAuthUser } from '../hooks/useAuthUser';
+import { useFocusEffect } from '@react-navigation/native';
 const { width, height } = Dimensions.get("window");
 
 const MAX_PROMPT_LENGTH = 100; // Maximum characters before truncation
@@ -50,6 +51,24 @@ const CreateImagesScreen = ({ route, navigation }) => {
   const truncatedMessage = message.length > MAX_PROMPT_LENGTH 
     ? `${message.substring(0, MAX_PROMPT_LENGTH)}...` 
     : message;
+
+  // Clear data when screen loses focus and reset when it gains focus
+  useFocusEffect(
+    React.useCallback(() => {
+      // This runs when the screen comes into focus
+      fetchAndStoreImage();
+      
+      // This runs when the screen goes out of focus
+      return () => {
+        // Clear state when navigating away
+        setImageUrl(null);
+        setCurrentViewingImage(null);
+        setModalVisible(false);
+        // Clear stored images
+        AsyncStorage.removeItem("downloadedImage");
+      };
+    }, [message])
+  );
 
   useEffect(() => {
     // Start shimmer animation
@@ -93,6 +112,13 @@ const CreateImagesScreen = ({ route, navigation }) => {
         }),
       ])
     ).start();
+    
+    // Clean up when component unmounts
+    return () => {
+      setImageUrl(null);
+      setCurrentViewingImage(null);
+      AsyncStorage.removeItem("downloadedImage");
+    };
   }, [shimmerValue, pulseAnim, loadingDots]);
 
   // Function to fetch and process image
@@ -110,7 +136,7 @@ const CreateImagesScreen = ({ route, navigation }) => {
       
       // Make API request to generate new image
       const response = await axios.post(
-        "https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/generateImage",
+        "https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/createI",
         { text: message, uid: uid },
         {
           headers: {
@@ -143,14 +169,6 @@ const CreateImagesScreen = ({ route, navigation }) => {
       Alert.alert("Error", "Something went wrong. Please try again.");
     }
   };
-
-  useEffect(() => {
-    if (message) fetchAndStoreImage();
-
-    return () => {
-      AsyncStorage.removeItem("downloadedImage");
-    };
-  }, []);
 
   const fadeInImage = () => {
     Animated.parallel([
@@ -208,10 +226,10 @@ const CreateImagesScreen = ({ route, navigation }) => {
         style={styles.header}
       >
         <TouchableOpacity 
-          style={styles.backButton} 
+          style={[styles.backButton, {backgroundColor: colors.primary}]} 
           onPress={() => navigation.goBack()}
         >
-          <MaterialIcons name="arrow-back" size={24} color="#fff" />
+          <MaterialIcons name="arrow-back" size={24} color='#fff' />
         </TouchableOpacity>
         
         <Text style={[styles.heading, {color: colors.text}]}>
@@ -305,34 +323,20 @@ const CreateImagesScreen = ({ route, navigation }) => {
             style={styles.buttonsContainer}
           >
             <TouchableOpacity 
-              style={styles.generateAgainButtonContainer} 
+              style={styles.tryAgainButton} 
               onPress={handleTryAgain}
             >
-              <LinearGradient
-                colors={['#8A2387', '#E94057']}
-                start={{x: 0, y: 0}}
-                end={{x: 1, y: 0}}
-                style={styles.generateAgainButton}
-              >
-                <MaterialIcons name="refresh" size={20} color="#fff" />
-                <Text style={styles.generateAgainText}>Generate Again</Text>
-              </LinearGradient>
+              <MaterialIcons name="refresh" size={20} color="#000" />
+              <Text style={styles.tryAgainText}>Generate Again</Text>
             </TouchableOpacity>
             
             {imageUrl && (
               <TouchableOpacity
-                style={styles.downloadButtonContainer}
+                style={[styles.downloadButton]}
                 onPress={() => Linking.openURL(imageUrl)}
               >
-                <LinearGradient
-                  colors={['#4F74FF', '#3B5FE3']}
-                  start={{x: 0, y: 0}}
-                  end={{x: 1, y: 0}}
-                  style={styles.downloadButton}
-                >
-                  <MaterialIcons name="file-download" size={20} color="#fff" />
-                  <Text style={styles.downloadText}>Download</Text>
-                </LinearGradient>
+                <MaterialIcons name="file-download" size={20} color="#fff" />
+                <Text style={styles.downloadText}>Download</Text>
               </TouchableOpacity>
             )}
           </Animatable.View>
@@ -378,30 +382,16 @@ const CreateImagesScreen = ({ route, navigation }) => {
                 style={styles.modalActionButton}
                 onPress={() => Linking.openURL(currentViewingImage)}
               >
-                <LinearGradient
-                  colors={['#8A2387', '#E94057', '#F27121']}
-                  start={{x: 0, y: 0}}
-                  end={{x: 1, y: 0}}
-                  style={styles.gradientButton}
-                >
-                  <MaterialIcons name="file-download" size={20} color="#fff" />
-                  <Text style={styles.modalActionText}>Download</Text>
-                </LinearGradient>
+                <MaterialIcons name="file-download" size={20} color="#fff" />
+                <Text style={styles.modalActionText}>Download</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={styles.modalActionButton}
+                style={styles.closeButton}
                 onPress={() => setModalVisible(false)}
               >
-                <LinearGradient
-                  colors={['#4F74FF', '#3B5FE3']}
-                  start={{x: 0, y: 0}}
-                  end={{x: 1, y: 0}}
-                  style={styles.gradientButton}
-                >
-                  <MaterialIcons name="close" size={20} color="#fff" />
-                  <Text style={styles.modalActionText}>Close</Text>
-                </LinearGradient>
+                <MaterialIcons name="close" size={20} color="#000" />
+                <Text style={styles.closeButtonText}>Close</Text>
               </TouchableOpacity>
             </View>
           </Animatable.View>
@@ -561,44 +551,36 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingHorizontal: 16,
   },
-  generateAgainButtonContainer: {
-    flex: 1,
-    maxWidth: 160,
-    marginHorizontal: 8,
-    borderRadius: 25,
-    overflow: 'hidden',
-  },
-  generateAgainButton: {
+  tryAgainButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'center', 
+    backgroundColor: "rgba(255,255,255,0.9)",
     paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  generateAgainText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  downloadButtonContainer: {
-    flex: 1,
-    maxWidth: 160,
-    marginHorizontal: 8,
+    paddingHorizontal: 20,
     borderRadius: 25,
-    overflow: 'hidden',
+    marginHorizontal: 8,
+  },
+  tryAgainText: {
+    color: "#000000",
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 8,
   },
   downloadButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: "#4F74FF",
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    marginHorizontal: 8,
   },
   downloadText: {
     color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '500',
     marginLeft: 8,
   },
   modalContainer: {
@@ -648,23 +630,35 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
   },
   modalActionButton: {
-    flex: 1,
-    maxWidth: 150,
-    marginHorizontal: 8,
-    borderRadius: 25,
-    overflow: 'hidden',
-  },
-  gradientButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: "#4F74FF",
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    marginHorizontal: 8,
   },
   modalActionText: {
     color: "#fff",
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 8,
+  },
+  closeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center', 
+    backgroundColor: "rgba(255,255,255,0.9)",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    marginHorizontal: 8,
+  },
+  closeButtonText: {
+    color: "#000000",
+    fontSize: 16,
+    fontWeight: '500',
     marginLeft: 8,
   },
 });
