@@ -506,284 +506,292 @@ const HumaniseTextScreen = () => {
           keyboardShouldPersistTaps="handled"
           bounces={false}
         >
-          {/* Welcome Banner */}
-          <Animated.View style={[styles.welcomeBanner, { 
-            opacity: fadeAnim,
-            transform: [{ translateY: Animated.multiply(Animated.subtract(1, fadeAnim), 20) }]
-          }]}>
-            <LinearGradient
-              colors={currentTheme === 'dark' ? 
-                ['#9C27B0', '#7B1FA2'] : 
-                ['#E1BEE7', '#CE93D8']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.bannerGradient}
-            >
-              {/* Decorative elements */}
-              <Animated.View 
-                style={[
-                  styles.decorCircle1, 
-                  { 
-                    opacity: 0.1, 
-                    transform: [{ rotate: spin }],
-                    borderColor: colors.primary
-                  }
-                ]}
-              />
-              <Animated.View 
-                style={[
-                  styles.decorCircle2, 
-                  { 
-                    opacity: 0.15, 
-                    transform: [{ rotate: spin }],
-                    borderColor: currentTheme === 'dark' ? colors.secondary : colors.primary
-                  }
-                ]}
-              />
-              
-              <View style={[styles.bannerContent, isSmallScreen && { flexDirection: 'column' }]}>
-                <View style={[styles.bannerTextContent, isSmallScreen && { paddingRight: 0, marginBottom: responsiveSpacing(16) }]}>
-                  <Text style={[styles.bannerTitle, { color: colors.text }]}>
-                    Humanise Your Text
-                  </Text>
-                  <Text style={[styles.bannerSubtitle, { color: currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)' }]}>
-                    Transform AI-generated text into natural, human-like writing
-                  </Text>
-                  <View style={styles.featureList}>
-                    <View style={styles.featureItemBanner}>
-                      <Ionicons name="checkmark-circle" size={normalize(16)} color={currentTheme === 'dark' ? '#BA68C8' : '#9C27B0'} />
-                      <Text style={[styles.featureText, { color: currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)' }]}>
-                        Multiple tone options
-                      </Text>
-                    </View>
-                    <View style={styles.featureItemBanner}>
-                      <Ionicons name="checkmark-circle" size={normalize(16)} color={currentTheme === 'dark' ? '#BA68C8' : '#9C27B0'} />
-                      <Text style={[styles.featureText, { color: currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)' }]}>
-                        Natural-sounding results
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-                
-                <Animated.View style={[styles.iconOuter, isSmallScreen && { alignSelf: 'center' }, { transform: [{ scale: pulseAnim }] }]}>
-                  <View style={styles.iconContainer}>
-                    <LinearGradient
-                      colors={['#9C27B0', '#7B1FA2']}
-                      style={styles.iconGradient}
-                    >
-                      <Animated.View style={{ transform: [{ rotate: spin }] }}>
-                        <MaterialCommunityIcons name="human-greeting" size={normalize(32)} color="#FFFFFF" />
-                      </Animated.View>
-                    </LinearGradient>
-                    <Animated.View 
-                      style={[
-                        styles.iconRing, 
-                        { 
-                          transform: [{ rotate: spin }],
-                          borderColor: currentTheme === 'dark' ? '#9C27B0' : '#9C27B0' 
-                        }
-                      ]}
-                    />
-                  </View>
-                </Animated.View>
-              </View>
-            </LinearGradient>
-          </Animated.View>
-          
-          {/* Tone Selector */}
-          <View style={styles.toneContainer}>
-            <View style={styles.sectionHeaderContainer}>
-              <MaterialCommunityIcons name="format-font" size={normalize(20)} color={colors.primary} />
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Select Tone</Text>
-            </View>
-            <FlatList
-              data={tones}
-              renderItem={renderToneItem}
-              keyExtractor={item => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.toneList}
-            />
-          </View>
-          
-          {/* Input Section */}
-          <View style={styles.inputContainer}>
-            <View style={styles.sectionHeaderContainer}>
-              <MaterialCommunityIcons name="text-box-check-outline" size={normalize(20)} color={colors.primary} />
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Text</Text>
-            </View>
-            
-            <View style={[styles.textInputContainer, { 
-              backgroundColor: currentTheme === 'dark' ? 'rgba(30, 30, 40, 0.6)' : 'rgba(255, 255, 255, 0.8)',
-              borderColor: colors.border,
-              shadowColor: colors.primary
-            }]}>
-              <View style={styles.inputHeaderBar}>
-                <Text style={[styles.inputLabel, { color: '#9C27B0' }]}>
-                  <MaterialCommunityIcons name="text-box-outline" size={normalize(14)} color={'#9C27B0'} /> Input Text
-                </Text>
-                <TouchableOpacity 
-                  style={[styles.pasteButton, { minWidth: responsiveSpacing(70), minHeight: responsiveSpacing(30), justifyContent: 'center', alignItems: 'center' }]} 
-                  onPress={async () => {
-                    const clipboardText = await Clipboard.getString();
-                    if (clipboardText) {
-                      setInputText(clipboardText);
-                    }
-                  }}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          <View style={styles.contentWrapper}>
+            {/* Welcome Banner with matching container */}
+            <View style={styles.standardContainer}>
+              <Animated.View style={[styles.welcomeBanner, { 
+                opacity: fadeAnim,
+                transform: [{ translateY: Animated.multiply(Animated.subtract(1, fadeAnim), 20) }]
+              }]}>
+                <LinearGradient
+                  colors={currentTheme === 'dark' ? 
+                    ['#9C27B0', '#7B1FA2'] : 
+                    ['#E1BEE7', '#CE93D8']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.bannerGradient}
                 >
-                  <MaterialCommunityIcons name="content-paste" size={normalize(14)} color={colors.primary} />
-                  <Text style={[styles.pasteButtonText, { color: colors.primary }]}>Paste</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <View style={[styles.textInputWrapper]}>
-                <TextInput
-                  style={[styles.textInput, { color: colors.text, height: Math.max(150 * scale, 150) }]}
-                  placeholder="Enter text you want to humanise..."
-                  placeholderTextColor={'#A3A3A3FF'}
-                  value={inputText}
-                  onChangeText={setInputText}
-                  multiline
-                  numberOfLines={8}
-                  textAlignVertical="top"
-                  editable={!isProcessing}
-                />
-                
-                {/* Scan line animation */}
-                {inputText.length > 0 && !isFinished && (
+                  {/* Decorative elements */}
                   <Animated.View 
                     style={[
-                      styles.scanLine,
-                      {
-                        backgroundColor: colors.primary,
-                        opacity: 0.4,
-                        transform: [
-                          { 
-                            translateY: scanLineAnim.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: [0, 150 * scale]
-                            })
-                          }
-                        ]
+                      styles.decorCircle1, 
+                      { 
+                        opacity: 0.1, 
+                        transform: [{ rotate: spin }],
+                        borderColor: colors.primary
                       }
                     ]}
                   />
-                )}
+                  <Animated.View 
+                    style={[
+                      styles.decorCircle2, 
+                      { 
+                        opacity: 0.15, 
+                        transform: [{ rotate: spin }],
+                        borderColor: currentTheme === 'dark' ? colors.secondary : colors.primary
+                      }
+                    ]}
+                  />
+                  
+                  <View style={[styles.bannerContent, isSmallScreen && { flexDirection: 'column' }]}>
+                    <View style={[styles.bannerTextContent, isSmallScreen && { paddingRight: 0, marginBottom: responsiveSpacing(16) }]}>
+                      <Text style={[styles.bannerTitle, { color: colors.text }]}>
+                        Humanise Your Text
+                      </Text>
+                      <Text style={[styles.bannerSubtitle, { color: currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)' }]}>
+                        Transform AI-generated text into natural, human-like writing
+                      </Text>
+                      <View style={styles.featureList}>
+                        <View style={styles.featureItemBanner}>
+                          <Ionicons name="checkmark-circle" size={normalize(16)} color={currentTheme === 'dark' ? '#BA68C8' : '#9C27B0'} />
+                          <Text style={[styles.featureText, { color: currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)' }]}>
+                            Multiple tone options
+                          </Text>
+                        </View>
+                        <View style={styles.featureItemBanner}>
+                          <Ionicons name="checkmark-circle" size={normalize(16)} color={currentTheme === 'dark' ? '#BA68C8' : '#9C27B0'} />
+                          <Text style={[styles.featureText, { color: currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)' }]}>
+                            Natural-sounding results
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                    
+                    <Animated.View style={[styles.iconOuter, isSmallScreen && { alignSelf: 'center' }, { transform: [{ scale: pulseAnim }] }]}>
+                      <View style={styles.iconContainer}>
+                        <LinearGradient
+                          colors={['#9C27B0', '#7B1FA2']}
+                          style={styles.iconGradient}
+                        >
+                          <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                            <MaterialCommunityIcons name="human-greeting" size={normalize(32)} color="#FFFFFF" />
+                          </Animated.View>
+                        </LinearGradient>
+                        <Animated.View 
+                          style={[
+                            styles.iconRing, 
+                            { 
+                              transform: [{ rotate: spin }],
+                              borderColor: currentTheme === 'dark' ? '#9C27B0' : '#9C27B0' 
+                            }
+                          ]}
+                        />
+                      </View>
+                    </Animated.View>
+                  </View>
+                </LinearGradient>
+              </Animated.View>
+            </View>
+            
+            {/* Tone Selector */}
+            <View style={styles.toneContainer}>
+              <View style={styles.sectionHeaderContainer}>
+                <MaterialCommunityIcons name="format-font" size={normalize(20)} color={colors.primary} />
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Select Tone</Text>
               </View>
-              
-              <View style={styles.textInputFooter}>
-                <Text style={[styles.characterCount, { color: '#9C27B0' }]}>
-                  {inputText.length} characters
-                </Text>
-                {inputText.length > 0 && selectedTone && (
-                    <Text style={[styles.longTextNote, { color: '#9C27B0' }]}>
-                    <Ionicons name="checkmark-circle" size={normalize(12)} color={'#9C27B0'} /> {selectedTone.charAt(0).toUpperCase() + selectedTone.slice(1)} tone
-                  </Text>
+              <FlatList
+                data={tones}
+                renderItem={renderToneItem}
+                keyExtractor={item => item.id}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.toneList}
+              />
+            </View>
+            
+            {/* Input Section */}
+            <View style={styles.standardContainer}>
+              <View style={styles.inputContainer}>
+                <View style={styles.sectionHeaderContainer}>
+                  <MaterialCommunityIcons name="text-box-check-outline" size={normalize(20)} color={colors.primary} />
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Text</Text>
+                </View>
+                
+                <View style={[styles.textInputContainer, { 
+                  backgroundColor: currentTheme === 'dark' ? 'rgba(30, 30, 40, 0.6)' : 'rgba(255, 255, 255, 0.8)',
+                  borderColor: colors.border,
+                  shadowColor: colors.primary
+                }]}>
+                  <View style={styles.inputHeaderBar}>
+                    <Text style={[styles.inputLabel, { color: '#9C27B0' }]}>
+                      <MaterialCommunityIcons name="text-box-outline" size={normalize(14)} color={'#9C27B0'} /> Input Text
+                    </Text>
+                    <TouchableOpacity 
+                      style={[styles.pasteButton, { minWidth: responsiveSpacing(70), minHeight: responsiveSpacing(30), justifyContent: 'center', alignItems: 'center' }]} 
+                      onPress={async () => {
+                        const clipboardText = await Clipboard.getString();
+                        if (clipboardText) {
+                          setInputText(clipboardText);
+                        }
+                      }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <MaterialCommunityIcons name="content-paste" size={normalize(14)} color={colors.primary} />
+                      <Text style={[styles.pasteButtonText, { color: colors.primary }]}>Paste</Text>
+                    </TouchableOpacity>
+                  </View>
+                  
+                  <View style={[styles.textInputWrapper]}>
+                    <TextInput
+                      style={[styles.textInput, { color: colors.text, height: Math.max(150 * scale, 150) }]}
+                      placeholder="Enter text you want to humanise..."
+                      placeholderTextColor={'#A3A3A3FF'}
+                      value={inputText}
+                      onChangeText={setInputText}
+                      multiline
+                      numberOfLines={8}
+                      textAlignVertical="top"
+                      editable={!isProcessing}
+                    />
+                    
+                    {/* Scan line animation */}
+                    {inputText.length > 0 && !isFinished && (
+                      <Animated.View 
+                        style={[
+                          styles.scanLine,
+                          {
+                            backgroundColor: colors.primary,
+                            opacity: 0.4,
+                            transform: [
+                              { 
+                                translateY: scanLineAnim.interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: [0, 150 * scale]
+                                })
+                              }
+                            ]
+                          }
+                        ]}
+                      />
+                    )}
+                  </View>
+                  
+                  <View style={styles.textInputFooter}>
+                    <Text style={[styles.characterCount, { color: '#9C27B0' }]}>
+                      {inputText.length} characters
+                    </Text>
+                    {inputText.length > 0 && selectedTone && (
+                        <Text style={[styles.longTextNote, { color: '#9C27B0' }]}>
+                        <Ionicons name="checkmark-circle" size={normalize(12)} color={'#9C27B0'} /> {selectedTone.charAt(0).toUpperCase() + selectedTone.slice(1)} tone
+                      </Text>
+                    )}
+                  </View>
+                </View>
+                
+                {!isFinished && (
+                  <TouchableOpacity 
+                    style={[styles.submitButton, {
+                      backgroundColor: isProcessing || inputText.trim() === '' ? '#BA68C8' : '#9C27B0',
+                      opacity: isProcessing || inputText.trim() === '' ? 0.7 : 1
+                    }]}
+                    onPress={handleSend}
+                    disabled={isProcessing || inputText.trim() === ''}
+                  >
+                    {isProcessing ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <View style={styles.fixedAnalyzeButtonContent}>
+                        <Text style={styles.submitButtonText}>Humanise</Text>
+                        <MaterialCommunityIcons name="human-greeting" size={normalize(20)} color="#FFFFFF" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
                 )}
               </View>
             </View>
             
-            {!isFinished && (
-              <TouchableOpacity 
-                style={[styles.submitButton, {
-                  backgroundColor: isProcessing || inputText.trim() === '' ? '#BA68C8' : '#9C27B0',
-                  opacity: isProcessing || inputText.trim() === '' ? 0.7 : 1
-                }]}
-                onPress={handleSend}
-                disabled={isProcessing || inputText.trim() === ''}
-              >
-                {isProcessing ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <View style={styles.fixedAnalyzeButtonContent}>
-                    <Text style={styles.submitButtonText}>Humanise</Text>
-                    <MaterialCommunityIcons name="human-greeting" size={normalize(20)} color="#FFFFFF" />
+            {/* Result Section */}
+            {isFinished && (
+              <View style={styles.standardContainer}>
+                <Animated.View style={[styles.resultContainer, {
+                  opacity: resultOpacity,
+                  transform: [{ translateY: resultTranslateY }]
+                }]}>
+                  <View style={[styles.resultHeader, isSmallScreen && { flexDirection: 'column', alignItems: 'flex-start' }]}>
+                    <View style={styles.sectionHeaderContainer}>
+                      <MaterialCommunityIcons name="text-box-check-outline" size={normalize(20)} color={colors.primary} />
+                      <Text style={[styles.sectionTitle, { color: colors.text }]}>Humanised Result</Text>
+                    </View>
+                    <TouchableOpacity 
+                      style={[styles.resetButton, isSmallScreen && { marginTop: responsiveSpacing(8) }]}
+                      onPress={handleReset}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <MaterialIcons name="refresh" size={normalize(20)} color={colors.primary} />
+                      <Text style={[styles.resetButtonText, { color: colors.primary }]}>
+                        New Text
+                      </Text>
+                    </TouchableOpacity>
                   </View>
-                )}
-              </TouchableOpacity>
-            )}
-          </View>
-          
-          {/* Result Section */}
-          {isFinished && (
-            <Animated.View style={[styles.resultContainer, {
-              opacity: resultOpacity,
-              transform: [{ translateY: resultTranslateY }]
-            }]}>
-              <View style={[styles.resultHeader, isSmallScreen && { flexDirection: 'column', alignItems: 'flex-start' }]}>
-                <View style={styles.sectionHeaderContainer}>
-                  <MaterialCommunityIcons name="text-box-check-outline" size={normalize(20)} color={colors.primary} />
-                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Humanised Result</Text>
-                </View>
-                <TouchableOpacity 
-                  style={[styles.resetButton, isSmallScreen && { marginTop: responsiveSpacing(8) }]}
-                  onPress={handleReset}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <MaterialIcons name="refresh" size={normalize(20)} color={colors.primary} />
-                  <Text style={[styles.resetButtonText, { color: colors.primary }]}>
-                    New Text
-                  </Text>
-                </TouchableOpacity>
+                  
+                  <View style={[styles.resultBox, {
+                    backgroundColor: currentTheme === 'dark' ? 'rgba(30, 30, 40, 0.6)' : 'rgba(255, 255, 255, 0.8)',
+                    borderColor: colors.border
+                  }]}>
+                    <Text style={[styles.resultText, { color: colors.text }]}>
+                      {outputText}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity 
+                      style={[styles.actionButton, { backgroundColor: currentTheme === 'dark' ? 'rgba(40, 40, 50, 0.6)' : 'rgba(245, 245, 255, 0.6)' }]}
+                      onPress={copyToClipboard}
+                    >
+                      <MaterialIcons 
+                        name={isCopied ? "check" : "content-copy"} 
+                        size={normalize(22)} 
+                        color={isCopied ? "#4CAF50" : colors.text} 
+                      />
+                      <Text style={[styles.actionButtonText, { 
+                        color: isCopied ? "#4CAF50" : colors.text 
+                      }]}>
+                        {isCopied ? "Copied" : "Copy"}
+                      </Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={[styles.actionButton, { backgroundColor: currentTheme === 'dark' ? 'rgba(40, 40, 50, 0.6)' : 'rgba(245, 245, 255, 0.6)' }]}
+                      onPress={shareText}
+                    >
+                      <MaterialIcons name="share" size={normalize(22)} color={colors.text} />
+                      <Text style={[styles.actionButtonText, { color: colors.text }]}>
+                        Share
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </Animated.View>
               </View>
-              
-              <View style={[styles.resultBox, {
-                backgroundColor: currentTheme === 'dark' ? 'rgba(30, 30, 40, 0.6)' : 'rgba(255, 255, 255, 0.8)',
-                borderColor: colors.border
-              }]}>
-                <Text style={[styles.resultText, { color: colors.text }]}>
-                  {outputText}
+            )}
+            
+            {/* Processing Animation */}
+            {isProcessing && (
+              <View style={styles.processingContainer}>
+                <LottieView 
+                  source={require('../assets/image2.json')}
+                  autoPlay
+                  loop
+                  style={styles.lottieAnimation}
+                />
+                <Text style={[styles.processingText, { color: colors.text }]}>
+                  Transforming your text...
+                </Text>
+                <Text style={[styles.processingSubtext, { color: colors.textSecondary }]}>
+                  Using advanced AI to create human-like content
                 </Text>
               </View>
-              
-              <View style={styles.actionButtons}>
-                <TouchableOpacity 
-                  style={[styles.actionButton, { backgroundColor: currentTheme === 'dark' ? 'rgba(40, 40, 50, 0.6)' : 'rgba(245, 245, 255, 0.6)' }]}
-                  onPress={copyToClipboard}
-                >
-                  <MaterialIcons 
-                    name={isCopied ? "check" : "content-copy"} 
-                    size={normalize(22)} 
-                    color={isCopied ? "#4CAF50" : colors.text} 
-                  />
-                  <Text style={[styles.actionButtonText, { 
-                    color: isCopied ? "#4CAF50" : colors.text 
-                  }]}>
-                    {isCopied ? "Copied" : "Copy"}
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.actionButton, { backgroundColor: currentTheme === 'dark' ? 'rgba(40, 40, 50, 0.6)' : 'rgba(245, 245, 255, 0.6)' }]}
-                  onPress={shareText}
-                >
-                  <MaterialIcons name="share" size={normalize(22)} color={colors.text} />
-                  <Text style={[styles.actionButtonText, { color: colors.text }]}>
-                    Share
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </Animated.View>
-          )}
-          
-          {/* Processing Animation */}
-          {isProcessing && (
-            <View style={styles.processingContainer}>
-              <LottieView 
-                source={require('../assets/image2.json')}
-                autoPlay
-                loop
-                style={styles.lottieAnimation}
-              />
-              <Text style={[styles.processingText, { color: colors.text }]}>
-                Transforming your text...
-              </Text>
-              <Text style={[styles.processingSubtext, { color: colors.textSecondary }]}>
-                Using advanced AI to create human-like content
-              </Text>
-            </View>
-          )}
+            )}
+          </View>
         </ScrollView>
       </View>
       
@@ -879,16 +887,22 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
     width: '100%',
-    maxWidth: 600,
   },
   scrollContent: {
-    paddingHorizontal: responsiveSpacing(16),
     paddingBottom: responsiveSpacing(40),
+    alignItems: 'center',
+  },
+  contentWrapper: {
+    width: '100%', 
+    maxWidth: 600,
+    paddingHorizontal: responsiveSpacing(16),
+  },
+  standardContainer: {
     width: '100%',
-    alignItems: 'stretch',
+    marginTop: responsiveSpacing(16),
   },
   welcomeBanner: {
-    marginTop: responsiveSpacing(16),
+    width: '100%',
     borderRadius: responsiveSpacing(24),
     overflow: 'hidden',
     shadowColor: '#000',
@@ -896,15 +910,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
-    width: '100%',
-    maxWidth: 600,
+    marginTop: 0,
   },
   bannerGradient: {
+    width: '100%',
     borderRadius: responsiveSpacing(24),
-    padding: responsiveSpacing(24),
     position: 'relative',
     overflow: 'hidden',
-    width: '100%',
   },
   decorCircle1: {
     position: 'absolute',
@@ -932,6 +944,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     flexWrap: 'wrap',
     width: '100%',
+    padding: responsiveSpacing(24),
   },
   bannerTextContent: {
     flex: 1,
@@ -1034,9 +1047,9 @@ const styles = StyleSheet.create({
   inputContainer: {
     marginTop: responsiveSpacing(24),
     width: '100%',
-    maxWidth: 600,
   },
   textInputContainer: {
+    width: '100%',
     borderRadius: responsiveSpacing(16),
     borderWidth: 1,
     overflow: 'hidden',
@@ -1046,7 +1059,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
-    width: '100%',
   },
   inputHeaderBar: {
     flexDirection: 'row',
@@ -1150,7 +1162,6 @@ const styles = StyleSheet.create({
   resultContainer: {
     marginTop: responsiveSpacing(24),
     width: '100%',
-    maxWidth: 600,
   },
   resultHeader: {
     flexDirection: 'row',

@@ -375,10 +375,7 @@ const HomeScreen = () => {
                 {t('aiTools')}
               </Text>
             </View>
-            
-            <TouchableOpacity style={styles.viewAllButton}>
-              <Text style={[styles.viewAllText, { color: colors.primary }]}>View All</Text>
-            </TouchableOpacity>
+          
           </View>
           
           <FlatList

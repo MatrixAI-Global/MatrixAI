@@ -2710,7 +2710,7 @@ const styles = StyleSheet.create({
     },
     audioControlsContainer: {
         position: 'absolute',
-        backgroundColor: '#F2F3F7',
+        backgroundColor: '#D5D5D6FF',
         alignItems: 'center',
         justifyContent: 'center',
         width: '100%', // Adjust width as needed
@@ -2722,7 +2722,7 @@ const styles = StyleSheet.create({
        justifyContent: 'center',
       
        position: 'absolute',
-       backgroundColor: '#F2F3F7',
+       backgroundColor: '#D5D5D6FF',
        borderRadius:50,
        paddingLeft:15,
        paddingRight:15,
@@ -2759,12 +2759,9 @@ const styles = StyleSheet.create({
     waveformBox2: {
         justifyContent: 'center',
         alignItems: 'center',
+     
         // Explicitly remove any shadow
-        shadowColor: 'transparent',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0,
-        shadowRadius: 0,
-        elevation: 0,
+       
     },
     waveformContainer: {
         borderRadius: 10,
@@ -2775,11 +2772,7 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         minHeight: 80,
         // Explicitly remove any shadow
-        shadowColor: 'transparent',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0,
-        shadowRadius: 0,
-        elevation: 0,
+      
     },
    
     waveform: {
@@ -3388,8 +3381,8 @@ zIndex:101,
     },
     centerFloatingButton: {
         position: 'absolute',
-        bottom: 80,
-        left: '15%',
+        bottom: 7,
+        left: 70,
         marginLeft: -30, // Half of button width to center
         width: 50,
         height: 50,

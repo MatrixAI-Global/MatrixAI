@@ -346,11 +346,7 @@ const ProfileScreen = ({ navigation }) => {
                 <ThemedText style={[styles.menuTitle, {color: colors.text}]}>{t('support')}</ThemedText>
                 
                 <ThemedCard style={[styles.menuContainer, {backgroundColor: colors.card , borderWidth: 0.8, borderColor: colors.border}]}>
-                    <MenuItem 
-                        iconName="help-circle-outline" 
-                        label={t('helpCenter')} 
-                        onPress={() => navigation.navigate('FeedbackScreen')} 
-                    />
+                   
                     <MenuItem 
                         iconName="headset-outline" 
                         label={t('customerSupport')} 

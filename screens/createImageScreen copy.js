@@ -26,14 +26,14 @@ import { useFocusEffect } from '@react-navigation/native';
 const { width, height } = Dimensions.get("window");
 
 const CreateImagesScreen2 = ({ route, navigation }) => {
-  const { message } = route.params; // Extract text from params
+  const { message, imageCount = 4 } = route.params; // Extract text and imageCount from params
   const [imageUrls, setImageUrls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { getThemeColors } = useTheme();
   const colors = getThemeColors();
   const [selectedImage, setSelectedImage] = useState(null);
-  const [gridImages, setGridImages] = useState([null, null, null, null]);
+  const [gridImages, setGridImages] = useState([]);
 
   // Animated values
   const shimmerValue = useRef(new Animated.Value(0)).current;
@@ -47,20 +47,30 @@ const CreateImagesScreen2 = ({ route, navigation }) => {
   useFocusEffect(
     React.useCallback(() => {
       // This runs when the screen comes into focus
+      clearStoredImages(); // Clear any previous images first
       fetchAndStoreImages();
       
       // This runs when the screen goes out of focus
       return () => {
         // Clear state when navigating away
         setImageUrls([]);
-        setGridImages([null, null, null, null]);
+        setGridImages([]);
         setSelectedImage(null);
         setError(null);
         // Clear stored images
-        AsyncStorage.removeItem("generatedImages");
+        clearStoredImages();
       };
-    }, [message])
+    }, [message, imageCount])
   );
+
+  // Function to clear stored images
+  const clearStoredImages = async () => {
+    try {
+      await AsyncStorage.removeItem("generatedImages");
+    } catch (error) {
+      console.error("Error clearing stored images:", error);
+    }
+  };
 
   useEffect(() => {
     // Start shimmer animation
@@ -108,9 +118,9 @@ const CreateImagesScreen2 = ({ route, navigation }) => {
     // Clear all data when component unmounts
     return () => {
       setImageUrls([]);
-      setGridImages([null, null, null, null]);
+      setGridImages([]);
       setSelectedImage(null);
-      AsyncStorage.removeItem("generatedImages");
+      clearStoredImages();
     };
   }, [shimmerValue, pulseAnim, loadingDots]);
 
@@ -121,7 +131,7 @@ const CreateImagesScreen2 = ({ route, navigation }) => {
       
       // Clear stored images if refreshing
       if (refreshing) {
-        await AsyncStorage.removeItem("generatedImages");
+        await clearStoredImages();
       }
 
       // Try to get stored images first (unless refreshing)
@@ -130,7 +140,7 @@ const CreateImagesScreen2 = ({ route, navigation }) => {
         if (storedImages) {
           const parsedImages = JSON.parse(storedImages);
           setImageUrls(parsedImages);
-          setGridImages(parsedImages.slice(0, 4));
+          setGridImages(parsedImages);
           
           // Set images immediately but keep loading state for 1-2 seconds
           fadeInImage();
@@ -145,7 +155,7 @@ const CreateImagesScreen2 = ({ route, navigation }) => {
       // Fetch new images
       const response = await axios.post(
         "https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/generateImage2",
-        { text: message, uid: uid },
+        { text: message, uid: uid, imageCount: imageCount },
         {
           headers: {
             "Content-Type": "application/json",
@@ -167,7 +177,7 @@ const CreateImagesScreen2 = ({ route, navigation }) => {
 
         await AsyncStorage.setItem("generatedImages", JSON.stringify(imageUrlsArray));
         setImageUrls(imageUrlsArray);
-        setGridImages(imageUrlsArray.slice(0, 4));
+        setGridImages(imageUrlsArray);
         
         // Set images immediately but keep loading state for 1-2 seconds
         fadeInImage();
@@ -205,7 +215,7 @@ const CreateImagesScreen2 = ({ route, navigation }) => {
 
   const handleTryAgain = () => {
     setSelectedImage(null);
-    setGridImages([null, null, null, null]);
+    setGridImages([]);
     // Reset animations
     imageOpacity.setValue(0);
     imageScale.setValue(0.95);
@@ -224,7 +234,7 @@ const CreateImagesScreen2 = ({ route, navigation }) => {
 
   const renderSkeletonGrid = () => (
     <View style={styles.gridContainer}>
-      {Array.from({ length: 4 }).map((_, index) => (
+      {Array.from({ length: imageCount }).map((_, index) => (
         <View key={index} style={styles.imageBox}>
           <View style={styles.imageSkeleton}>
             <Animated.View
@@ -282,7 +292,7 @@ const CreateImagesScreen2 = ({ route, navigation }) => {
         <Animated.View 
           style={[
             styles.gridContainer, 
-            { opacity: imageOpacity, display: gridImages[0] ? 'flex' : 'none' }
+            { opacity: imageOpacity, display: gridImages.length > 0 ? 'flex' : 'none' }
           ]}
         >
           {gridImages.map((imageUrl, index) => (

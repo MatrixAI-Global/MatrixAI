@@ -330,19 +330,19 @@ const ImageGenerateScreen = () => {
         {/* Header Animation */}
        
         <Animated.View style={[styles.header, { transform: [{ scale: scaleAnim }], backgroundColor: colors.background2}]}>
-          <TouchableOpacity 
-            style={[styles.backButton]} 
-            onPress={() => navigation.goBack()}
-          >
-            <Image source={require('../assets/back.png')} style={[styles.headerIcon, {tintColor: colors.text}]} />
-          </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.backButton, {backgroundColor: colors.primary}]} 
+          onPress={() => navigation.goBack()}
+        >
+          <MaterialIcons name="arrow-back" size={24} color="#fff" />
+        </TouchableOpacity>
           <Text style={[styles.headerTitle, {color: colors.text}]}>Matrix AI</Text>
           {!isFinished && (
             <TouchableOpacity 
-              style={[styles.historyButton]} 
+              style={[styles.historyButton, {backgroundColor: colors.primary}]} 
               onPress={toggleHistory}
             >
-              <MaterialIcons name="history" size={24} color={colors.text} />
+              <MaterialIcons name="history" size={24} color={'#fff'} />
             </TouchableOpacity>
           )}
         </Animated.View>
@@ -372,7 +372,7 @@ const ImageGenerateScreen = () => {
             >
               <View style={styles.horizontalContent}>
                 <View style={styles.generateContent}>
-                  <Text style={styles.generateText}>Generate</Text>
+                  <Text style={styles.generateText}>Generate I</Text>
                   <View style={styles.horizontalContent}>
                     <Text style={styles.coinText}>-1</Text>
                     <Image source={require('../assets/coin.png')} style={styles.coinIcon} />
@@ -527,14 +527,12 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+ 
   },
   historyButton: {
     padding: 8,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+ 
   },
   placeholderContainer: {
     alignItems: 'center',

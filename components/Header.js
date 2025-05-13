@@ -108,7 +108,7 @@ const Header = ({ navigation, uid, openDrawer }) => {
          
 
             {/* Welcome Text with Profile Picture */}
-            <View style={[styles.rowContainer, {backgroundColor: 'transparent'}]  }>
+            <View style={[styles.rowContainer]  }>
                 <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
                     <Image 
                         source={dpUrl ? { uri: dpUrl } : require('../assets/Avatar/Cat.png')} 

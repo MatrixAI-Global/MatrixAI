@@ -516,176 +516,188 @@ const ContentWriterScreen = () => {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Welcome Banner */}
-        <Animated.View style={[styles.welcomeBanner, { 
-          opacity: fadeAnim,
-          transform: [{ translateY: Animated.multiply(Animated.subtract(1, fadeAnim), 20) }]
-        }]}>
-          <LinearGradient
-            colors={currentTheme === 'dark' ? 
-              ['#FF6D00', '#F57C00'] : 
-              ['#FFF3E0', '#FFE0B2']}
-            style={styles.bannerGradient}
-          >
-            <View style={styles.bannerContent}>
-              <View style={styles.bannerTextContent}>
-                <Text style={[styles.bannerTitle, { color: colors.text }]}>
-                  AI Content Writer
-                </Text>
-                <Text style={[styles.bannerSubtitle, { color: colors.textSecondary }]}>
-                  Generate professional content for articles, emails, blogs and more
-                </Text>
+        <View style={styles.contentWrapper}>
+          {/* Welcome Banner with matching container */}
+          <View style={styles.standardContainer}>
+            <Animated.View style={[styles.welcomeBanner, { 
+              opacity: fadeAnim,
+              transform: [{ translateY: Animated.multiply(Animated.subtract(1, fadeAnim), 20) }]
+            }]}>
+              <LinearGradient
+                colors={currentTheme === 'dark' ? 
+                  ['#FF6D00', '#F57C00'] : 
+                  ['#FFF3E0', '#FFE0B2']}
+                style={styles.bannerGradient}
+              >
+                <View style={styles.bannerContent}>
+                  <View style={styles.bannerTextContent}>
+                    <Text style={[styles.bannerTitle, { color: colors.text }]}>
+                      AI Content Writer
+                    </Text>
+                    <Text style={[styles.bannerSubtitle, { color: colors.textSecondary }]}>
+                      Generate professional content for articles, emails, blogs and more
+                    </Text>
+                  </View>
+                  <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                    <View style={styles.iconContainer}>
+                      <LinearGradient
+                        colors={['#FF6D00', '#F57C00']}
+                        style={styles.iconGradient}
+                      >
+                        <MaterialCommunityIcons name="text-box-outline" size={32} color="#FFFFFF" />
+                      </LinearGradient>
+                    </View>
+                  </Animated.View>
+                </View>
+              </LinearGradient>
+            </Animated.View>
+          </View>
+          
+          {/* Content Type Selector */}
+          <View style={styles.standardContainer}>
+            <View style={styles.typeContainer}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Content Type</Text>
+              <FlatList
+                data={contentTypes}
+                renderItem={renderContentTypeItem}
+                keyExtractor={item => item.id}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.typeList}
+              />
+            </View>
+          </View>
+          
+          {/* Prompt Input */}
+          <View style={styles.standardContainer}>
+            <View style={styles.promptContainer}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>What to write about?</Text>
+              <View style={[styles.promptInputWrapper, { 
+                backgroundColor: colors.card,
+                borderColor: colors.border
+              }]}>
+                <TextInput
+                  style={[styles.promptInput, { color: colors.text }]}
+                  placeholder="Enter your topic or request..."
+                  placeholderTextColor={'#A3A3A3FF'}
+                  value={prompt}
+                  onChangeText={setPrompt}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                  editable={!isGenerating}
+                />
               </View>
-              <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-                <View style={styles.iconContainer}>
-                  <LinearGradient
-                    colors={['#FF6D00', '#F57C00']}
-                    style={styles.iconGradient}
+            </View>
+          </View>
+          
+          {/* Generate Button */}
+          {!generatedContent && (
+            <View style={styles.standardContainer}>
+              <TouchableOpacity 
+                style={[styles.generateButton, {
+                  backgroundColor: colors.primary,
+                  opacity: isGenerating || prompt.trim() === '' ? 0.7 : 1
+                }]}
+                onPress={handleGenerate}
+                disabled={isGenerating || prompt.trim() === ''}
+              >
+                {isGenerating ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Text style={styles.generateButtonText}>Generate</Text>
+                    <MaterialCommunityIcons 
+                      name={getContentTypeIcon()} 
+                      size={20} 
+                      color="#FFFFFF" 
+                    />
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+          
+          {/* Result Section */}
+          {generatedContent !== '' && (
+            <View style={styles.standardContainer}>
+              <Animated.View style={[styles.resultContainer, {
+                opacity: resultOpacity,
+                transform: [{ translateY: resultTranslateY }]
+              }]}>
+                <View style={styles.resultHeader}>
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Generated Content</Text>
+                  <TouchableOpacity 
+                    style={styles.newContentButton}
+                    onPress={handleClearForm}
                   >
-                    <MaterialCommunityIcons name="text-box-outline" size={32} color="#FFFFFF" />
-                  </LinearGradient>
+                    <MaterialIcons name="refresh" size={20} color={colors.primary} />
+                    <Text style={[styles.newContentButtonText, { color: colors.primary }]}>
+                      New Content
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                
+                <View style={[styles.contentBox, {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border
+                }]}>
+                  <ScrollView 
+                    style={styles.contentScroll}
+                    nestedScrollEnabled={true}
+                  >
+                    <Text style={[styles.contentText, { color: colors.text }]}>
+                      {generatedContent}
+                    </Text>
+                  </ScrollView>
+                </View>
+                
+                <View style={styles.actionButtons}>
+                  <TouchableOpacity 
+                    style={[styles.actionButton, { backgroundColor: colors.card }]}
+                    onPress={copyToClipboard}
+                  >
+                    <MaterialIcons 
+                      name={isCopied ? "check" : "content-copy"} 
+                      size={22} 
+                      color={isCopied ? "#4CAF50" : colors.text} 
+                    />
+                    <Text style={[styles.actionButtonText, { 
+                      color: isCopied ? "#4CAF50" : colors.text 
+                    }]}>
+                      {isCopied ? "Copied" : "Copy"}
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[styles.actionButton, { backgroundColor: colors.card }]}
+                    onPress={shareContent}
+                  >
+                    <MaterialIcons name="share" size={22} color={colors.text} />
+                    <Text style={[styles.actionButtonText, { color: colors.text }]}>
+                      Share
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </Animated.View>
             </View>
-          </LinearGradient>
-        </Animated.View>
-        
-        {/* Content Type Selector */}
-        <View style={styles.typeContainer}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Content Type</Text>
-          <FlatList
-            data={contentTypes}
-            renderItem={renderContentTypeItem}
-            keyExtractor={item => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.typeList}
-          />
+          )}
+          
+          {/* Processing Animation */}
+          {isGenerating && (
+            <View style={styles.processingContainer}>
+              <LottieView 
+                source={require('../assets/image2.json')}
+                autoPlay
+                loop
+                style={styles.lottieAnimation}
+              />
+              <Text style={[styles.processingText, { color: colors.text }]}>
+                Creating your content...
+              </Text>
+            </View>
+          )}
         </View>
-        
-        {/* Prompt Input */}
-        <View style={styles.promptContainer}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>What to write about?</Text>
-          <View style={[styles.promptInputWrapper, { 
-            backgroundColor: colors.card,
-            borderColor: colors.border
-          }]}>
-            <TextInput
-              style={[styles.promptInput, { color: colors.text }]}
-              placeholder="Enter your topic or request..."
-              placeholderTextColor={'#A3A3A3FF'}
-              value={prompt}
-              onChangeText={setPrompt}
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-              editable={!isGenerating}
-            />
-          </View>
-        </View>
-        
-        {/* Generate Button */}
-        {!generatedContent && (
-          <TouchableOpacity 
-            style={[styles.generateButton, {
-              backgroundColor: colors.primary,
-              opacity: isGenerating || prompt.trim() === '' ? 0.7 : 1
-            }]}
-            onPress={handleGenerate}
-            disabled={isGenerating || prompt.trim() === ''}
-          >
-            {isGenerating ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <Text style={styles.generateButtonText}>Generate</Text>
-                <MaterialCommunityIcons 
-                  name={getContentTypeIcon()} 
-                  size={20} 
-                  color="#FFFFFF" 
-                />
-              </>
-            )}
-          </TouchableOpacity>
-        )}
-        
-        {/* Result Section */}
-        {generatedContent !== '' && (
-          <Animated.View style={[styles.resultContainer, {
-            opacity: resultOpacity,
-            transform: [{ translateY: resultTranslateY }]
-          }]}>
-            <View style={styles.resultHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Generated Content</Text>
-              <TouchableOpacity 
-                style={styles.newContentButton}
-                onPress={handleClearForm}
-              >
-                <MaterialIcons name="refresh" size={20} color={colors.primary} />
-                <Text style={[styles.newContentButtonText, { color: colors.primary }]}>
-                  New Content
-                </Text>
-              </TouchableOpacity>
-            </View>
-            
-            <View style={[styles.contentBox, {
-              backgroundColor: colors.card,
-              borderColor: colors.border
-            }]}>
-              <ScrollView 
-                style={styles.contentScroll}
-                nestedScrollEnabled={true}
-              >
-                <Text style={[styles.contentText, { color: colors.text }]}>
-                  {generatedContent}
-                </Text>
-              </ScrollView>
-            </View>
-            
-            <View style={styles.actionButtons}>
-              <TouchableOpacity 
-                style={[styles.actionButton, { backgroundColor: colors.card }]}
-                onPress={copyToClipboard}
-              >
-                <MaterialIcons 
-                  name={isCopied ? "check" : "content-copy"} 
-                  size={22} 
-                  color={isCopied ? "#4CAF50" : colors.text} 
-                />
-                <Text style={[styles.actionButtonText, { 
-                  color: isCopied ? "#4CAF50" : colors.text 
-                }]}>
-                  {isCopied ? "Copied" : "Copy"}
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.actionButton, { backgroundColor: colors.card }]}
-                onPress={shareContent}
-              >
-                <MaterialIcons name="share" size={22} color={colors.text} />
-                <Text style={[styles.actionButtonText, { color: colors.text }]}>
-                  Share
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        )}
-        
-        {/* Processing Animation */}
-        {isGenerating && (
-          <View style={styles.processingContainer}>
-            <LottieView 
-              source={require('../assets/image2.json')}
-              autoPlay
-              loop
-              style={styles.lottieAnimation}
-            />
-            <Text style={[styles.processingText, { color: colors.text }]}>
-              Creating your content...
-            </Text>
-          </View>
-        )}
       </ScrollView>
       
       {/* History Panel */}
@@ -754,13 +766,19 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    width: '100%',
   },
   scrollContent: {
-    paddingHorizontal: 16,
     paddingBottom: 40,
+    alignItems: 'center',
+  },
+  contentWrapper: {
+    width: '100%', 
+    maxWidth: 600,
+    paddingHorizontal: 16,
   },
   welcomeBanner: {
-    marginTop: 16,
+    width: '100%',
     borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -773,13 +791,15 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   bannerGradient: {
+    width: '100%',
     borderRadius: 20,
-    padding: 20,
   },
   bannerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    width: '100%',
+    padding: 20,
   },
   bannerTextContent: {
     flex: 1,
@@ -818,6 +838,7 @@ const styles = StyleSheet.create({
   },
   typeContainer: {
     marginTop: 24,
+    width: '100%',
   },
   sectionTitle: {
     fontSize: 16,
@@ -845,8 +866,10 @@ const styles = StyleSheet.create({
   },
   promptContainer: {
     marginTop: 24,
+    width: '100%',
   },
   promptInputWrapper: {
+    width: '100%',
     borderRadius: 16,
     borderWidth: 1,
     padding: 12,
@@ -857,6 +880,7 @@ const styles = StyleSheet.create({
     minHeight: 80,
   },
   generateButton: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -885,6 +909,7 @@ const styles = StyleSheet.create({
   },
   resultContainer: {
     marginTop: 24,
+    width: '100%',
   },
   resultHeader: {
     flexDirection: 'row',
@@ -902,6 +927,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   contentBox: {
+    width: '100%',
     borderRadius: 16,
     borderWidth: 1,
     padding: 16,
@@ -1012,6 +1038,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 2,
+  },
+  standardContainer: {
+    width: '100%',
+    marginTop: 16,
   },
 });
 

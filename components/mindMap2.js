@@ -4,8 +4,10 @@ import OpenAI from 'openai';
 import { WebView } from 'react-native-webview';
 import axios from 'axios';
 import { XMLParser } from 'fast-xml-parser';
-
+import { useTheme } from '../context/ThemeContext';
 const ForceDirectedGraph2 = ({ transcription, uid, audioid, xmlData }) => {
+  const { getThemeColors } = useTheme();
+  const colors = getThemeColors();
   const [graphData, setGraphData] = useState(null);
   const openai = new OpenAI({
     baseURL: 'https://api.deepseek.com',

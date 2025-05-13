@@ -513,340 +513,348 @@ const DetectAIScreen = () => {
           keyboardShouldPersistTaps="handled"
           bounces={false}
         >
-          {/* Welcome Banner - adjusted for small screens */}
-          <Animated.View style={[styles.welcomeBanner, { 
-            opacity: fadeAnim,
-            transform: [{ translateY: Animated.multiply(Animated.subtract(1, fadeAnim), 20) }]
-          }]}>
-            <LinearGradient
-              colors={currentTheme === 'dark' ? 
-                ['#1A237E', '#283593'] : 
-                ['#E8EAF6', '#C5CAE9']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.bannerGradient}
-            >
-              {/* Decorative elements */}
-              <Animated.View 
-                style={[
-                  styles.decorCircle1, 
-                  { 
-                    opacity: 0.1, 
-                    transform: [{ rotate: spin }],
-                    borderColor: colors.primary
-                  }
-                ]}
-              />
-              <Animated.View 
-                style={[
-                  styles.decorCircle2, 
-                  { 
-                    opacity: 0.15, 
-                    transform: [{ rotate: spin }],
-                    borderColor: currentTheme === 'dark' ? colors.secondary : colors.primary
-                  }
-                ]}
-              />
-              
-              <View style={[styles.bannerContent, isSmallScreen && { flexDirection: 'column' }]}>
-                <View style={[styles.bannerTextContent, isSmallScreen && { paddingRight: 0, marginBottom: responsiveSpacing(16) }]}>
-                  <Text style={[styles.bannerTitle, { color: colors.text }]}>
-                    AI Text Detector
-                  </Text>
-                  <Text style={[styles.bannerSubtitle, { color: currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)' }]}>
-                    Detect AI-generated content with advanced ML
-                  </Text>
-                  <View style={styles.featureList}>
-                    <View style={styles.featureItemBanner}>
-                      <Ionicons name="checkmark-circle" size={normalize(16)} color={currentTheme === 'dark' ? '#5C6BC0' : '#3F51B5'} />
-                      <Text style={[styles.featureText, { color: currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)' }]}>
-                        Fast and accurate detection
-                      </Text>
-                    </View>
-                    <View style={styles.featureItemBanner}>
-                      <Ionicons name="checkmark-circle" size={normalize(16)} color={currentTheme === 'dark' ? '#5C6BC0' : '#3F51B5'} />
-                      <Text style={[styles.featureText, { color: currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)' }]}>
-                        Detailed analytics
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-                
-                <Animated.View style={[styles.iconOuter, isSmallScreen && { alignSelf: 'center' }, { transform: [{ scale: pulseAnim }] }]}>
-                  <View style={styles.iconContainer}>
-                    <LinearGradient
-                      colors={['#3F51B5', '#1A237E']}
-                      style={styles.iconGradient}
-                    >
-                      <Animated.View style={{ transform: [{ rotate: spin }] }}>
-                        <MaterialCommunityIcons name="shield-search" size={normalize(32)} color="#FFFFFF" />
-                      </Animated.View>
-                    </LinearGradient>
-                    <Animated.View 
-                      style={[
-                        styles.iconRing, 
-                        { 
-                          transform: [{ rotate: spin }],
-                          borderColor: currentTheme === 'dark' ? '#3F51B5' : '#3F51B5' 
-                        }
-                      ]}
-                    />
-                  </View>
-                </Animated.View>
-              </View>
-            </LinearGradient>
-          </Animated.View>
-          
-          {/* Responsive Input Section */}
-          <View style={styles.inputContainer}>
-            <View style={styles.sectionHeaderContainer}>
-              <MaterialCommunityIcons name="text-box-search-outline" size={normalize(20)} color={colors.primary} />
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Text Analysis</Text>
-            </View>
-            
-            <View style={[styles.textInputContainer, { 
-              backgroundColor: currentTheme === 'dark' ? 'rgba(30, 30, 40, 0.6)' : 'rgba(255, 255, 255, 0.8)',
-              borderColor: colors.border,
-              shadowColor: colors.primary
-            }]}>
-              <View style={styles.inputHeaderBar}>
-                <Text style={[styles.inputLabel, { color: '#3F51B5' }]}>
-                  <MaterialCommunityIcons name="text-box-outline" size={normalize(14)} color={'#3F51B5'} /> Input Text
-                </Text>
-                <TouchableOpacity 
-                  style={[styles.pasteButton, { minWidth: responsiveSpacing(70), minHeight: responsiveSpacing(30), justifyContent: 'center', alignItems: 'center' }]} 
-                  onPress={async () => {
-                    const clipboardText = await Clipboard.getString();
-                    if (clipboardText) {
-                      setInputText(clipboardText);
-                    }
-                  }}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          <View style={styles.contentWrapper}>
+            {/* Welcome Banner with matching container */}
+            <View style={styles.standardContainer}>
+              <Animated.View style={[styles.welcomeBanner, { 
+                opacity: fadeAnim,
+                transform: [{ translateY: Animated.multiply(Animated.subtract(1, fadeAnim), 20) }]
+              }]}>
+                <LinearGradient
+                  colors={currentTheme === 'dark' ? 
+                    ['#1A237E', '#283593'] : 
+                    ['#E8EAF6', '#C5CAE9']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.bannerGradient}
                 >
-                  <MaterialCommunityIcons name="content-paste" size={normalize(14)} color={colors.primary} />
-                  <Text style={[styles.pasteButtonText, { color: colors.primary }]}>Paste</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <View style={[styles.textInputWrapper]}>
-                <TextInput
-                  style={[styles.textInput, { color: colors.text, height: Math.max(150 * scale, 150) }]}
-                  placeholder="Enter or paste text to analyze for AI detection..."
-                  placeholderTextColor={'#A3A3A3FF'}
-                  value={inputText}
-                  onChangeText={setInputText}
-                  multiline
-                  numberOfLines={8}
-                  textAlignVertical="top"
-                  editable={!isAnalyzing}
-                />
-                
-                {/* Scan line animation */}
-                {inputText.length > 0 && !analysisResult && (
+                  {/* Decorative elements */}
                   <Animated.View 
                     style={[
-                      styles.scanLine,
-                      {
-                        backgroundColor: colors.primary,
-                        opacity: 0.4,
-                        transform: [
-                          { 
-                            translateY: scanLineAnim.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: [0, 150 * scale]
-                            })
-                          }
-                        ]
+                      styles.decorCircle1, 
+                      { 
+                        opacity: 0.1, 
+                        transform: [{ rotate: spin }],
+                        borderColor: colors.primary
                       }
                     ]}
                   />
-                )}
-              </View>
-              
-              <View style={styles.textInputFooter}>
-                <Text style={[styles.characterCount, { color: '#3F51B5' }]}>
-                  {inputText.length} characters
-                </Text>
-                {inputText.length > 1000 && (
-                  <Text style={[styles.longTextNote, { color: '#3F51B5' }]}>
-                    <Ionicons name="checkmark-circle" size={normalize(12)} color={'#3F51B5'} /> Sufficient length
-                  </Text>
+                  <Animated.View 
+                    style={[
+                      styles.decorCircle2, 
+                      { 
+                        opacity: 0.15, 
+                        transform: [{ rotate: spin }],
+                        borderColor: currentTheme === 'dark' ? colors.secondary : colors.primary
+                      }
+                    ]}
+                  />
+                  
+                  <View style={[styles.bannerContent, isSmallScreen && { flexDirection: 'column' }]}>
+                    <View style={[styles.bannerTextContent, isSmallScreen && { paddingRight: 0, marginBottom: responsiveSpacing(16) }]}>
+                      <Text style={[styles.bannerTitle, { color: colors.text }]}>
+                        AI Text Detector
+                      </Text>
+                      <Text style={[styles.bannerSubtitle, { color: currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)' }]}>
+                        Detect AI-generated content with advanced ML
+                      </Text>
+                      <View style={styles.featureList}>
+                        <View style={styles.featureItemBanner}>
+                          <Ionicons name="checkmark-circle" size={normalize(16)} color={currentTheme === 'dark' ? '#5C6BC0' : '#3F51B5'} />
+                          <Text style={[styles.featureText, { color: currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)' }]}>
+                            Fast and accurate detection
+                          </Text>
+                        </View>
+                        <View style={styles.featureItemBanner}>
+                          <Ionicons name="checkmark-circle" size={normalize(16)} color={currentTheme === 'dark' ? '#5C6BC0' : '#3F51B5'} />
+                          <Text style={[styles.featureText, { color: currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)' }]}>
+                            Detailed analytics
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                    
+                    <Animated.View style={[styles.iconOuter, isSmallScreen && { alignSelf: 'center' }, { transform: [{ scale: pulseAnim }] }]}>
+                      <View style={styles.iconContainer}>
+                        <LinearGradient
+                          colors={['#3F51B5', '#1A237E']}
+                          style={styles.iconGradient}
+                        >
+                          <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                            <MaterialCommunityIcons name="shield-search" size={normalize(32)} color="#FFFFFF" />
+                          </Animated.View>
+                        </LinearGradient>
+                        <Animated.View 
+                          style={[
+                            styles.iconRing, 
+                            { 
+                              transform: [{ rotate: spin }],
+                              borderColor: currentTheme === 'dark' ? '#3F51B5' : '#3F51B5' 
+                            }
+                          ]}
+                        />
+                      </View>
+                    </Animated.View>
+                  </View>
+                </LinearGradient>
+              </Animated.View>
+            </View>
+            
+            {/* Responsive Input Section */}
+            <View style={styles.standardContainer}>
+              <View style={styles.inputContainer}>
+                <View style={styles.sectionHeaderContainer}>
+                  <MaterialCommunityIcons name="text-box-search-outline" size={normalize(20)} color={colors.primary} />
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Text Analysis</Text>
+                </View>
+                
+                <View style={[styles.textInputContainer, { 
+                  backgroundColor: currentTheme === 'dark' ? 'rgba(30, 30, 40, 0.6)' : 'rgba(255, 255, 255, 0.8)',
+                  borderColor: colors.border,
+                  shadowColor: colors.primary
+                }]}>
+                  <View style={styles.inputHeaderBar}>
+                    <Text style={[styles.inputLabel, { color: '#3F51B5' }]}>
+                      <MaterialCommunityIcons name="text-box-outline" size={normalize(14)} color={'#3F51B5'} /> Input Text
+                    </Text>
+                    <TouchableOpacity 
+                      style={[styles.pasteButton, { minWidth: responsiveSpacing(70), minHeight: responsiveSpacing(30), justifyContent: 'center', alignItems: 'center' }]} 
+                      onPress={async () => {
+                        const clipboardText = await Clipboard.getString();
+                        if (clipboardText) {
+                          setInputText(clipboardText);
+                        }
+                      }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <MaterialCommunityIcons name="content-paste" size={normalize(14)} color={colors.primary} />
+                      <Text style={[styles.pasteButtonText, { color: colors.primary }]}>Paste</Text>
+                    </TouchableOpacity>
+                  </View>
+                  
+                  <View style={[styles.textInputWrapper]}>
+                    <TextInput
+                      style={[styles.textInput, { color: colors.text, height: Math.max(150 * scale, 150) }]}
+                      placeholder="Enter or paste text to analyze for AI detection..."
+                      placeholderTextColor={'#A3A3A3FF'}
+                      value={inputText}
+                      onChangeText={setInputText}
+                      multiline
+                      numberOfLines={8}
+                      textAlignVertical="top"
+                      editable={!isAnalyzing}
+                    />
+                    
+                    {/* Scan line animation */}
+                    {inputText.length > 0 && !analysisResult && (
+                      <Animated.View 
+                        style={[
+                          styles.scanLine,
+                          {
+                            backgroundColor: colors.primary,
+                            opacity: 0.4,
+                            transform: [
+                              { 
+                                translateY: scanLineAnim.interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: [0, 150 * scale]
+                                })
+                              }
+                            ]
+                          }
+                        ]}
+                      />
+                    )}
+                  </View>
+                  
+                  <View style={styles.textInputFooter}>
+                    <Text style={[styles.characterCount, { color: '#3F51B5' }]}>
+                      {inputText.length} characters
+                    </Text>
+                    {inputText.length > 1000 && (
+                      <Text style={[styles.longTextNote, { color: '#3F51B5' }]}>
+                        <Ionicons name="checkmark-circle" size={normalize(12)} color={'#3F51B5'} /> Sufficient length
+                      </Text>
+                    )}
+                  </View>
+                </View>
+                
+                {!analysisResult && (
+                  <TouchableOpacity 
+                    style={[styles.fixedAnalyzeButton, {
+                      backgroundColor: isAnalyzing || inputText.trim() === '' ? '#9FA8DA' : '#3F51B5',
+                      opacity: isAnalyzing || inputText.trim() === '' ? 0.7 : 1
+                    }]}
+                    onPress={handleAnalyze}
+                    disabled={isAnalyzing || inputText.trim() === ''}
+                  >
+                    {isAnalyzing ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <View style={styles.fixedAnalyzeButtonContent}>
+                        <Text style={styles.fixedAnalyzeButtonText}>Analyze Content</Text>
+                        <MaterialCommunityIcons name="shield-search" size={normalize(20)} color="#FFFFFF" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
                 )}
               </View>
             </View>
             
-            {!analysisResult && (
-              <TouchableOpacity 
-                style={[styles.fixedAnalyzeButton, {
-                  backgroundColor: isAnalyzing || inputText.trim() === '' ? '#9FA8DA' : '#3F51B5',
-                  opacity: isAnalyzing || inputText.trim() === '' ? 0.7 : 1
-                }]}
-                onPress={handleAnalyze}
-                disabled={isAnalyzing || inputText.trim() === ''}
-              >
-                {isAnalyzing ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <View style={styles.fixedAnalyzeButtonContent}>
-                    <Text style={styles.fixedAnalyzeButtonText}>Analyze Content</Text>
-                    <MaterialCommunityIcons name="shield-search" size={normalize(20)} color="#FFFFFF" />
+            {/* Result Section with Improved Layout for Small Screens */}
+            {analysisResult && (
+              <View style={styles.standardContainer}>
+                <Animated.View style={[styles.resultContainer, { opacity: resultOpacity }]}>
+                  <View style={[styles.resultHeader, isSmallScreen && { flexDirection: 'column', alignItems: 'flex-start' }]}>
+                    <View style={styles.sectionHeaderContainer}>
+                      <MaterialCommunityIcons name="chart-bar" size={normalize(20)} color={colors.primary} />
+                      <Text style={[styles.sectionTitle, { color: colors.text }]}>Analysis Results</Text>
+                    </View>
+                    <TouchableOpacity 
+                      style={[styles.resetButton, isSmallScreen && { marginTop: responsiveSpacing(8) }]}
+                      onPress={handleReset}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <MaterialIcons name="refresh" size={normalize(20)} color={colors.primary} />
+                      <Text style={[styles.resetButtonText, { color: colors.primary }]}>
+                        New Analysis
+                      </Text>
+                    </TouchableOpacity>
                   </View>
-                )}
-              </TouchableOpacity>
-            )}
-          </View>
-          
-          {/* Result Section with Improved Layout for Small Screens */}
-          {analysisResult && (
-            <Animated.View style={[styles.resultContainer, { opacity: resultOpacity }]}>
-              <View style={[styles.resultHeader, isSmallScreen && { flexDirection: 'column', alignItems: 'flex-start' }]}>
-                <View style={styles.sectionHeaderContainer}>
-                  <MaterialCommunityIcons name="chart-bar" size={normalize(20)} color={colors.primary} />
-                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Analysis Results</Text>
-                </View>
-                <TouchableOpacity 
-                  style={[styles.resetButton, isSmallScreen && { marginTop: responsiveSpacing(8) }]}
-                  onPress={handleReset}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <MaterialIcons name="refresh" size={normalize(20)} color={colors.primary} />
-                  <Text style={[styles.resetButtonText, { color: colors.primary }]}>
-                    New Analysis
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              
-              {/* AI Probability Meter with Futuristic Design */}
-              <View style={[styles.meterContainer, { 
-                backgroundColor: currentTheme === 'dark' ? 'rgba(30, 30, 40, 0.6)' : 'rgba(255, 255, 255, 0.8)',
-                borderColor: colors.border
-              }]}>
-                <View style={styles.meterHeaderContainer}>
-                  <Text style={[styles.meterTitle, { color: colors.text }]}>
-                    AI Probability Analysis
-                  </Text>
-                  <View style={styles.resultBadge}>
-                    <Text style={styles.resultBadgeText}>
-                      {analysisResult.aiProbability > 0.8 ? 'AI Generated' : 
-                       analysisResult.aiProbability > 0.5 ? 'Possibly AI' : 'Likely Human'}
-                    </Text>
-                  </View>
-                </View>
-                
-                <View style={styles.meterContent}>
-                  <View style={styles.meter}>
-                    <View style={[styles.meterBackground, { backgroundColor: 'rgba(0, 0, 0, 0.1)' }]}>
-                      <Animated.View 
-                        style={[
-                          styles.meterFill, 
-                          { 
-                            width: meterAnim.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: ['0%', '100%']
-                            }),
+                  
+                  {/* AI Probability Meter with Futuristic Design */}
+                  <View style={[styles.meterContainer, { 
+                    backgroundColor: currentTheme === 'dark' ? 'rgba(30, 30, 40, 0.6)' : 'rgba(255, 255, 255, 0.8)',
+                    borderColor: colors.border
+                  }]}>
+                    <View style={styles.meterHeaderContainer}>
+                      <Text style={[styles.meterTitle, { color: colors.text }]}>
+                        AI Probability Analysis
+                      </Text>
+                      <View style={styles.resultBadge}>
+                        <Text style={styles.resultBadgeText}>
+                          {analysisResult.aiProbability > 0.8 ? 'AI Generated' : 
+                          analysisResult.aiProbability > 0.5 ? 'Possibly AI' : 'Likely Human'}
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.meterContent}>
+                      <View style={styles.meter}>
+                        <View style={[styles.meterBackground, { backgroundColor: 'rgba(0, 0, 0, 0.1)' }]}>
+                          <Animated.View 
+                            style={[
+                              styles.meterFill, 
+                              { 
+                                width: meterAnim.interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: ['0%', '100%']
+                                }),
+                                backgroundColor: meterAnim.interpolate({
+                                  inputRange: [0, 0.4, 0.7, 1],
+                                  outputRange: ['#4CAF50', '#CDDC39', '#FF9800', '#F44336']
+                                })
+                              }
+                            ]}
+                          />
+                        </View>
+                        
+                        <View style={styles.meterLabels}>
+                          <View style={styles.meterLabelContainer}>
+                            <Text style={[styles.meterLabelText, { color: '#4CAF50' }]}>Human</Text>
+                            <Text style={[styles.meterLabelValue, { color: colors.text }]}>
+                              {Math.round((1 - analysisResult.aiProbability) * 100)}%
+                            </Text>
+                          </View>
+                          
+                          <Animated.View style={[styles.meterValueContainer, { 
                             backgroundColor: meterAnim.interpolate({
                               inputRange: [0, 0.4, 0.7, 1],
                               outputRange: ['#4CAF50', '#CDDC39', '#FF9800', '#F44336']
                             })
-                          }
-                        ]}
-                      />
-                    </View>
-                    
-                    <View style={styles.meterLabels}>
-                      <View style={styles.meterLabelContainer}>
-                        <Text style={[styles.meterLabelText, { color: '#4CAF50' }]}>Human</Text>
-                        <Text style={[styles.meterLabelValue, { color: colors.text }]}>
-                          {Math.round((1 - analysisResult.aiProbability) * 100)}%
-                        </Text>
+                          }]}>
+                            <Animated.Text style={styles.meterValue}>
+                              {Math.round(analysisResult.aiProbability * 100)}%
+                            </Animated.Text>
+                          </Animated.View>
+                          
+                          <View style={styles.meterLabelContainer}>
+                            <Text style={[styles.meterLabelText, { color: '#F44336' }]}>AI</Text>
+                            <Text style={[styles.meterLabelValue, { color: colors.text }]}>
+                              {Math.round(analysisResult.aiProbability * 100)}%
+                            </Text>
+                          </View>
+                        </View>
                       </View>
                       
-                      <Animated.View style={[styles.meterValueContainer, { 
-                        backgroundColor: meterAnim.interpolate({
-                          inputRange: [0, 0.4, 0.7, 1],
-                          outputRange: ['#4CAF50', '#CDDC39', '#FF9800', '#F44336']
-                        })
-                      }]}>
-                        <Animated.Text style={styles.meterValue}>
-                          {Math.round(analysisResult.aiProbability * 100)}%
-                        </Animated.Text>
-                      </Animated.View>
-                      
-                      <View style={styles.meterLabelContainer}>
-                        <Text style={[styles.meterLabelText, { color: '#F44336' }]}>AI</Text>
-                        <Text style={[styles.meterLabelValue, { color: colors.text }]}>
-                          {Math.round(analysisResult.aiProbability * 100)}%
+                      {/* AI Analysis Card */}
+                      <View style={styles.analysisCard}>
+                        <MaterialCommunityIcons 
+                          name={analysisResult.aiProbability > 0.5 ? 'robot' : 'account'} 
+                          size={24} 
+                          color={analysisResult.aiProbability > 0.5 ? '#F44336' : '#4CAF50'} 
+                          style={styles.analysisIcon}
+                        />
+                        <Text style={[styles.analysisText, { color: colors.text }]}>
+                          {analysisResult.aiProbability > 0.8 ? 
+                            'This text was very likely generated by AI. The analysis shows strong patterns of artificial generation.' :
+                          analysisResult.aiProbability > 0.6 ?
+                            'This text shows moderate signs of AI generation. Some patterns are consistent with AI writing.' :
+                          analysisResult.aiProbability > 0.4 ?
+                            'This text shows some characteristics of AI writing, but is inconclusive. Could be human-edited AI content.' :
+                            'This text was likely written by a human. Few or no AI generation patterns detected.'}
                         </Text>
                       </View>
                     </View>
                   </View>
                   
-                  {/* AI Analysis Card */}
-                  <View style={styles.analysisCard}>
-                    <MaterialCommunityIcons 
-                      name={analysisResult.aiProbability > 0.5 ? 'robot' : 'account'} 
-                      size={24} 
-                      color={analysisResult.aiProbability > 0.5 ? '#F44336' : '#4CAF50'} 
-                      style={styles.analysisIcon}
+                  {/* Feature Analysis with Enhanced Visual Design */}
+                  <View style={[styles.featuresContainer, { 
+                    backgroundColor: currentTheme === 'dark' ? 'rgba(30, 30, 40, 0.6)' : 'rgba(255, 255, 255, 0.8)',
+                    borderColor: colors.border
+                  }]}>
+                    <View style={styles.sectionHeaderContainer}>
+                      <MaterialCommunityIcons name="format-list-checks" size={20} color={colors.primary} />
+                      <Text style={[styles.featuresTitle, { color: colors.text }]}>Key Indicators</Text>
+                    </View>
+                    
+                    <FlatList
+                      data={analysisResult.features}
+                      renderItem={renderFeatureItem}
+                      keyExtractor={(item) => item.name}
+                      scrollEnabled={false}
+                      contentContainerStyle={styles.featuresList}
                     />
-                    <Text style={[styles.analysisText, { color: colors.text }]}>
-                      {analysisResult.aiProbability > 0.8 ? 
-                        'This text was very likely generated by AI. The analysis shows strong patterns of artificial generation.' :
-                      analysisResult.aiProbability > 0.6 ?
-                        'This text shows moderate signs of AI generation. Some patterns are consistent with AI writing.' :
-                      analysisResult.aiProbability > 0.4 ?
-                        'This text shows some characteristics of AI writing, but is inconclusive. Could be human-edited AI content.' :
-                        'This text was likely written by a human. Few or no AI generation patterns detected.'}
-                    </Text>
+                    
+                    <View style={styles.disclaimerContainer}>
+                      <MaterialCommunityIcons name="information-outline" size={16} color={colors.textSecondary} />
+                      <Text style={[styles.disclaimerText, { color: colors.textSecondary }]}>
+                        This analysis is based on machine learning algorithms and may not be 100% accurate.
+                      </Text>
+                    </View>
                   </View>
-                </View>
+                </Animated.View>
               </View>
-              
-              {/* Feature Analysis with Enhanced Visual Design */}
-              <View style={[styles.featuresContainer, { 
-                backgroundColor: currentTheme === 'dark' ? 'rgba(30, 30, 40, 0.6)' : 'rgba(255, 255, 255, 0.8)',
-                borderColor: colors.border
-              }]}>
-                <View style={styles.sectionHeaderContainer}>
-                  <MaterialCommunityIcons name="format-list-checks" size={20} color={colors.primary} />
-                  <Text style={[styles.featuresTitle, { color: colors.text }]}>Key Indicators</Text>
-                </View>
-                
-                <FlatList
-                  data={analysisResult.features}
-                  renderItem={renderFeatureItem}
-                  keyExtractor={(item) => item.name}
-                  scrollEnabled={false}
-                  contentContainerStyle={styles.featuresList}
+            )}
+            
+            {/* Processing Animation */}
+            {isAnalyzing && (
+              <View style={styles.processingContainer}>
+                <LottieView 
+                  source={require('../assets/image2.json')}
+                  autoPlay
+                  loop
+                  style={styles.lottieAnimation}
                 />
-                
-                <View style={styles.disclaimerContainer}>
-                  <MaterialCommunityIcons name="information-outline" size={16} color={colors.textSecondary} />
-                  <Text style={[styles.disclaimerText, { color: colors.textSecondary }]}>
-                    This analysis is based on machine learning algorithms and may not be 100% accurate.
-                  </Text>
-                </View>
+                <Text style={[styles.processingText, { color: colors.text }]}>
+                  Analyzing text patterns...
+                </Text>
+                <Text style={[styles.processingSubtext, { color: colors.textSecondary }]}>
+                  Using advanced machine learning to detect AI signatures
+                </Text>
               </View>
-            </Animated.View>
-          )}
-          
-          {/* Processing Animation */}
-          {isAnalyzing && (
-            <View style={styles.processingContainer}>
-              <LottieView 
-                source={require('../assets/image2.json')}
-                autoPlay
-                loop
-                style={styles.lottieAnimation}
-              />
-              <Text style={[styles.processingText, { color: colors.text }]}>
-                Analyzing text patterns...
-              </Text>
-              <Text style={[styles.processingSubtext, { color: colors.textSecondary }]}>
-                Using advanced machine learning to detect AI signatures
-              </Text>
-            </View>
-          )}
+            )}
+          </View>
         </ScrollView>
       </View>
       
@@ -942,16 +950,22 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
     width: '100%',
-    maxWidth: 600,
   },
   scrollContent: {
-    paddingHorizontal: responsiveSpacing(16),
     paddingBottom: responsiveSpacing(40),
+    alignItems: 'center',
+  },
+  contentWrapper: {
+    width: '100%', 
+    maxWidth: 600,
+    paddingHorizontal: responsiveSpacing(16),
+  },
+  standardContainer: {
     width: '100%',
-    alignItems: 'stretch',
+    marginTop: responsiveSpacing(16),
   },
   welcomeBanner: {
-    marginTop: responsiveSpacing(16),
+    width: '100%',
     borderRadius: responsiveSpacing(24),
     overflow: 'hidden',
     shadowColor: '#000',
@@ -959,15 +973,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
-    width: '100%',
-    maxWidth: 600,
   },
   bannerGradient: {
+    width: '100%',
     borderRadius: responsiveSpacing(24),
-    padding: responsiveSpacing(24),
     position: 'relative',
     overflow: 'hidden',
-    width: '100%',
   },
   decorCircle1: {
     position: 'absolute',
@@ -995,6 +1006,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     flexWrap: 'wrap',
     width: '100%',
+    padding: responsiveSpacing(24),
   },
   bannerTextContent: {
     flex: 1,
@@ -1064,7 +1076,6 @@ const styles = StyleSheet.create({
   inputContainer: {
     marginTop: responsiveSpacing(24),
     width: '100%',
-    maxWidth: 600,
   },
   sectionTitle: {
     fontSize: normalize(18),
@@ -1072,6 +1083,7 @@ const styles = StyleSheet.create({
     marginLeft: responsiveSpacing(8),
   },
   textInputContainer: {
+    width: '100%',
     borderRadius: responsiveSpacing(16),
     borderWidth: 1,
     overflow: 'hidden',
@@ -1081,7 +1093,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
-    width: '100%',
   },
   inputHeaderBar: {
     flexDirection: 'row',
@@ -1185,7 +1196,6 @@ const styles = StyleSheet.create({
   resultContainer: {
     marginTop: responsiveSpacing(24),
     width: '100%',
-    maxWidth: 600,
   },
   resultHeader: {
     flexDirection: 'row',

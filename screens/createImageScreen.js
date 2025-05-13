@@ -14,6 +14,7 @@ import {
   StatusBar,
   ScrollView,
   Alert,
+  FlatList,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
@@ -32,8 +33,8 @@ const MAX_PROMPT_LENGTH = 100; // Maximum characters before truncation
 const CreateImagesScreen = ({ route, navigation }) => {
   const { getThemeColors } = useTheme();
   const colors = getThemeColors();
-  const { message } = route.params; // Extract text from params
-  const [imageUrl, setImageUrl] = useState(null); // Store the selected image URL
+  const { message, imageCount = 1 } = route.params; // Extract text and imageCount from params
+  const [images, setImages] = useState([]); // Store the generated image URLs
   const [loading, setLoading] = useState(true); // Track loading state
   const [modalVisible, setModalVisible] = useState(false); // Modal visibility state
   const [currentViewingImage, setCurrentViewingImage] = useState(null);
@@ -56,19 +57,29 @@ const CreateImagesScreen = ({ route, navigation }) => {
   useFocusEffect(
     React.useCallback(() => {
       // This runs when the screen comes into focus
-      fetchAndStoreImage();
+      clearStoredImages(); // Clear any previous images first
+      fetchAndStoreImages();
       
       // This runs when the screen goes out of focus
       return () => {
         // Clear state when navigating away
-        setImageUrl(null);
+        setImages([]);
         setCurrentViewingImage(null);
         setModalVisible(false);
         // Clear stored images
-        AsyncStorage.removeItem("downloadedImage");
+        clearStoredImages();
       };
-    }, [message])
+    }, [message, imageCount])
   );
+
+  // Function to clear stored images
+  const clearStoredImages = async () => {
+    try {
+      await AsyncStorage.removeItem("downloadedImages");
+    } catch (error) {
+      console.error("Error clearing stored images:", error);
+    }
+  };
 
   useEffect(() => {
     // Start shimmer animation
@@ -115,17 +126,17 @@ const CreateImagesScreen = ({ route, navigation }) => {
     
     // Clean up when component unmounts
     return () => {
-      setImageUrl(null);
+      setImages([]);
       setCurrentViewingImage(null);
-      AsyncStorage.removeItem("downloadedImage");
+      clearStoredImages();
     };
   }, [shimmerValue, pulseAnim, loadingDots]);
 
-  // Function to fetch and process image
-  const fetchAndStoreImage = async () => {
+  // Function to fetch and process images
+  const fetchAndStoreImages = async () => {
     try {
-      // Clear any previously stored image when fetching a new one
-      await AsyncStorage.removeItem("downloadedImage");
+      // Clear any previously stored images when fetching new ones
+      await clearStoredImages();
       
       setLoading(true);
       setShowSkeleton(true);
@@ -134,10 +145,14 @@ const CreateImagesScreen = ({ route, navigation }) => {
       imageOpacity.setValue(0);
       imageScale.setValue(0.95);
       
-      // Make API request to generate new image
+      // Make API request to generate new images
       const response = await axios.post(
-        "https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/createI",
-        { text: message, uid: uid },
+        "https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/generateImage2",
+        { 
+          text: message, 
+          uid: uid,
+          imageCount: imageCount 
+        },
         {
           headers: {
             "Content-Type": "application/json",
@@ -146,12 +161,12 @@ const CreateImagesScreen = ({ route, navigation }) => {
         }
       );
 
-      if (response.data && response.data.image && response.data.image.url) {
-        const imageData = response.data.image;
-        await AsyncStorage.setItem("downloadedImage", JSON.stringify(imageData));
-        setImageUrl(imageData.url);
+      if (response.data && response.data.images && response.data.images.length > 0) {
+        const imageData = response.data.images;
+        await AsyncStorage.setItem("downloadedImages", JSON.stringify(imageData));
+        setImages(imageData.map(img => img.url));
         
-        // Show skeleton for 1 second before revealing the image
+        // Show skeleton for 1 second before revealing the images
         setTimeout(() => {
           setShowSkeleton(false);
           setLoading(false);
@@ -160,10 +175,10 @@ const CreateImagesScreen = ({ route, navigation }) => {
       } else {
         setLoading(false);
         setShowSkeleton(false);
-        Alert.alert("Error", "Failed to generate image. Please try again.");
+        Alert.alert("Error", "Failed to generate images. Please try again.");
       }
     } catch (error) {
-      console.error("Error fetching image:", error);
+      console.error("Error fetching images:", error);
       setLoading(false);
       setShowSkeleton(false);
       Alert.alert("Error", "Something went wrong. Please try again.");
@@ -186,7 +201,7 @@ const CreateImagesScreen = ({ route, navigation }) => {
   };
 
   const handleTryAgain = () => {
-    fetchAndStoreImage();
+    fetchAndStoreImages();
   };
 
   const openImageModal = (url) => {
@@ -203,6 +218,29 @@ const CreateImagesScreen = ({ route, navigation }) => {
     outputRange: [-width, width],
   });
 
+  const renderSkeleton = () => {
+    if (imageCount === 1) {
+      return renderSingleSkeleton();
+    } else {
+      return (
+        <View style={styles.gridContainer}>
+          {[...Array(imageCount)].map((_, index) => (
+            <View key={index} style={styles.gridItem}>
+              <View style={styles.gridImageSkeleton}>
+                <Animated.View
+                  style={[
+                    styles.shimmer,
+                    { transform: [{ translateX: shimmerTranslate }] },
+                  ]}
+                />
+              </View>
+            </View>
+          ))}
+        </View>
+      );
+    }
+  };
+
   const renderSingleSkeleton = () => (
     <View style={styles.singleContainer}>
       <View style={styles.imageSkeleton}>
@@ -214,6 +252,76 @@ const CreateImagesScreen = ({ route, navigation }) => {
         />
       </View>
     </View>
+  );
+
+  const renderSingleImage = () => (
+    <Animated.View 
+      style={[
+        styles.singleContainer, 
+        { 
+          opacity: imageOpacity,
+          transform: [{ scale: imageScale }] 
+        }
+      ]}
+    >
+      <LinearGradient
+        colors={['rgba(0,0,0,0.02)', 'rgba(0,0,0,0.1)']}
+        style={styles.imageBorder}
+      >
+        {images.length > 0 ? (
+          <Image
+            source={{ uri: images[0] }}
+            style={styles.image}
+            resizeMode="contain"
+          />
+        ) : (
+          <View style={styles.placeholderContainer}>
+            <MaterialIcons name="image-not-supported" size={32} color="#555" />
+          </View>
+        )}
+        
+        <TouchableOpacity 
+          style={styles.expandButton}
+          onPress={() => openImageModal(images[0])}
+        >
+          <MaterialIcons name="fullscreen" size={18} color="#fff" />
+        </TouchableOpacity>
+      </LinearGradient>
+    </Animated.View>
+  );
+
+  const renderGridImages = () => (
+    <Animated.View 
+      style={[
+        styles.gridContainer, 
+        { 
+          opacity: imageOpacity,
+          transform: [{ scale: imageScale }] 
+        }
+      ]}
+    >
+      {images.map((url, index) => (
+        <View key={index} style={styles.gridItem}>
+          <LinearGradient
+            colors={['rgba(0,0,0,0.02)', 'rgba(0,0,0,0.1)']}
+            style={styles.gridImageBorder}
+          >
+            <Image
+              source={{ uri: url }}
+              style={styles.gridImage}
+              resizeMode="cover"
+            />
+            
+            <TouchableOpacity 
+              style={styles.gridExpandButton}
+              onPress={() => openImageModal(url)}
+            >
+              <MaterialIcons name="fullscreen" size={16} color="#fff" />
+            </TouchableOpacity>
+          </LinearGradient>
+        </View>
+      ))}
+    </Animated.View>
   );
 
   return (
@@ -279,41 +387,9 @@ const CreateImagesScreen = ({ route, navigation }) => {
           </>
         ) : null}
         
-        {/* Show skeleton during loading or when showSkeleton is true */}
-        {(loading || showSkeleton) ? renderSingleSkeleton() : (
-          <Animated.View 
-            style={[
-              styles.singleContainer, 
-              { 
-                opacity: imageOpacity,
-                transform: [{ scale: imageScale }] 
-              }
-            ]}
-          >
-            <LinearGradient
-              colors={['rgba(0,0,0,0.02)', 'rgba(0,0,0,0.1)']}
-              style={styles.imageBorder}
-            >
-              {imageUrl ? (
-                <Image
-                  source={{ uri: imageUrl }}
-                  style={styles.image}
-                  resizeMode="contain"
-                />
-              ) : (
-                <View style={styles.placeholderContainer}>
-                  <MaterialIcons name="image-not-supported" size={32} color="#555" />
-                </View>
-              )}
-              
-              <TouchableOpacity 
-                style={styles.expandButton}
-                onPress={() => openImageModal(imageUrl)}
-              >
-                <MaterialIcons name="fullscreen" size={18} color="#fff" />
-              </TouchableOpacity>
-            </LinearGradient>
-          </Animated.View>
+        {/* Show skeletons during loading or when showSkeleton is true */}
+        {(loading || showSkeleton) ? renderSkeleton() : (
+          imageCount === 1 ? renderSingleImage() : renderGridImages()
         )}
 
         {!loading && !showSkeleton && (
@@ -330,10 +406,10 @@ const CreateImagesScreen = ({ route, navigation }) => {
               <Text style={styles.tryAgainText}>Generate Again</Text>
             </TouchableOpacity>
             
-            {imageUrl && (
+            {images.length > 0 && (
               <TouchableOpacity
                 style={[styles.downloadButton]}
-                onPress={() => Linking.openURL(imageUrl)}
+                onPress={() => Linking.openURL(images[0])}
               >
                 <MaterialIcons name="file-download" size={20} color="#fff" />
                 <Text style={styles.downloadText}>Download</Text>
@@ -502,11 +578,38 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
   },
+  gridContainer: {
+    width: width * 0.9,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginVertical: 16,
+  },
+  gridItem: {
+    width: (width * 0.9 - 12) / 2,
+    height: (width * 0.9 - 12) / 2,
+    marginBottom: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#2A2A2A',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
   imageBorder: {
     width: '100%',
     height: '100%',
     padding: 2,
     borderRadius: 16,
+  },
+  gridImageBorder: {
+    width: '100%',
+    height: '100%',
+    padding: 2,
+    borderRadius: 12,
   },
   imageSkeleton: {
     width: "100%",
@@ -515,6 +618,14 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     position: "relative",
     borderRadius: 16,
+  },
+  gridImageSkeleton: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#2A2A2A",
+    overflow: "hidden",
+    position: "relative",
+    borderRadius: 12,
   },
   shimmer: {
     width: "30%",
@@ -527,6 +638,11 @@ const styles = StyleSheet.create({
     height: "100%",
     borderRadius: 14,
   },
+  gridImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 10,
+  },
   expandButton: {
     position: 'absolute',
     top: 12,
@@ -534,6 +650,18 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  gridExpandButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',

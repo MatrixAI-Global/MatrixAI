@@ -48,6 +48,14 @@ const decode = (base64) => {
   return bytes;
 };
 
+// Add this near the top of the BotScreen component
+const persistEvent = (event) => {
+  if (event && typeof event.persist === 'function') {
+    event.persist();
+  }
+  return event;
+};
+
   const BotScreen = ({ navigation, route }) => {
   const { getThemeColors } = useTheme();
   const colors = getThemeColors();
@@ -99,24 +107,41 @@ const decode = (base64) => {
   
   // Track keyboard visibility
   useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener(
+    const keyboardWillShowListener = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      () => {
+      (e) => {
         setIsKeyboardVisible(true);
+        // When keyboard shows, scroll to the bottom after a short delay
+        if (messages.length > 0) {
+          setTimeout(() => {
+            if (flatListRef.current) {
+              flatListRef.current.scrollToEnd({ animated: false });
+            }
+          }, 100);
+        }
       }
     );
-    const keyboardDidHideListener = Keyboard.addListener(
+    
+    const keyboardWillHideListener = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
       () => {
         setIsKeyboardVisible(false);
+        // When keyboard hides, scroll to adjust view
+        if (messages.length > 0) {
+          setTimeout(() => {
+            if (flatListRef.current) {
+              flatListRef.current.scrollToEnd({ animated: false });
+            }
+          }, 100);
+        }
       }
     );
 
     return () => {
-      keyboardDidShowListener.remove();
-      keyboardDidHideListener.remove();
+      keyboardWillShowListener.remove();
+      keyboardWillHideListener.remove();
     };
-  }, []);
+  }, [messages.length]);
 
   // Set initial chat ID from route params if available - prevent infinite updates
   useEffect(() => {
@@ -164,18 +189,22 @@ const decode = (base64) => {
 
   const onDeleteChat = async (chatId) => {
     try {
+      // Ensure chatId is a string and store it locally to avoid synthetic event issues
+      const chatToDelete = String(chatId);
+      
       // Remove chat from local state
-      setChats(prevChats => prevChats.filter(chat => chat.id !== chatId));
+      setChats(prevChats => prevChats.filter(chat => chat.id !== chatToDelete));
       
       // If the deleted chat is the current chat, select another chat or start a new one
-      if (chatId === currentChatId) {
-        const remainingChats = chats.filter(chat => chat.id !== chatId);
+      if (chatToDelete === currentChatId) {
+        const remainingChats = chats.filter(chat => chat.id !== chatToDelete);
         if (remainingChats.length > 0) {
           // Select the first available chat and keep the sidebar open
           selectChat(remainingChats[0].id, false);
         } else {
           // If no chats remain, start a new one
-          startNewChat();
+          const newChatId = Date.now().toString();
+          startNewChat(newChatId);
         }
       }
       
@@ -183,7 +212,7 @@ const decode = (base64) => {
       const { error: deleteError } = await supabase
         .from('user_chats')
         .delete()
-        .eq('chat_id', chatId);
+        .eq('chat_id', chatToDelete);
       
       if (deleteError) {
         console.error('Error deleting chat from Supabase:', deleteError);
@@ -200,10 +229,6 @@ const decode = (base64) => {
   const fetchDeepSeekResponse = async (userMessage, retryCount = 0) => {
     try {
       setIsLoading(true);
-      
-      // Add a temporary loading message
-      const loadingMessageId = Date.now().toString();
-      setMessages(prev => [...prev, { id: loadingMessageId, isLoading: true, sender: 'bot' }]);
       
       // Get the current role context
       const currentChatObj = chats.find(chat => chat.id === currentChatId);
@@ -231,15 +256,21 @@ const decode = (base64) => {
         }
       );
       
-      // Remove the loading message
-      setMessages(prev => prev.filter(msg => msg.id !== loadingMessageId));
-      
       // Process the response
       if (response.data && response.data.output && response.data.output.text) {
         const botMessage = response.data.output.text;
         
-        // Add the bot's response to messages
-        setMessages(prev => [...prev, { id: Date.now().toString(), text: botMessage, sender: 'bot' }]);
+        // Remove the loading indicator and add the bot's response
+        setMessages(prev => {
+          // Filter out any loading messages
+          const messagesWithoutLoading = prev.filter(msg => !msg.isLoading);
+          // Add the bot's response
+          return [...messagesWithoutLoading, {
+            id: Date.now().toString(),
+            text: botMessage,
+            sender: 'bot'
+          }];
+        });
         
         // Save the chat history for the bot response
         await saveChatHistory(botMessage, 'bot');
@@ -249,20 +280,23 @@ const decode = (base64) => {
     } catch (error) {
       console.error('Error fetching DeepSeek response:', error);
       
-      // Remove the loading message
-      setMessages(prev => prev.filter(msg => !msg.isLoading));
-      
       // If we need to handle network errors, we can retry
       if (retryCount < 1 && (error.message.includes('timeout') || error.message.includes('network'))) {
         console.log('Retrying due to possible network error...');
         return fetchDeepSeekResponse(userMessage, retryCount + 1);
       }
       
-      // Add an error message
-      setMessages(prev => [
-        ...prev,
-        { id: Date.now().toString(), text: 'Sorry, I encountered an error. Could you try again?', sender: 'bot' },
-      ]);
+      // Remove the loading indicator and add an error message
+      setMessages(prev => {
+        // Filter out any loading messages
+        const messagesWithoutLoading = prev.filter(msg => !msg.isLoading);
+        // Add the error message
+        return [...messagesWithoutLoading, {
+          id: Date.now().toString(),
+          text: 'Sorry, I encountered an error. Could you try again?',
+          sender: 'bot'
+        }];
+      });
       
       // Save the error message
       await saveChatHistory('Sorry, I encountered an error. Could you try again?', 'bot');
@@ -474,13 +508,19 @@ const decode = (base64) => {
               timestamp: new Date().toISOString()
             };
             
-            // Update local state first
-            const updatedMessages = [...messages, newMessage];
-            setMessages(updatedMessages);
+            // Create a loading indicator message
+            const loadingMessage = {
+              id: 'loading-' + Date.now().toString(),
+              isLoading: true,
+              sender: 'bot'
+            };
+            
+            // Add both the user message and loading indicator to state
+            setMessages(prev => [...prev, newMessage, loadingMessage]);
             
             // Update the current chat's messages in local state
             setChats(prevChats => prevChats.map(chat => 
-              chat.id === currentChatId ? { ...chat, messages: updatedMessages } : chat
+              chat.id === currentChatId ? { ...chat, messages: [...(chat.messages || []), newMessage] } : chat
             ));
 
             // Clear input
@@ -855,26 +895,13 @@ const decode = (base64) => {
     // Special case for loading animation
     if (item.isLoading && item.sender === 'bot') {
       return (
-        <View style={[
-          styles.messageWrapperOuter,
-          styles.botMessageWrapper
-        ]}>
-          <Animatable.View
-            animation="fadeInUp"
-            duration={300}
-            style={[
-              styles.messageContainer,
-              styles.botMessageContainer,
-              styles.loadingMessageContainer
-            ]}
-          >
-            <LottieView
-              source={require('../assets/dot.json')}
-              autoPlay
-              loop
-              style={styles.loadingAnimation}
-            />
-          </Animatable.View>
+        <View style={styles.loadingContainer}>
+          <LottieView
+            source={require('../assets/dot.json')}
+            autoPlay
+            loop
+            style={styles.loadingAnimation}
+          />
         </View>
       );
     }
@@ -910,9 +937,24 @@ const decode = (base64) => {
       }
     };
 
-    // Check if this is the last message and if it's from the bot and if loading is active
+    // Check if this is the last message, if it's from the user, and if loading is active
     const isLastMessage = messages[messages.length - 1]?.id === item.id;
-    const shouldShowLoading = isLastMessage && isBot && isLoading;
+    const isLastUserMessage = isLastMessage && !isBot && isLoading;
+    
+    // After the user's last message, add a loading indicator as a separate message
+    if (isLastUserMessage) {
+      // Add loading message to the end of messages if it doesn't exist
+      setTimeout(() => {
+        if (isLoading && !messages.some(msg => msg.isLoading)) {
+          const loadingMessage = {
+            id: 'loading-' + Date.now(),
+            isLoading: true,
+            sender: 'bot'
+          };
+          setMessages(prev => [...prev, loadingMessage]);
+        }
+      }, 500);
+    }
     
     // Check if the message has an image
     if (item.image) {
@@ -1127,6 +1169,18 @@ const decode = (base64) => {
               />
             </TouchableOpacity>
           </View>
+          
+          {/* Show loading animation below the last user message when response is being generated */}
+          {isLastUserMessage && (
+            <View style={styles.loadingMessageContainer}>
+              <LottieView
+                source={require('../assets/dot.json')}
+                autoPlay
+                loop
+                style={styles.loadingAnimation}
+              />
+            </View>
+          )}
         </View>
       );
     }
@@ -1385,6 +1439,14 @@ const decode = (base64) => {
             isBot ? styles.botMessageContainer : styles.userMessageContainer,
           ]}
         >
+          {isBot && (
+            <View style={styles.botHeaderContainer}>
+              <View style={styles.botHeaderLogoContainer}>
+              <Image source={require('../assets/logo7.png')} style={[styles.botHeaderLogo , {tintColor: '#fff'}]} />
+              </View>
+              <Text style={[styles.botHeaderText , {color: colors.border}]}>MatrixAI</Text>
+            </View>
+          )}
           <View style={isBot ? styles.botTextContainer : styles.userTextContainer}>
             {formatMessageText(displayText, item.sender).map((line, index) => {
               // Handle markdown content
@@ -1722,15 +1784,42 @@ const decode = (base64) => {
             />
           </TouchableOpacity>
         </View>
+        
+        {/* Show loading animation below the last user message when response is being generated */}
+        {isLastUserMessage && (
+          <View style={styles.loadingMessageContainer}>
+            <LottieView
+              source={require('../assets/dot.json')}
+              autoPlay
+              loop
+              style={styles.loadingAnimation}
+            />
+          </View>
+        )}
       </View>
     );
-  }, [dataLoaded, messages, expandedMessages]);
+  }, [dataLoaded, messages, expandedMessages, isLoading]);
 
   useEffect(() => {
+    // Remove the web-specific event listener code that's causing errors
+    // window is undefined in React Native
+
     let chatSubscription;
     
+    // Manually persist the chatid from route params to avoid synthetic event issues
+    let persistedChatId = null;
+    if (route && route.params && route.params.chatid) {
+      persistedChatId = String(route.params.chatid);
+      console.log('Setting initial chatid from route params:', persistedChatId);
+    }
+    
     // Function to fetch all user chats
-    const fetchUserChats = async () => {
+    const fetchUserChats = async (eventObj) => {
+      // If an event is passed, ensure it's persisted
+      if (eventObj) {
+        persistEvent(eventObj);
+      }
+
       try {
         // Get current user session
         const { data: { session } } = await supabase.auth.getSession();
@@ -1786,59 +1875,62 @@ const decode = (base64) => {
             setMessages([]);
           }
           
-          setDataLoaded(true);
-          return; // Exit early for anonymous users
+          return;
         }
         
-        // Rest of the original function for authenticated users
         const userId = session.user.id;
         
-        // Query all chats for this user
-        const { data: userChats, error: chatsError } = await supabase
+        // Fetch all chats for the current user, ordered by most recent
+        const { data: userChats, error: chatError } = await supabase
           .from('user_chats')
           .select('*')
           .eq('user_id', userId)
           .order('updated_at', { ascending: false });
         
-        if (chatsError) {
-          console.error('Error fetching user chats:', chatsError);
-          setDataLoaded(true);
+        if (chatError) {
+          console.error('Error fetching user chats:', chatError);
+          // Create a new chat as fallback
+          const newChatId = Date.now().toString();
+          startNewChat(newChatId);
           return;
         }
         
-        if (userChats && userChats.length > 0) {
-          // Process each chat to handle image messages
-          const processedChats = userChats.map(chat => {
-            const processedMessages = (chat.messages || []).map(msg => {
-              if (msg && msg.text && typeof msg.text === 'string' && 
-                  msg.text.includes('supabase.co/storage/v1/')) {
-            return {
-              ...msg,
-                  image: msg.text,
-                  text: ''
-            };
-          }
-          return msg;
-        });
-
-            return {
-              id: chat.chat_id,
-              name: chat.name || 'Chat',
-              description: chat.description || '',
-              role: chat.role || '',
-              roleDescription: chat.role_description || '',
-              messages: processedMessages,
-            };
+        // Process the chats to match the local state format and ensure messages is an array
+        const processedChats = userChats.map(chat => {
+          // Map messages and check for image URLs
+          const processedMessages = (chat.messages || []).map(msg => {
+            if (msg.text && typeof msg.text === 'string' && 
+                msg.text.includes('supabase.co/storage/v1/')) {
+              return {
+                ...msg,
+                image: msg.text,
+                text: ''
+              };
+            }
+            return msg;
           });
           
-          setChats(processedChats);
-          
-          // If there's a specific chatid from route params, load that chat
-          if (chatid && chatid !== 'undefined' && chatid !== 'null') {
-            const specificChat = processedChats.find(chat => chat.id === chatid);
+          return {
+            id: chat.chat_id,
+            name: chat.name || 'Chat',
+            description: chat.description || '',
+            role: chat.role || '',
+            roleDescription: chat.role_description || '',
+            messages: processedMessages,
+          };
+        });
+        
+        // Update state with all fetched chats
+        setChats(processedChats);
+        
+        // If we have chats
+        if (processedChats.length > 0) {
+          // Use the persisted chat ID instead of the potentially nullified synthetic event
+          if (persistedChatId) {
+            const specificChat = processedChats.find(chat => chat.id === persistedChatId);
             if (specificChat) {
-              console.log('Loading specific chat:', chatid);
-              setCurrentChatId(chatid);
+              console.log('Loading specific chat:', persistedChatId);
+              setCurrentChatId(persistedChatId);
               setMessages(specificChat.messages || []);
               setCurrentRole(specificChat.role || '');
             } else {
@@ -1978,13 +2070,27 @@ const decode = (base64) => {
     
     // Handle a chat being deleted
     const handleChatDelete = (deletedChat) => {
-      setChats(prevChats => prevChats.filter(chat => chat.id !== deletedChat.chat_id));
+      // First ensure we have a valid event by using our persistEvent helper
+      const persistedEvent = persistEvent(deletedChat);
+      
+      // Store the chat ID in a local variable to prevent synthetic event issues
+      const chatToDelete = persistedEvent?.chat_id;
+      
+      if (!chatToDelete) {
+        console.warn('Attempted to delete chat with undefined ID');
+        return;
+      }
+      
+      // Copy the chat_id immediately to avoid accessing the event later
+      const chatIdToDelete = String(chatToDelete);
+      
+      setChats(prevChats => prevChats.filter(chat => chat.id !== chatIdToDelete));
       
       // If the deleted chat is the current chat, select another chat
-      if (currentChatId === deletedChat.chat_id) {
+      if (currentChatId === chatIdToDelete) {
         setChats(prevChats => {
           // Get the remaining chats
-          const remainingChats = prevChats.filter(chat => chat.id !== deletedChat.chat_id);
+          const remainingChats = prevChats.filter(chat => chat.id !== chatIdToDelete);
           
           if (remainingChats.length > 0) {
             // Select the most recent chat and keep the sidebar open if it was open
@@ -1993,7 +2099,8 @@ const decode = (base64) => {
             return remainingChats;
           } else {
             // No chats remain, start a new one
-            startNewChat();
+            const newChatId = Date.now().toString();
+            startNewChat(newChatId);
             return remainingChats;
           }
         });
@@ -2008,14 +2115,28 @@ const decode = (base64) => {
       if (chatSubscription) {
         chatSubscription.unsubscribe();
       }
+      // Remove window event listener cleanup as well
     };
-  }, [navigation, route, chatid]);
+  }, [navigation, route]);
 
   // Modify the startNewChat to accept chatId parameter and ensure proper initialization
   const startNewChat = async (customChatId) => {
     try {
-      // Generate a new chat ID if none provided
-      const newChatId = customChatId || Date.now().toString();
+      // Validate and sanitize customChatId to prevent [object Object] issues
+      let newChatId;
+      
+      if (customChatId) {
+        // Detect if customChatId is an object (like a synthetic event) instead of a string/number 
+        if (typeof customChatId === 'object') {
+          console.warn('Received object instead of ID in startNewChat, generating new ID');
+          newChatId = Date.now().toString();
+        } else {
+          newChatId = String(customChatId);
+        }
+      } else {
+        newChatId = Date.now().toString();
+      }
+      
       console.log(`Starting new chat with ID: ${newChatId}`);
       
       // Show toast for user feedback
@@ -2032,21 +2153,21 @@ const decode = (base64) => {
       // Create a local chat object first regardless of authentication
       const timestamp = new Date().toISOString();
       const localChatObj = {
-      id: newChatId,
-      name: 'New Chat',
-      description: '',
-      role: '',
+        id: newChatId,
+        name: 'New Chat',
+        description: '',
+        role: '',
         roleDescription: '',
-      messages: [],
-    };
+        messages: [],
+      };
       
       // Update local state immediately
       setChats(prevChats => [localChatObj, ...prevChats.filter(chat => chat.id !== newChatId)]);
-    setCurrentChatId(newChatId);
-    setIsLoading(false);
-    setMessages([]);
-    setCurrentRole('');
-    setIsSidebarOpen(false);
+      setCurrentChatId(newChatId);
+      setIsLoading(false);
+      setMessages([]);
+      setCurrentRole('');
+      setIsSidebarOpen(false);
       
       // If user is not authenticated, just use the local state
       if (!session?.user?.id) {
@@ -2092,6 +2213,12 @@ const decode = (base64) => {
         .insert(newChat);
       
       if (insertError) {
+        // Handle duplicate key violation specifically
+        if (insertError.code === '23505') {
+          console.log('Chat with this ID already exists in database, using local state only');
+          // No need to show an error to the user, just continue with local state
+          return;
+        }
         console.error('Error creating new chat in Supabase:', insertError);
         // Continue using local state, already set up above
       } else {
@@ -2115,28 +2242,31 @@ const decode = (base64) => {
 
   
   const selectChat = async (chatId, closeSidebar = true) => {
-    setCurrentChatId(chatId);
-    const selectedChat = chats.find(chat => chat.id === chatId);
-    
-    if (selectedChat) {
-      setMessages(selectedChat.messages || []);
-      setCurrentRole(selectedChat.role || '');
-    } else {
-      setMessages([]);
-      setCurrentRole('');
-    }
-    
-    // Only close the sidebar if closeSidebar is true
-    if (closeSidebar) {
-      setIsSidebarOpen(false);
-    }
-    
     try {
+      // Ensure chatId is a string and store it locally to avoid synthetic event issues
+      const chatToSelect = String(chatId);
+      
+      setCurrentChatId(chatToSelect);
+      const selectedChat = chats.find(chat => chat.id === chatToSelect);
+      
+      if (selectedChat) {
+        setMessages(selectedChat.messages || []);
+        setCurrentRole(selectedChat.role || '');
+      } else {
+        setMessages([]);
+        setCurrentRole('');
+      }
+      
+      // Only close the sidebar if closeSidebar is true
+      if (closeSidebar) {
+        setIsSidebarOpen(false);
+      }
+      
       // Get the most up-to-date chat data from Supabase
       const { data: chatData, error: chatError } = await supabase
         .from('user_chats')
         .select('*')
-        .eq('chat_id', chatId)
+        .eq('chat_id', chatToSelect)
         .single();
       
       if (chatError) {
@@ -2164,7 +2294,7 @@ const decode = (base64) => {
         
         // Update the chat in the local state
         setChats(prevChats => prevChats.map(chat => 
-          chat.id === chatId 
+          chat.id === chatToSelect 
           ? {
               ...chat,
               messages: processedMessages,
@@ -3003,47 +3133,44 @@ const decode = (base64) => {
     );
   });
 
-  // Add these functions for scroll behavior
+  // Improve scrollToBottom function
   const scrollToBottom = () => {
     if (flatListRef.current && messages.length > 0) {
-      flatListRef.current.scrollToEnd({ animated: true });
+      // Use requestAnimationFrame for smoother scrolling
+      requestAnimationFrame(() => {
+        flatListRef.current.scrollToEnd({ animated: false });
+      });
     }
   };
   
+  // Simplify the handleScroll function to just handle the scroll button visibility
   const handleScroll = (event) => {
     const offsetY = event.nativeEvent.contentOffset.y;
     const contentSizeHeight = event.nativeEvent.contentSize.height;
     const layoutHeight = event.nativeEvent.layoutMeasurement.height;
     
     // Show the scroll button if not near the bottom
-    setShowScrollToBottom(offsetY < contentSizeHeight - layoutHeight - 50);
-    
-    // Save heights for later use
-    setListHeight(layoutHeight);
-    setContentHeight(contentSizeHeight);
+    setShowScrollToBottom(offsetY < contentSizeHeight - layoutHeight - 20);
   };
   
-  // Add an effect to scroll to bottom when messages change
+  // Add an effect to handle scrolling when messages change
   useEffect(() => {
     if (messages.length > 0) {
-      // Small delay to ensure content is rendered
-      setTimeout(scrollToBottom, 100);
+      // Only auto-scroll if the last message is a new one
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg && lastMsg.id !== lastScrolledMessageId.current) {
+        lastScrolledMessageId.current = lastMsg.id;
+        setTimeout(() => scrollToBottom(), 100);
+      }
     }
   }, [messages]);
-
-  // Scroll to bottom when keyboard opens
-  useEffect(() => {
-    if (isKeyboardVisible && messages.length > 0) {
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-    }
-  }, [isKeyboardVisible, messages.length]);
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
       
       {/* Back Button */}
       <TouchableOpacity 
-        style={[styles.backButton, { marginLeft: isSidebarOpen ? 300 : 0 }]}
+        style={[styles.backButton , {zIndex: 1, marginLeft: isSidebarOpen ? 300 : 0 }]}
         onPress={() => {
           if (isSidebarOpen) {
             setIsSidebarOpen(false);
@@ -3067,7 +3194,7 @@ const decode = (base64) => {
           <Image source={require('../assets/Avatar/Cat.png')} style={styles.botIcon} />
         <View style={styles.headerTextContainer}>
         
-          {currentRole && <Text style={styles.botRole}>{currentRole}</Text>|| <Text style={styles.botRole}>MatrixAI Bot</Text>}
+          <Text style={styles.botRole}>MatrixAI Bot</Text>
         
         </View>
         <TouchableOpacity onPress={() => navigation.navigate('CallScreen')}>
@@ -3079,228 +3206,230 @@ const decode = (base64) => {
        
       </View>
 
-      {/* Chat List */}
-      <Animatable.View animation="fadeIn" duration={1000} style={{ flex: 1 }}>
-        {messages.length > 0 ? (
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            keyExtractor={(item) => item.id}
-            renderItem={renderMessage}
-            contentContainerStyle={styles.messagesContainer}
-            style={styles.messagesList}
-            onScroll={handleScroll}
-            scrollEventThrottle={400}
-            onContentSizeChange={() => {
-              if (messages.length > 0 && !showScrollToBottom) {
-                scrollToBottom();
-              }
-            }}
-          />
-        ) : (
-          <View style={styles.emptyStateContainer}>
-            {/* ... existing empty state code ... */}
-          </View>
-        )}
-
-        {/* Placeholder for New Chat */}
-        {messages.length === 0 && dataLoaded && (
-          <View style={styles.placeholderContainer}>
-            <Image source={require('../assets/matrix.png')} style={styles.placeholderImage} />
-            <Text style={[styles.placeholderText , {color: colors.text}]}>Hi, I'm MatrixAI Bot.</Text>
-            <Text style={[styles.placeholderText2 , {color: colors.text}]}>How can I help you today?</Text>
-            
-            {/* New role selection UI */}
-            <Text style={[styles.placeholderText3 , {color: colors.text}]}>You can ask me any question or you</Text>
-            <Text style={[styles.placeholderText4 , {color: colors.text}]}>can select the below role:</Text>
-            <View style={styles.roleButtonsContainer}>
-              <View style={styles.roleButtonRow}>
-                <TouchableOpacity 
-                  style={styles.roleButton} 
-                  onPress={() => handleRoleSelection('🩺 Doctor')}
-                >
-                   <Text style={styles.roleButtonText}>🩺</Text>
-                  <Text style={styles.roleButtonText}>Doctor</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.roleButton} 
-                  onPress={() => handleRoleSelection('📚 Teacher')}
-                >
-                    <Text style={styles.roleButtonText}>📚</Text>
-                  <Text style={styles.roleButtonText}>Teacher</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.roleButtonRow}>
-                <TouchableOpacity 
-                  style={styles.roleButton} 
-                  onPress={() => handleRoleSelection('⚖️ Lawyer')}
-                >
-                    <Text style={styles.roleButtonText}>⚖️</Text>
-                  <Text style={styles.roleButtonText}>Lawyer</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.roleButton} 
-                  onPress={() => handleRoleSelection('🌱 Psychologist')}
-                >
-                    <Text style={styles.roleButtonText}>🌱</Text>
-                  <Text style={styles.roleButtonText}>Psychologist</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.roleButtonRow}>
-                <TouchableOpacity 
-                  style={styles.roleButton} 
-                  onPress={() => handleRoleSelection('🔧 Engineer')}
-                >
-                    <Text style={styles.roleButtonText}>🔧</Text>
-                  <Text style={styles.roleButtonText}>Engineer</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.roleButton} 
-                  onPress={() => handleRoleSelection('📐 Surveyor')}
-                >
-                    <Text style={styles.roleButtonText}>📐</Text>
-                  <Text style={styles.roleButtonText}>Surveyor</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.roleButtonRow}>
-                <TouchableOpacity 
-                  style={styles.roleButton} 
-                  onPress={() => handleRoleSelection('🏤 Architect')}
-                >
-                    <Text style={styles.roleButtonText}>🏤</Text>
-                  <Text style={styles.roleButtonText}>Architect</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.roleButton} 
-                  onPress={() => handleRoleSelection('📈 Financial Advisor')}
-                >
-                    <Text style={styles.roleButtonText}>📈</Text>
-                  <Text style={styles.roleButtonText}>Financial Advisor</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        )}
-      </Animatable.View>
-      {/* Loading animation */}
-     
-      
-      {/* Image Preview (WhatsApp Style) */}
-     
-
-      {/* KeyboardAvoidingView to handle chat input */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.keyboardAvoidingView}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+      {/* Main content area - using KeyboardAvoidingView for the entire chat area */}
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
       >
-        <View style={styles.inputContentContainer}>
-          {!selectedImage && (
-            <View style={styles.NewChat}>
-              <TouchableOpacity onPress={startNewChat} style={styles.NewChatButton}>
-                <MaterialCommunityIcons name="chat-plus-outline" size={24} color="#fff" />
-                <Text style={styles.NewChatText}>New Chat</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-           {selectedImage && (
-        <View style={[styles.imagePreviewContainer]}>
-          <View style={styles.imageIconContainer}>
-            <Ionicons name="image-outline" size={24} color="#fff" />
-          </View>
-          <Text style={styles.imageNameText} numberOfLines={1} ellipsizeMode="middle">
-            {imageFileName || "Selected Image"}
-          </Text>
-          <TouchableOpacity 
-            style={styles.removeImageButton}
-            onPress={() => setSelectedImage(null)}
+        {/* Chat List */}
+        <View style={{ flex: 1 }}>
+          <Animatable.View 
+            animation="fadeIn" 
+            duration={1000} 
+            style={{ flex: 1 }}
           >
-            <Ionicons name="close-circle" size={24} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      )}
-<View style={styles.chatBoxContainer2}>
-           <LinearGradient
-             colors={['transparent', 'transparent', colors.background2, colors.background2]}
-             locations={[0, 0.5, 0.5, 1]}
-             style={{
-               height:60,
-               width: '100%',
-               overflow: 'visible'
-             }}>
-            <View style={styles.chatBoxContainer}>
-              <TextInput
-                style={[styles.textInput, { textAlignVertical: 'top' }]}
-                placeholder={selectedImage ? "Add a caption..." : "Send a message..."}
-                placeholderTextColor="#ccc"
-                value={inputText}
-                onChangeText={handleInputChange}
-                onSubmitEditing={() => {
-                  handleSendMessage();
-                  Keyboard.dismiss();
+            {messages.length > 0 ? (
+              <FlatList
+                ref={flatListRef}
+                data={messages}
+                keyExtractor={(item) => item.id}
+                renderItem={renderMessage}
+                contentContainerStyle={[
+                  styles.messagesContainer,
+                
+                ]}
+                style={styles.messagesList}
+                onScroll={handleScroll}
+                scrollEventThrottle={400}
+                onContentSizeChange={() => scrollToBottom()}
+                maintainVisibleContentPosition={{
+                  minIndexForVisible: 0,
+                  autoscrollToTopThreshold: 10
                 }}
-                multiline={true}
-                numberOfLines={3}
-                maxLength={2000}
-                scrollEnabled={true}
-                returnKeyType="send"
-                blurOnSubmit={Platform.OS === 'ios' ? false : true}
               />
-              <TouchableOpacity onPress={handleAttach} style={styles.sendButton}>
-                {showAdditionalButtons ? (
-                  <Ionicons name="close" size={28} color="#4C8EF7" />
-                ) : (
-                  <MaterialCommunityIcons name="plus" size={28} color="#4C8EF7" />
-                )}
-              </TouchableOpacity>
-                     
-              <TouchableOpacity 
-                onPress={handleSendMessage} 
-                style={[styles.sendButton, isSendDisabled && styles.disabledButton]} 
-                disabled={isSendDisabled}
-              >
-                {isSendDisabled ? (
-                  <ActivityIndicator size="small" color="#4C8EF7" />
-                ) : (
-                  <Ionicons name="send" size={24} color="#4C8EF7" />
-                )}
-              </TouchableOpacity>
-            </View>
-           </LinearGradient>
-            </View>
-          {showAdditionalButtons && (
-            <View style={[styles.additionalButtonsContainer, {backgroundColor: colors.background2}]  }>
-              <View style={styles.buttonRow}>
-                <TouchableOpacity style={styles.additionalButton2} onPress={() => handleImageOCR('camera')}>
-                  <View style={styles.additionalButton}>
-                    <Ionicons name="camera" size={28} color="#4C8EF7" />
+            ) : (
+              <View style={styles.emptyStateContainer}>
+                {/* ... existing empty state code ... */}
+              </View>
+            )}
+
+            {/* Placeholder for New Chat */}
+            {messages.length === 0 && dataLoaded && (
+              <View style={styles.placeholderContainer}>
+                <Image source={require('../assets/matrix.png')} style={styles.placeholderImage} />
+                <Text style={[styles.placeholderText , {color: colors.text}]}>Hi, I'm MatrixAI Bot.</Text>
+                <Text style={[styles.placeholderText2 , {color: colors.text}]}>How can I help you today?</Text>
+                
+                {/* New role selection UI */}
+                <Text style={[styles.placeholderText3 , {color: colors.text}]}>You can ask me any question or you</Text>
+                <Text style={[styles.placeholderText4 , {color: colors.text}]}>can select the below role:</Text>
+                <View style={styles.roleButtonsContainer}>
+                  <View style={styles.roleButtonRow}>
+                    <TouchableOpacity 
+                      style={styles.roleButton} 
+                      onPress={() => handleRoleSelection('🩺 Doctor')}
+                    >
+                      <Text style={styles.roleButtonText}>🩺</Text>
+                      <Text style={styles.roleButtonText}>Doctor</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={styles.roleButton} 
+                      onPress={() => handleRoleSelection('📚 Teacher')}
+                    >
+                      <Text style={styles.roleButtonText}>📚</Text>
+                      <Text style={styles.roleButtonText}>Teacher</Text>
+                    </TouchableOpacity>
                   </View>
-                  <Text style={{color: colors.text}}>Photo</Text>
-                </TouchableOpacity>
-                      
-                <TouchableOpacity style={styles.additionalButton2} onPress={() => handleImageOCR('gallery')}>
-                  <View style={styles.additionalButton}>
-                    <Ionicons name="image" size={28} color="#4C8EF7" />
+                  
+                  <View style={styles.roleButtonRow}>
+                    <TouchableOpacity 
+                      style={styles.roleButton} 
+                      onPress={() => handleRoleSelection('⚖️ Lawyer')}
+                    >
+                      <Text style={styles.roleButtonText}>⚖️</Text>
+                      <Text style={styles.roleButtonText}>Lawyer</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={styles.roleButton} 
+                      onPress={() => handleRoleSelection('🌱 Psychologist')}
+                    >
+                      <Text style={styles.roleButtonText}>🌱</Text>
+                      <Text style={styles.roleButtonText}>Psychologist</Text>
+                    </TouchableOpacity>
                   </View>
-                  <Text style={{color: colors.text}}>Image</Text>
-                </TouchableOpacity>
-                      
-                <TouchableOpacity style={styles.additionalButton2}>
-                  <View style={styles.additionalButton}>
-                    <Ionicons name="attach" size={28} color="#4C8EF7" />
+                  
+                  <View style={styles.roleButtonRow}>
+                    <TouchableOpacity 
+                      style={styles.roleButton} 
+                      onPress={() => handleRoleSelection('🔧 Engineer')}
+                    >
+                      <Text style={styles.roleButtonText}>🔧</Text>
+                      <Text style={styles.roleButtonText}>Engineer</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={styles.roleButton} 
+                      onPress={() => handleRoleSelection('📐 Surveyor')}
+                    >
+                      <Text style={styles.roleButtonText}>📐</Text>
+                      <Text style={styles.roleButtonText}>Surveyor</Text>
+                    </TouchableOpacity>
                   </View>
-                  <Text style={{color: colors.text}}>Document</Text>
+                  
+                  <View style={styles.roleButtonRow}>
+                    <TouchableOpacity 
+                      style={styles.roleButton} 
+                      onPress={() => handleRoleSelection('🏤 Architect')}
+                    >
+                      <Text style={styles.roleButtonText}>🏤</Text>
+                      <Text style={styles.roleButtonText}>Architect</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={styles.roleButton} 
+                      onPress={() => handleRoleSelection('📈 Financial Advisor')}
+                    >
+                      <Text style={styles.roleButtonText}>📈</Text>
+                      <Text style={styles.roleButtonText}>Financial Advisor</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            )}
+          </Animatable.View>
+        </View>
+
+        {/* Input area with New Chat button above it */}
+        <View style={styles.inputContainer}>
+          {/* New Chat Button - Positioned just above the input with transparency */}
+          <View style={styles.newChatButtonContainer} pointerEvents="box-none">
+            <TouchableOpacity onPress={startNewChat} style={styles.NewChatButton}>
+              <MaterialCommunityIcons name="chat-plus-outline" size={24} color="#fff" />
+              <Text style={styles.NewChatText}>New Chat</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.inputContentContainer}>
+            {selectedImage && (
+              <View style={[styles.imagePreviewContainer]}>
+                <View style={styles.imageIconContainer}>
+                  <Ionicons name="image-outline" size={24} color="#fff" />
+                </View>
+                <Text style={styles.imageNameText} numberOfLines={1} ellipsizeMode="middle">
+                  {imageFileName || "Selected Image"}
+                </Text>
+                <TouchableOpacity 
+                  style={styles.removeImageButton}
+                  onPress={() => setSelectedImage(null)}
+                >
+                  <Ionicons name="close-circle" size={24} color="#fff" />
                 </TouchableOpacity>
               </View>
+            )}
+            <View style={[styles.chatBoxContainer2 , {zIndex: 20}]}>
+              <LinearGradient
+                colors={['transparent', 'transparent', colors.background2, colors.background2]}
+                locations={[0, 0.5, 0.5, 1]}
+                style={{
+                  height:40,
+                  width: '100%',
+                  overflow: 'visible'
+                }}>
+                <View style={[styles.chatBoxContainer , {zIndex: 20}]}>
+                  <TextInput
+                    style={[styles.textInput, { textAlignVertical: 'top' }]}
+                    placeholder={selectedImage ? "Add a caption..." : "Send a message..."}
+                    placeholderTextColor="#ccc"
+                    value={inputText}
+                    onChangeText={handleInputChange}
+                    onSubmitEditing={() => {
+                      handleSendMessage();
+                      Keyboard.dismiss();
+                    }}
+                    multiline={true}
+                    numberOfLines={3}
+                    maxLength={2000}
+                    scrollEnabled={true}
+                    returnKeyType="send"
+                    blurOnSubmit={Platform.OS === 'ios' ? false : true}
+                  />
+                  <TouchableOpacity onPress={handleAttach} style={styles.sendButton}>
+                    {showAdditionalButtons ? (
+                      <Ionicons name="close" size={28} color="#4C8EF7" />
+                    ) : (
+                      <MaterialCommunityIcons name="plus" size={28} color="#4C8EF7" />
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    onPress={handleSendMessage} 
+                    style={styles.sendButton} 
+                    disabled={isSendDisabled}
+                  >
+                    <Ionicons name="send" size={24} color="#4C8EF7" />
+                  </TouchableOpacity>
+                </View>
+              </LinearGradient>
             </View>
-          )}
+            {showAdditionalButtons && (
+              <View style={[styles.additionalButtonsContainer, {backgroundColor: colors.background2} , {zIndex: 10}]}>
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity style={styles.additionalButton2} onPress={() => handleImageOCR('camera')}>
+                    <View style={styles.additionalButton}>
+                      <Ionicons name="camera" size={28} color="#4C8EF7" />
+                    </View>
+                    <Text style={{color: colors.text}}>Photo</Text>
+                  </TouchableOpacity>
+                        
+                  <TouchableOpacity style={styles.additionalButton2} onPress={() => handleImageOCR('gallery')}>
+                    <View style={styles.additionalButton}>
+                      <Ionicons name="image" size={28} color="#4C8EF7" />
+                    </View>
+                    <Text style={{color: colors.text}}>Image</Text>
+                  </TouchableOpacity>
+                        
+                  <TouchableOpacity style={styles.additionalButton2}>
+                    <View style={styles.additionalButton}>
+                      <Ionicons name="attach" size={28} color="#4C8EF7" />
+                    </View>
+                    <Text style={{color: colors.text}}>Document</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
         </View>
       </KeyboardAvoidingView>
 
@@ -3409,11 +3538,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    backgroundColor: 'transparent',
     zIndex: 10,
+    position: 'absolute',
   },
   inputContentContainer: {
     width: '100%',
-    paddingBottom: 10,
+    paddingBottom: 5,
   },
   chatBoxContainer: {
     flexDirection: 'row',
@@ -3425,11 +3556,13 @@ const styles = StyleSheet.create({
     borderColor: '#007bff',
     paddingHorizontal: 10,
     backgroundColor: '#fff',
+    zIndex: 10,
   },
   chatBoxContainer2: {
    height: 40, // Set a specific height to properly show the gradient
    width: '100%',
    overflow: 'visible',
+   zIndex: -10,
   },
   NewChat: {
     alignSelf: 'center',
@@ -3460,7 +3593,7 @@ const styles = StyleSheet.create({
    padding: 5,
   },
   disabledButton: {
-    opacity: 1, // Changed from 0.5 to 1 to make activity indicator fully visible
+    // No opacity or visual changes, just disable the button functionality
   },
   
   // WhatsApp style image preview container
@@ -3585,25 +3718,26 @@ const styles = StyleSheet.create({
   loadingContainer: {
     position: 'relative',
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginVertical: 10,
-    alignSelf: 'flex-start',
-    width: '70%',
-    backgroundColor: '#F0F8FF',
-    borderRadius: 20,
-    padding: 10,
+    marginLeft: 15,
+    backgroundColor: '#333333',
+    padding: 12,
+    borderRadius: 15,
+    maxWidth: 80,
+    height: 40,
   },
   loadingMessageContainer: {
-    backgroundColor: '#F0F8FF',
-    minHeight: 50,
+    position: 'absolute',
+    right: 20,
+    bottom: 0,
+    backgroundColor: 'transparent',
     justifyContent: 'center',
-    alignItems: 'center',
-    width: 'auto',
-    maxWidth: '70%',
+    alignItems: 'flex-end',
   },
   loadingAnimation: {
-    width: 100,
-    height: 50,
+    width: 60,
+    height: 30,
   },
   botText: {
     fontSize: 16,
@@ -3625,12 +3759,8 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    padding: 10,
-    borderTopWidth: 1,
-    borderColor: '#E0E0E0',
+    width: '100%',
+    backgroundColor: 'transparent',
   },
   icon: {
     marginHorizontal: 10,
@@ -3818,10 +3948,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     width: '100%',
     paddingVertical: 10,
-    backgroundColor: '#fff',
+    backgroundColor: '#333',
     paddingHorizontal: 20,
     marginBottom: -10,
-    zIndex: 5,
+    zIndex: -5,
   },
   buttonRow: {
     flexDirection: 'row',
@@ -4461,10 +4591,72 @@ const styles = StyleSheet.create({
   },
   messagesContainer: {
     paddingVertical: 10,
-    paddingBottom: 80, // Add fixed padding for input area
+    flexGrow: 1,
+    paddingBottom: 15, // Minimal padding to keep messages from touching the input
   },
   messagesList: {
     flex: 1,
+  },
+  newChatButtonContainer: {
+    position: 'absolute',
+    alignSelf: 'center',
+    zIndex: 5,
+    top: -40, // Position above the input box
+    backgroundColor: 'transparent',
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    pointerEvents: 'box-none', // This allows touches to pass through to components behind it
+  },
+  NewChatButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 5,
+    backgroundColor: '#4C8EF7', 
+    borderRadius: 20,
+    justifyContent: 'center',
+    // Add a slight shadow so it stands out against messages
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+    elevation: 2,
+  },
+  NewChatText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 5,
+  },
+  inputContainer: {
+    width: '100%',
+    backgroundColor: 'transparent',
+  },
+  botHeaderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  
+  },
+  botHeaderLogo: {
+    width: 30,
+    height: 30,
+  
+  },
+  botHeaderText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#555',
+  },
+  botHeaderLogoContainer: {
+    width: 35,
+    height: 35,
+    marginRight: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 19,
+    borderRadius: 30,
+    backgroundColor: '#4C8EF7',
   },
 });
 

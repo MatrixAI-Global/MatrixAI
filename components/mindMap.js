@@ -9,7 +9,7 @@ import Share from 'react-native-share';
 import ViewShot from 'react-native-view-shot';
 import RNFS from 'react-native-fs';
 import { useTheme } from '../context/ThemeContext';
-
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 const ForceDirectedGraph = ({ transcription, uid, audioid, xmlData }) => {
   const { getThemeColors } = useTheme();
   const colors = getThemeColors();
@@ -602,26 +602,19 @@ const handleDownload = async () => {
       {tempWebView}  {/* Render temporary WebView when needed */}
 
       <TouchableOpacity 
-        style={[
-          styles.downloadButton,
-          loading && styles.downloadButtonDisabled
-        ]} 
-        onPress={handleDownload}
-        disabled={loading}
-      >
-        <View style={styles.buttonContent}>
-          {loading ? (
-            <>
-              <ActivityIndicator color={colors.text} style={styles.loader} />
-              <Text style={styles.buttonText}>Downloading...</Text>
-            </>
-          ) : (
-            <>
-              <Text style={styles.buttonText}>Download PDF</Text>
-            </>
-          )}
-        </View>
-      </TouchableOpacity>
+      style={[
+        styles.iconButton,
+        loading && styles.iconButtonDisabled
+      ]}
+      onPress={handleDownload}
+      disabled={loading}
+    >
+      {loading ? (
+        <ActivityIndicator color="#fff" style={styles.loader} />
+      ) : (
+        <MaterialIcons name="file-download" size={28} color="#fff" />
+      )}
+    </TouchableOpacity>
     </View>
   );
 };
@@ -630,40 +623,26 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
-  downloadButton: {
-    backgroundColor: '#007bff',
-    padding: 15,
-    margin: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-    elevation: 3, // Add shadow for Android
-    shadowColor: '#000', // Add shadow for iOS
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  downloadButtonDisabled: {
-    backgroundColor: '#cccccc',
-    elevation: 0,
-    shadowOpacity: 0,
-  },
-  buttonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  iconButton: {
+    position: 'absolute',
+    bottom: 16, // distance from bottom
+    left: 20,   // distance from left
+    backgroundColor: '#007bff', // blue background
+    borderRadius: 30,
+    width: 50,
+    height: 50,
     justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000, // ensure it's on top
   },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
+  iconButtonDisabled: {
+    backgroundColor: '#cccccc', // greyed out when disabled
   },
   loader: {
-    marginRight: 8,
+    width: 28,
+    height: 28,
   },
+  
 });
 
 export const getSvgData = () => {

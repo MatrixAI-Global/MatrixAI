@@ -1345,6 +1345,15 @@ const BotScreen2 = ({ navigation, route }) => {
                     isBot ? styles.botMessageContainer : styles.userMessageContainer,
                   ]}
                 >
+                  {isBot && (
+                    <View style={styles.botHeaderContainer}>
+                      <View style={styles.botHeaderLogoContainer}>
+                        <Image source={require('../assets/logo7.png')} style={styles.botHeaderLogo} />
+                      </View>
+                      <Text style={[styles.botHeaderText, {color: colors.border}]}>MatrixAI</Text>
+                    </View>
+                  )}
+                  
                   {item.image ? (
                     <TouchableOpacity onPress={() => handleImageTap(item.image)}>
                       <Image
@@ -3122,6 +3131,33 @@ marginBottom:-10,
     flex: 1,
   },
   // ... existing code ...
+  botHeaderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  
+  },
+  botHeaderLogo: {
+    width: 30,
+    height: 30,
+    tintColor: '#fff',
+  
+  },
+  botHeaderText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#555',
+  },
+  botHeaderLogoContainer: {
+    width: 35,
+    height: 35,
+    marginRight: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 19,
+    borderRadius: 30,
+    backgroundColor: '#4C8EF7',
+  },
 });
 
 export default BotScreen2;
