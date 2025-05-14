@@ -65,6 +65,7 @@ export const translations = {
     'male': 'Male',
     'female': 'Female',
     'others': 'Others',
+    'settingsSaved': 'Settings saved successfully',
     
     // Errors
     'errorOccurred': 'An error occurred',
@@ -103,8 +104,23 @@ export const translations = {
     'enterPromptHere': 'Enter your prompt here...',
     'generate': 'Generate Content',
     'generatedContent': 'Generated Content',
+    "pro": "Pro",
+    "upgradeToPro": "Upgrade to Pro",
+    "proFeatures": "Pro Features",
+    "videoGenerator": "Video Generator",
+    "imageAI": "Image AI",
+    "presentationAI": "Presentation AI",
+    "humaniseText": "Humanise Text",
+    "detectAI": "Detect AI",
+    "contentWriter": "Content Writer",
+    "processAndAnalyzeVideos": "Process and analyze videos",
+    "generateImages": "Generate images",
+    "createSlideDecksAutomatically": "Create slide decks automatically",
+    "convertSpeechToText": "Convert speech to text",
+    "humanLikeTransformations": "Human-like transformations",
+    "identifyAIGeneratedContent": "Identify AI-generated content",
+    "aiPoweredWritingAssistant": "AI-powered writing assistant",
   },
-  
   // Traditional Chinese
   'Traditional Chinese': {
     // Common
@@ -150,7 +166,9 @@ export const translations = {
     "rateUs": "評價我們",
     "yourInformation": "您的資訊",
      "proFeatures": "專業功能",
-
+     "pro": "專業版",
+     "upgradeToPro": "升級到專業版",
+     "proFeatures": "專業功能",
     // Language settings
     'languageSettings': '語言設定',
     'chooseLanguage': '選擇語言',
@@ -169,6 +187,7 @@ export const translations = {
     'male': '男性',
     'female': '女性',
     'others': '其他',
+    'settingsSaved': '設定已成功儲存',
     
     // Errors
     'errorOccurred': '發生錯誤',
@@ -207,6 +226,22 @@ export const translations = {
     'enterPromptHere': '在此輸入您的提示...',
     'generate': '生成內容',
     'generatedContent': '生成的內容',
+    "pro": "專業版",
+    "upgradeToPro": "升級到專業版",
+    "proFeatures": "專業功能",
+    "videoGenerator": "視頻生成",
+    "imageAI": "圖像AI",
+    "presentationAI": "演示文稿AI",
+    "humaniseText": "人類化文本",
+    "detectAI": "檢測AI",
+    "contentWriter": "內容寫作",
+    "processAndAnalyzeVideos": "處理和分析視頻",
+    "generateImages": "生成圖像",
+    "createSlideDecksAutomatically": "自動創建演示文稿",
+    "convertSpeechToText": "轉換語音為文本",
+    "humanLikeTransformations": "人類化文本",
+    "identifyAIGeneratedContent": "識別AI生成的內容",
+    "aiPoweredWritingAssistant": "AI驅動的寫作助手",
   },
 
   // Simplified Chinese
@@ -254,7 +289,10 @@ export const translations = {
     "rateUs": "评价我们",
     "yourInformation": "您的信息",
     "proFeatures": "专业功能",
-
+    "settingsSaved": "设置已成功保存",
+    "pro": "专业版",
+    "upgradeToPro": "升级到专业版",
+    "proFeatures": "专业功能",
     // Language settings
     'languageSettings': '语言设置',
     'chooseLanguage': '选择语言',
@@ -311,6 +349,29 @@ export const translations = {
     'enterPromptHere': '在此输入您的提示...',
     'generate': '生成内容',
     'generatedContent': '生成的内容',
+    "pro": "专业版",
+    "upgradeToPro": "升级到专业版",
+    "proFeatures": "专业功能",
+    "videoGenerator": "视频生成",
+    "imageAI": "图像AI",
+    "presentationAI": "演示文稿AI",
+    "humaniseText": "人类化文本",
+    "detectAI": "检测AI",
+    "contentWriter": "内容写作",
+    "processAndAnalyzeVideos": "处理和分析视频",
+    "generateImages": "生成图像",
+    "createSlideDecksAutomatically": "自动创建演示文稿",
+    "convertSpeechToText": "转换语音为文本",
+    "humanLikeTransformations": "人类化文本",
+    "identifyAIGeneratedContent": "识别AI生成的内容",
+    "aiPoweredWritingAssistant": "AI驱动的写作助手",
+    "videoGenerator": "视频生成",
+    "imageAI": "图像AI",
+    "presentationAI": "演示文稿AI",
+    "humaniseText": "人类化文本",
+    "detectAI": "检测AI",
+    "contentWriter": "内容写作",
+    "processAndAnalyzeVideos": "处理和分析视频",
   }
 };
 

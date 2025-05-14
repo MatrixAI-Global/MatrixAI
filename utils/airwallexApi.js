@@ -19,9 +19,10 @@ export const authenticate = async () => {
   // If in mock mode, return a fake token
   if (USE_MOCK_MODE) {
     console.log('[MOCK] Generating mock authentication token');
-    authToken = 'mock_token_' + Date.now();
+    const mockToken = 'mock_token_' + Date.now();
+    authToken = mockToken;
     tokenExpiry = new Date(new Date().getTime() + 3600 * 1000); // 1 hour from now
-    return authToken;
+    return mockToken;
   }
 
   try {

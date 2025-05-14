@@ -23,7 +23,8 @@ const AirwallexProvider = ({ children }) => {
   // Function to initialize Airwallex auth only when explicitly called
   const initializeAirwallex = async () => {
     // If already initialized or initializing, don't start again
-    if (initialized || initializing) return { success: initialized, error };
+    if (initialized) return { success: true, error: null };
+    if (initializing) return { success: false, error: "Initialization in progress" };
     
     setInitializing(true);
     setError(null);
@@ -31,11 +32,17 @@ const AirwallexProvider = ({ children }) => {
     try {
       console.log('Initializing Airwallex...');
       // Authenticate with Airwallex
-      await authenticate();
+      const token = await authenticate();
       console.log('Airwallex initialized successfully');
-      setInitialized(true);
-      setError(null);
-      return { success: true, error: null };
+      
+      // Only set initialized if we actually got a token
+      if (token) {
+        setInitialized(true);
+        setError(null);
+        return { success: true, error: null };
+      } else {
+        throw new Error('Authentication failed - no token received');
+      }
     } catch (err) {
       console.error('Failed to initialize Airwallex:', err);
       const errorMessage = err.message || 'Failed to initialize payment provider';

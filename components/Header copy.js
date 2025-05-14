@@ -4,6 +4,7 @@ import { useCoinsSubscription } from '../hooks/useCoinsSubscription';
 import { supabase } from '../supabaseClient';
 import { useTheme } from '../context/ThemeContext';
 import { useProfileUpdate } from '../context/ProfileUpdateContext';
+import { useLanguage } from '../context/LanguageContext';
 
 const Header2 = ({ navigation, uid, openDrawer }) => {
     console.log("Header rendering with UID:", uid);
@@ -15,7 +16,7 @@ const Header2 = ({ navigation, uid, openDrawer }) => {
     const { getThemeColors } = useTheme();
     const { lastUpdate } = useProfileUpdate();
     const colors = getThemeColors();
-    
+    const { t } = useLanguage();
     useEffect(() => {
         if (uid) {
             fetchUserData();
@@ -87,7 +88,7 @@ const Header2 = ({ navigation, uid, openDrawer }) => {
                                     {userName} 
                                 </Text>
                                 <View style={[styles.proBadge , {backgroundColor: colors.primary}]}>
-                                    <Text style={styles.proText}>PRO</Text>
+                                    <Text style={styles.proText}>{t('pro')}</Text>
                                 </View>
                             </View>
                         ) : (

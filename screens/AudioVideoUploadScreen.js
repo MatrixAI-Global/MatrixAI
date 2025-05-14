@@ -11,6 +11,9 @@ import {
     Modal,
     Platform,
     Animated,
+    PanResponder,
+    BackHandler,
+    TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DocumentPicker from 'react-native-document-picker';
@@ -22,7 +25,7 @@ import Feather from 'react-native-vector-icons/Feather';
 import Octicons from 'react-native-vector-icons/Octicons';
 import axios from 'axios';
 import { Buffer } from 'buffer';
-import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler'; 
+import { GestureHandlerRootView, Swipeable, gestureHandlerRootHOC } from 'react-native-gesture-handler'; 
 import Share from 'react-native-share'; // Add for file sharing
 import { Button, Alert } from 'react-native';
 import { supabase } from '../supabaseClient'; 
@@ -982,7 +985,106 @@ const AudioVideoUploadScreen = () => {
         });
     };
 
-    const renderRightActions = (item,progress, dragX) => (
+    const swipeableRefs = useRef({});
+    const flatListRef = useRef(null);
+    const startX = useRef(0);
+    
+    // Create a specialized back gesture detector with higher priority
+    const backGestureResponder = useRef(
+        PanResponder.create({
+            // Take control of gesture recognition at the start
+            onStartShouldSetPanResponder: (evt, gestureState) => {
+                return evt.nativeEvent.pageX < 50; // Only for touches that start near the left edge
+            },
+            // Also take control during movement if needed
+            onMoveShouldSetPanResponder: (evt, gestureState) => {
+                return gestureState.dx > 20 && gestureState.dy < 20 && gestureState.dy > -20 && evt.nativeEvent.pageX < 100;
+            },
+            // Handle the gesture
+            onPanResponderMove: (evt, gestureState) => {
+                // Log gesture for debugging
+                if (gestureState.dx > 30) {
+                    console.log('Back gesture detected:', gestureState.dx);
+                }
+            },
+            // When released, check if we should trigger navigation
+            onPanResponderRelease: (evt, gestureState) => {
+                if (gestureState.dx > 50) {
+                    navigation.goBack();
+                    return true;
+                }
+                return false;
+            },
+            // Ensure this responder has priority
+            onPanResponderTerminationRequest: () => false,
+        })
+    ).current;
+    
+    // Create pan responder for the rest of the screen
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => false,
+            onMoveShouldSetPanResponder: (evt, gestureState) => {
+                return gestureState.dx > 20 && gestureState.dy < 50 && gestureState.dy > -50;
+            },
+            onPanResponderRelease: (evt, gestureState) => {
+                if (gestureState.dx > 100) {
+                    navigation.goBack();
+                }
+            },
+        })
+    ).current;
+    
+    // Handle horizontal drag on FlatList
+    const handleScrollBeginDrag = (e) => {
+        startX.current = e.nativeEvent.contentOffset.x;
+    };
+    
+    const handleScroll = (e) => {
+        // Check if it's a left-to-right scroll at the left edge of content
+        if (e.nativeEvent.contentOffset.x <= 0 && startX.current > e.nativeEvent.contentOffset.x) {
+            const dragDistance = startX.current - e.nativeEvent.contentOffset.x;
+            if (dragDistance > 50) {
+                navigation.goBack();
+            }
+        }
+    };
+    
+    // Handle horizontal swipe with simpler approach
+    const [touchStart, setTouchStart] = useState(0);
+    
+    const handleTouchStart = (e) => {
+        setTouchStart(e.nativeEvent.pageX);
+    };
+    
+    const handleTouchEnd = (e) => {
+        const touchEnd = e.nativeEvent.pageX;
+        const distance = touchEnd - touchStart;
+        
+        // If swiped from left to right
+        if (distance > 50 && touchStart < 50) {
+            navigation.goBack();
+            return true;
+        }
+        return false;
+    };
+    
+    // BackHandler for Android
+    useEffect(() => {
+        const backAction = () => {
+            navigation.goBack();
+            return true;
+        };
+        
+        const backHandler = BackHandler.addEventListener(
+            'hardwareBackPress',
+            backAction
+        );
+        
+        return () => backHandler.remove();
+    }, [navigation]);
+    
+    const renderRightActions = (item, progress, dragX) => (
         <View style={styles.rightActionsContainer}>
             
             {/* Edit Button */}
@@ -1025,9 +1127,14 @@ const AudioVideoUploadScreen = () => {
 
         return (
             <Swipeable
-            renderRightActions={(progress, dragX) => renderRightActions(item, progress, dragX, colors.text)} // Pass `item` to renderRightActions
-            overshootRight={false}
-        >
+                ref={ref => swipeableRefs.current[item.audioid] = ref}
+                renderRightActions={(progress, dragX) => renderRightActions(item, progress, dragX, colors.text)}
+                overshootRight={false}
+                leftThreshold={200} // Set very high to prevent left swipe activation
+                rightThreshold={40}
+                friction={2}
+                enableTrackpadTwoFingerGesture
+            >
                 <TouchableOpacity
                     style={[
                         styles.fileItem,
@@ -1039,6 +1146,8 @@ const AudioVideoUploadScreen = () => {
                             toggleFileSelection(item.audioid);
                         }
                     }}
+                    onTouchStart={handleTouchStart}
+                    onTouchEnd={handleTouchEnd}
                 >
                     {isFilterMode && (
                         <View style={styles.dot}>
@@ -1272,7 +1381,25 @@ const AudioVideoUploadScreen = () => {
     };
 
     return (
-        <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
+        <SafeAreaView 
+            style={[styles.container, {backgroundColor: colors.background}]} 
+            {...panResponder.panHandlers}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+        >
+            {/* Back Gesture Detector - covers left edge of screen */}
+            <View
+                style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 50,
+                    zIndex: 999,
+                }}
+                {...backGestureResponder.panHandlers}
+            />
+            
             {/* Header Section */}
 
            
@@ -1322,33 +1449,44 @@ const AudioVideoUploadScreen = () => {
             {/* Filter Modal */}
             
             {/* File List */}
-            <FlatList
-                data={getFilteredFiles()}
-                keyExtractor={(item) => item.audioid}
-                renderItem={renderFileItem}
-                showsVerticalScrollIndicator={false}
-                onRefresh={() => loadFiles(true)}
-                refreshing={isLoading}
-                ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        {isLoading ? (
-                            <ActivityIndicator size="large" color="#007bff" />
-                        ) : (
-                            <>
-                                <Image 
-                                    source={emptyIcon}
+            <View 
+                style={{flex: 1}} 
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
+            >
+                <FlatList
+                    ref={flatListRef}
+                    data={getFilteredFiles()}
+                    keyExtractor={(item) => item.audioid}
+                    renderItem={renderFileItem}
+                    showsVerticalScrollIndicator={false}
+                    horizontal={false}
+                    directionalLockEnabled={true}
+                    scrollToOverflowEnabled={false}
+                    disableScrollViewPanResponder={true}
+                    onRefresh={() => loadFiles(true)}
+                    refreshing={isLoading}
+                    ListEmptyComponent={
+                        <View style={styles.emptyContainer}>
+                            {isLoading ? (
+                                <ActivityIndicator size="large" color="#007bff" />
+                            ) : (
+                                <>
+                                    <Image 
+                                        source={emptyIcon}
                                         style={[styles.emptyImage, {tintColor: colors.text}]}
-                                />
-                                <Text style={[styles.emptyText, {color: colors.text}]}>
-                                    {searchQuery 
-                                        ? "No files match your search"
-                                        : "No audio files found"}
-                                </Text>
-                            </>
-                        )}
-                    </View>
-                }
-            />
+                                    />
+                                    <Text style={[styles.emptyText, {color: colors.text}]}>
+                                        {searchQuery 
+                                            ? "No files match your search"
+                                            : "No audio files found"}
+                                    </Text>
+                                </>
+                            )}
+                        </View>
+                    }
+                />
+            </View>
                 {isFilterMode && (
             <TouchableOpacity style={styles.deleteAllButton} onPress={handleDeleteAll}>
                 {isDeleting ? (
@@ -2054,4 +2192,4 @@ color:'#000',
     },
 });
 
-export default AudioVideoUploadScreen;
+export default gestureHandlerRootHOC(AudioVideoUploadScreen);

@@ -76,6 +76,7 @@ import AddonScreen from './screens/coins/AddonScreen.js';
 import FeedbackScreen from './screens/FeedbackScreen.js';
 import PaymentScreen from './screens/coins/PaymentScreen.js';
 import AirwallexPaymentScreen from './screens/coins/AirwallexPaymentScreen.js';
+import PaymentSuccessScreen from './screens/coins/PaymentSuccess.js';
 import StripeProvider from './components/StripeProvider';
 import AirwallexProvider from './components/AirwallexProvider';
 
@@ -344,6 +345,11 @@ const App = () => {
                                     <Stack.Screen 
                                         name="PaymentSuccess" 
                                         component={SuccessScreen} 
+                                        options={{ headerShown: false }} 
+                                    />
+                                    <Stack.Screen 
+                                        name="PaymentSuccessScreen" 
+                                        component={PaymentSuccessScreen} 
                                         options={{ headerShown: false }} 
                                     />
                                    

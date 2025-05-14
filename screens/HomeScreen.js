@@ -124,56 +124,56 @@ const HomeScreen = () => {
   const tools = [
     {
       id: 'video',
-      title: 'Video Generator',
-      description: 'Process and analyze videos',
+      title: t('videoGenerator'),
+      description: t('processAndAnalyzeVideos'),
       icon: <MaterialCommunityIcons name="video-outline" size={26} color="#FFFFFF" />,
       colors: ['#0091EA', '#0D47A1'],
       screen: 'VideoUpload'
     },
     {
       id: 'image',
-      title: 'Image AI',
-      description: 'Generate images',
+      title: t('imageAI'),
+      description: t('generateImages'),
       icon: <MaterialCommunityIcons name="image-edit-outline" size={26} color="#FFFFFF" />,
       colors: ['#2962FF', '#2979FF'],
       screen: 'ImageTextScreen'
     },
     {
       id: 'ppt',
-      title: 'Presentation AI',
-      description: 'Create slide decks automatically',
+      title: t('presentationAI'),
+      description: t('createSlideDecksAutomatically'),
       icon: <MaterialCommunityIcons name="file-presentation-box" size={26} color="#FFFFFF" />,
       colors: ['#00BFA5', '#009688'],
       screen: 'PPTGenerateScreen'
     },
     {
       id: 'speech',
-      title: 'Speech to Text',
-      description: 'Convert speech to text',
+      title: t('speechToText'),
+      description: t('convertSpeechToText'),
       icon: <MaterialCommunityIcons name="microphone" size={26} color="#FFFFFF" />,
       colors: ['#FF6D00', '#F57C00'],
       screen: 'SpeechToTextScreen'
     },
     {
       id: 'background',
-      title: 'Humanise Text',
-      description: 'Human-like transformations',
+      title: t('humaniseText'),
+      description: t('humanLikeTransformations'),
       icon: <MaterialCommunityIcons name="human-greeting" size={26} color="#FFFFFF" />,
       colors: ['#D500F9', '#9C27B0'],
       screen: 'HumaniseText'
     },
     {
       id: 'detect',
-      title: 'Detect AI',
-      description: 'Identify AI-generated content',
+      title: t('detectAI'),
+      description: t('identifyAIGeneratedContent'),
       icon: <MaterialCommunityIcons name="magnify-scan" size={26} color="#FFFFFF" />,
       colors: ['#43A047', '#2E7D32'],
       screen: 'DetectAIScreen'
     },
     {
       id: 'content',
-      title: 'Content Writer',
-      description: 'AI-powered writing assistant',
+      title: t('contentWriter'),
+      description: t('aiPoweredWritingAssistant'),
       icon: <MaterialCommunityIcons name="text-box-outline" size={26} color="#FFFFFF" />,
       colors: ['#FF6D00', '#F57C00'],
       screen: 'ContentWriterScreen'
@@ -242,18 +242,11 @@ const HomeScreen = () => {
       <StatusBar barStyle={currentTheme === 'dark' ? "light-content" : "dark-content"} backgroundColor="transparent" translucent />
       
       {/* Fixed header with blur effect */}
-      <View style={styles.fixedHeader}>
-        <LinearGradient
-          colors={getHeaderBgColors()}
-          style={styles.headerGradient}
-        >
-          <Header navigation={navigation} uid={uid} openDrawer={toggleSidePanel} />
-        </LinearGradient>
+      <View style={[styles.fixedHeader, {backgroundColor: 'transparent'}]}>
+        <Header navigation={navigation} uid={uid} openDrawer={toggleSidePanel}/>
         
         {/* Add subtle border to the header for better visibility */}
-        <View style={[styles.headerBorder, { 
-          borderBottomColor: currentTheme === 'dark' ? 'rgba(60, 60, 67, 0.3)' : 'rgba(200, 200, 200, 0.5)'
-        }]} />
+       
       </View>
 
       <ScrollView 
@@ -401,7 +394,7 @@ const HomeScreen = () => {
               <MaterialCommunityIcons name="star" size={18} color="#FFFFFF" />
             </LinearGradient>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              {isUserPro ? 'Pro Features' : 'Upgrade to Pro'}
+              {isUserPro ? t('proFeatures') : t('upgradeToPro')}
             </Text>
           </View>
           
@@ -432,12 +425,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   fixedHeader: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-    resizeMode: 'contain',
+    paddingTop: 5,
+    paddingHorizontal: 10,
+    marginBottom: 10,
     
     
   },

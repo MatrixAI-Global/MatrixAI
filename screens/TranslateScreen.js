@@ -367,8 +367,48 @@ import Slider from '@react-native-community/slider'; // Import the Slider compon
         // Set isMounted to true when component mounts
         isMounted.current = true;
         
-        // Fetch data on mount
-        fetchAudioMetadata(uid, audioid);
+        // Check for existing data in AsyncStorage first
+        const checkCachedData = async () => {
+            try {
+                const cachedDataString = await AsyncStorage.getItem(`audioData-${audioid}`);
+                if (cachedDataString) {
+                    const cachedData = JSON.parse(cachedDataString);
+                    
+                    // Only use cached data if the transcription is valid
+                    const cachedTranscription = cachedData.transcription || '';
+                    const isPlaceholderMessage = cachedTranscription === 'Generating Transcription May take some time...';
+                    
+                    if (cachedTranscription && !isPlaceholderMessage && cachedTranscription.trim() !== '') {
+                        // Use the cached data
+                        console.log('Using cached transcription data');
+                        setTranscription(cachedData.transcription || '');
+                        setParagraphs(cachedData.paragraphs || []);
+                        setAudioUrl(cachedData.audioUrl || '');
+                        setKeypoints(cachedData.keyPoints || '');
+                        setXMLData(cachedData.XMLData || '');
+                        setDuration(cachedData.duration || 0);
+                        setAudioDuration(cachedData.audioDuration || 0);
+                        
+                        // Still fetch fresh data from server in the background
+                        fetchAudioMetadata(uid, audioid);
+                    } else {
+                        // If cached data is invalid, fetch fresh data
+                        console.log('Cached transcription is empty or invalid, fetching fresh data');
+                        fetchAudioMetadata(uid, audioid);
+                    }
+                } else {
+                    // No cached data, fetch from server
+                    fetchAudioMetadata(uid, audioid);
+                }
+            } catch (error) {
+                console.error('Error checking cached data:', error);
+                // Fall back to server fetch
+                fetchAudioMetadata(uid, audioid);
+            }
+        };
+        
+        // Start by checking for cached data
+        checkCachedData();
         
         // Clean up function
         return () => {
@@ -1340,22 +1380,39 @@ import Slider from '@react-native-community/slider'; // Import the Slider compon
 
     const handlePress = async () => {
         if (transcriptionGeneratedFor.has(audioid)) return;
-    
+
         setIsTranscriptionGenerating(true);
-    
+
         try {
+            // Clear any previously cached placeholder data
+            try {
+                const cachedDataString = await AsyncStorage.getItem(`audioData-${audioid}`);
+                if (cachedDataString) {
+                    const cachedData = JSON.parse(cachedDataString);
+                    const cachedTranscription = cachedData.transcription || '';
+                    const isPlaceholderMessage = cachedTranscription === 'Generating Transcription May take some time...';
+                    
+                    if (isPlaceholderMessage || cachedTranscription.trim() === '') {
+                        // Remove invalid cached data
+                        await AsyncStorage.removeItem(`audioData-${audioid}`);
+                        console.log('Removed invalid cached transcription data');
+                    }
+                }
+            } catch (e) {
+                console.error('Error clearing cached data:', e);
+            }
+
             const formData = new FormData();
             formData.append('uid', uid);
             formData.append('audioid', audioid);
-    
+
             const response = await fetch('https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/convertAudio', {
                 method: 'POST',
                 body: formData,
             });
-    
+
             const data = await response.json();
           
-    
             if (response.ok) {
                 setTranscriptionGeneratedFor(prev => new Set(prev).add(audioid));
                 await fetchAudioMetadata(uid, audioid); // Reload data from API
@@ -1661,8 +1718,22 @@ import Slider from '@react-native-community/slider'; // Import the Slider compon
             const data = await response.json();
             console.log(data);
             if (response.ok) {
+                // Get the transcription data from the response
+                const transcriptionData = data.transcription || '';
+                const isPlaceholderMessage = transcriptionData === 'Generating Transcription May take some time...';
+                
+                // If transcription is empty or contains placeholder message, clear any cached data to prevent stale data
+                if (!transcriptionData || isPlaceholderMessage || transcriptionData.trim() === '') {
+                    try {
+                        await AsyncStorage.removeItem(`audioData-${audioid}`);
+                        console.log('Cleared cached data because transcription is empty or contains placeholder message');
+                    } catch (e) {
+                        console.error('Error clearing AsyncStorage:', e);
+                    }
+                }
+                
                 // Set state with fetched data
-                setTranscription(data.transcription || '');
+                setTranscription(transcriptionData);
                 setFileName(data.audio_name || 'Untitled');
                 setFileContent(data.file_path || '');
                 const audioDur = data.duration || 0;
@@ -1683,8 +1754,8 @@ import Slider from '@react-native-community/slider'; // Import the Slider compon
                     // Fallback to the old method if words_data is not available
                     let paragraphs = [];
                     let wordTimings = [];
-                    if (data.transcription) {
-                        const { paragraphs: para, words } = splitTranscription(data.transcription);
+                    if (transcriptionData && !isPlaceholderMessage) {
+                        const { paragraphs: para, words } = splitTranscription(transcriptionData);
                         paragraphs = para;
                         setParagraphs(para);
                         if (data.duration) {
@@ -1698,16 +1769,20 @@ import Slider from '@react-native-community/slider'; // Import the Slider compon
                 setKeypoints(data.key_points || '');
                 setXMLData(data.xml_data || '');
                 
-                // Cache the data with duration included
-                await AsyncStorage.setItem(`audioData-${audioid}`, JSON.stringify({
-                    transcription: data.transcription || '',
-                    paragraphs: paragraphs || [],
-                    audioUrl: data.audio_url || '',
-                    keyPoints: data.key_points || '',
-                    XMLData: data.xml_data || '',
-                    duration: audioDur,
-                    audioDuration: audioDur
-                }));
+                // Only cache the data if transcription is not empty and not showing the placeholder message
+                if (transcriptionData && !isPlaceholderMessage && transcriptionData.trim() !== '') {
+                    await AsyncStorage.setItem(`audioData-${audioid}`, JSON.stringify({
+                        transcription: transcriptionData,
+                        paragraphs: paragraphs || [],
+                        audioUrl: data.audio_url || '',
+                        keyPoints: data.key_points || '',
+                        XMLData: data.xml_data || '',
+                        duration: audioDur,
+                        audioDuration: audioDur
+                    }));
+                } else {
+                    console.log('Not caching data as transcription is empty or contains placeholder message');
+                }
             } else {
                 console.error('Error fetching audio metadata:', data.error);
                 Alert.alert('Error', 'Failed to load audio data');

@@ -1143,11 +1143,16 @@ const persistEvent = (event) => {
             <View style={isBot ? styles.botTail : styles.userTail} />
           </Animatable.View>
           
-          {/* Message action buttons - outside the bubble */}
-          <View style={[
-            styles.messageActionButtons,
-            isBot ? styles.botMessageActions : styles.userMessageActions
-          ]}>
+          {/* Message action buttons for image messages */}
+          <Animatable.View
+            animation="fadeInUp"
+            duration={800}
+            delay={200}
+            style={[
+              styles.messageActionButtons,
+              isBot ? styles.botMessageActions : styles.userMessageActions
+            ]}
+          >
             <TouchableOpacity 
               style={styles.actionButton} 
               onPress={handleCopyText}
@@ -1168,7 +1173,7 @@ const persistEvent = (event) => {
                 color="#666" 
               />
             </TouchableOpacity>
-          </View>
+          </Animatable.View>
           
           {/* Show loading animation below the last user message when response is being generated */}
           {isLastUserMessage && (
@@ -1758,11 +1763,16 @@ const persistEvent = (event) => {
           <View style={isBot ? styles.botTail : styles.userTail} />
         </Animatable.View>
         
-        {/* Message action buttons - outside the bubble */}
-        <View style={[
-          styles.messageActionButtons,
-          isBot ? styles.botMessageActions : styles.userMessageActions
-        ]}>
+        {/* Message action buttons - outside the bubble but inside the animation */}
+        <Animatable.View
+          animation="fadeInUp"
+          duration={800}
+          delay={200}
+          style={[
+            styles.messageActionButtons,
+            isBot ? styles.botMessageActions : styles.userMessageActions
+          ]}
+        >
           <TouchableOpacity 
             style={styles.actionButton} 
             onPress={handleCopyText}
@@ -1783,7 +1793,7 @@ const persistEvent = (event) => {
               color="#666" 
             />
           </TouchableOpacity>
-        </View>
+        </Animatable.View>
         
         {/* Show loading animation below the last user message when response is being generated */}
         {isLastUserMessage && (
@@ -3718,26 +3728,25 @@ const styles = StyleSheet.create({
   loadingContainer: {
     position: 'relative',
     justifyContent: 'center',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginVertical: 10,
-    marginLeft: 15,
-    backgroundColor: '#333333',
-    padding: 12,
+    marginLeft: 1,
+
+    padding: 15,
     borderRadius: 15,
-    maxWidth: 80,
-    height: 40,
+    maxWidth: 150,
+    minHeight: 100,
   },
   loadingMessageContainer: {
+    display: 'none', // Hide this container completely
     position: 'absolute',
-    right: 20,
-    bottom: 0,
-    backgroundColor: 'transparent',
-    justifyContent: 'center',
-    alignItems: 'flex-end',
+    opacity: 0,
+    width: 0,
+    height: 0,
   },
   loadingAnimation: {
-    width: 60,
-    height: 30,
+    width: 250,
+    height: 200,
   },
   botText: {
     fontSize: 16,
@@ -4210,8 +4219,9 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     width: '100%',
     maxWidth: '100%',
-    flexWrap: 'wrap',
-    flexShrink: 1,
+    overflow: 'hidden',
+    minHeight: 40,
+    justifyContent: 'center',
   },
   complexMathText: {
     fontFamily: 'monospace',

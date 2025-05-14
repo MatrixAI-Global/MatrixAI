@@ -101,9 +101,9 @@ const AirwallexPaymentScreen = ({ navigation, route }) => {
 
   // Effect to navigate when countdown reaches 0
   useEffect(() => {
-    if (paymentSuccess && countdown === 0 && successData) {
+    if (paymentSuccess && successData) {
+      // Navigate immediately instead of waiting for countdown
       try {
-        // Try native navigation
         handleActualNavigation();
       } catch (e) {
         console.error("Navigation error:", e);
@@ -124,22 +124,17 @@ const AirwallexPaymentScreen = ({ navigation, route }) => {
         }, 1000);
       }
     }
-  }, [countdown, paymentSuccess, successData]);
+  }, [paymentSuccess, successData]);
 
   // Function to handle actual navigation - separated to isolate errors
   const handleActualNavigation = () => {
     if (!successData) return;
     
-    // Try to go to HomeScreen first
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Home' }]
-    });
+    console.log('Navigating to success screen with data:', successData);
     
-    // After a delay try to navigate to success screen
-    setTimeout(() => {
-      navigation.navigate('PaymentSuccess', successData);
-    }, 500);
+    // Use navigation.navigate instead of replace to ensure proper stack management
+    // and to prevent the user from getting stuck in a screen with no back button
+    navigation.navigate('PaymentSuccessScreen', successData);
   };
 
   // Payment methods data
@@ -324,9 +319,14 @@ const AirwallexPaymentScreen = ({ navigation, route }) => {
       endDate: safeEndDate,
     };
     
+    console.log('Setting payment success with data:', navigationData);
+    
     // Update state to trigger the useEffect
     setSuccessData(navigationData);
     setPaymentSuccess(true);
+    
+    // Set a shorter countdown for better user experience
+    setCountdown(5);
   };
 
   const handleCardPayment = async () => {
@@ -527,6 +527,37 @@ const AirwallexPaymentScreen = ({ navigation, route }) => {
       return;
     }
 
+    console.log('Processing payment with method:', selectedPaymentMethod);
+    
+    // In mock mode, we can always proceed
+    if (USE_MOCK_MODE) {
+      console.log('Proceeding with payment in mock mode');
+      processPaymentWithSelectedMethod();
+      return;
+    }
+    
+    // Ensure the system is ready
+    if (!initialized) {
+      console.log('Payment system not initialized, attempting to initialize...');
+      initializeAirwallex().then(result => {
+        if (result.success) {
+          console.log('Initialization successful, proceeding with payment');
+          processPaymentWithSelectedMethod();
+        } else {
+          Alert.alert(
+            'Payment System Error', 
+            'Unable to connect to payment system. Please try again later.',
+            [{ text: 'OK' }]
+          );
+        }
+      });
+    } else {
+      processPaymentWithSelectedMethod();
+    }
+  };
+  
+  // Helper function to process payment based on selected method
+  const processPaymentWithSelectedMethod = () => {
     // For card payment, validate card details
     if (selectedPaymentMethod === 'card') {
       if (!validateAllCardFields()) {
@@ -556,7 +587,9 @@ const AirwallexPaymentScreen = ({ navigation, route }) => {
         handleGenericPayment('virtual_card', 'Virtual Card');
         break;
       default:
-        Alert.alert('Payment Method', 'Please select a valid payment method.');
+        // Fallback to any payment method as mock
+        console.log('No specific payment handler for', selectedPaymentMethod, 'using generic payment');
+        handleGenericPayment(selectedPaymentMethod, 'Payment');
     }
   };
 
@@ -680,29 +713,45 @@ const AirwallexPaymentScreen = ({ navigation, route }) => {
     </View>
   );
 
-  // Initialize Airwallex when the payment screen mounts
+  // Initialize Airwallex when the component mounts
   useEffect(() => {
     const initPaymentSystem = async () => {
       setInitializingAirwallex(true);
       try {
-        const result = await initializeAirwallex();
-        if (!result.success) {
-          setAirwallexError(result.error);
+        if (!initialized) {
+          console.log('Initializing Airwallex payment system...');
+          const result = await initializeAirwallex();
+          
+          if (!result.success && !USE_MOCK_MODE) {
+            console.error('Failed to initialize Airwallex:', result.error || 'Unknown error');
+            setAirwallexError(result.error || 'Failed to initialize payment system');
+          } else {
+            // Even if initialization failed, we can proceed in mock mode
+            console.log('Airwallex initialized successfully or using mock mode');
+            
+            // In mock mode, we can just proceed even if initialization failed
+            if (USE_MOCK_MODE && !result.success) {
+              console.log('Using mock mode despite initialization failure');
+            }
+          }
         }
       } catch (err) {
         console.error('Error initializing Airwallex:', err);
-        setAirwallexError('Failed to initialize payment system. Please try again.');
+        if (!USE_MOCK_MODE) {
+          setAirwallexError('Failed to initialize payment system. Please try again.');
+        } else {
+          console.log('Using mock mode despite error:', err);
+        }
       } finally {
         setInitializingAirwallex(false);
       }
     };
 
     initPaymentSystem();
-  }, []);
+  }, [initialized, initializeAirwallex]);
 
-  // Add this after other useEffect hooks and before rendering UI
   // Show loading state while initializing Airwallex
-  if (initializingAirwallex || initializing) {
+  if (initializingAirwallex) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color="#2274F0" />
@@ -713,8 +762,8 @@ const AirwallexPaymentScreen = ({ navigation, route }) => {
     );
   }
 
-  // Show error if Airwallex initialization failed
-  if (airwallexError || error) {
+  // Show error if Airwallex initialization failed - but only if we're not in mock mode
+  if ((airwallexError || error) && !USE_MOCK_MODE) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
         <Icon name="alert-circle" size={50} color="#e74c3c" />
