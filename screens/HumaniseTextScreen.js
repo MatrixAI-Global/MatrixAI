@@ -380,12 +380,12 @@ const HumaniseTextScreen = () => {
         <MaterialCommunityIcons 
           name={item.icon} 
           size={normalize(24)} 
-          color={isSelected ? '#FFFFFF' : colors.text} 
+          color={isSelected ? colors.text : colors.text} 
         />
         <Text style={[
           styles.toneName,
           { 
-            color: isSelected ? '#FFFFFF' : colors.text,
+            color: isSelected ? colors.text : colors.text,
             fontWeight: isSelected ? '600' : '500'
           }
         ]}>

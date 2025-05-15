@@ -989,42 +989,21 @@ const AudioVideoUploadScreen = () => {
     const flatListRef = useRef(null);
     const startX = useRef(0);
     
-    // Create a specialized back gesture detector with higher priority
-    const backGestureResponder = useRef(
-        PanResponder.create({
-            // Take control of gesture recognition at the start
-            onStartShouldSetPanResponder: (evt, gestureState) => {
-                return evt.nativeEvent.pageX < 50; // Only for touches that start near the left edge
-            },
-            // Also take control during movement if needed
-            onMoveShouldSetPanResponder: (evt, gestureState) => {
-                return gestureState.dx > 20 && gestureState.dy < 20 && gestureState.dy > -20 && evt.nativeEvent.pageX < 100;
-            },
-            // Handle the gesture
-            onPanResponderMove: (evt, gestureState) => {
-                // Log gesture for debugging
-                if (gestureState.dx > 30) {
-                    console.log('Back gesture detected:', gestureState.dx);
-                }
-            },
-            // When released, check if we should trigger navigation
-            onPanResponderRelease: (evt, gestureState) => {
-                if (gestureState.dx > 50) {
-                    navigation.goBack();
-                    return true;
-                }
-                return false;
-            },
-            // Ensure this responder has priority
-            onPanResponderTerminationRequest: () => false,
-        })
-    ).current;
-    
     // Create pan responder for the rest of the screen
     const panResponder = useRef(
         PanResponder.create({
-            onStartShouldSetPanResponder: () => false,
+            onStartShouldSetPanResponder: (evt) => {
+                // Don't intercept touches near the top-left corner (back button area)
+                if (evt.nativeEvent.pageX < 70 && evt.nativeEvent.pageY < 100) {
+                    return false;
+                }
+                return false;
+            },
             onMoveShouldSetPanResponder: (evt, gestureState) => {
+                // Don't intercept touches near the top-left corner (back button area)
+                if (evt.nativeEvent.pageX < 70 && evt.nativeEvent.pageY < 100) {
+                    return false;
+                }
                 return gestureState.dx > 20 && gestureState.dy < 50 && gestureState.dy > -50;
             },
             onPanResponderRelease: (evt, gestureState) => {
@@ -1032,6 +1011,45 @@ const AudioVideoUploadScreen = () => {
                     navigation.goBack();
                 }
             },
+        })
+    ).current;
+    
+    // Create a specialized back gesture detector with higher priority
+    const backGestureResponder = useRef(
+        PanResponder.create({
+            // Take control of gesture recognition at the start
+            onStartShouldSetPanResponder: (evt, gestureState) => {
+                // Exclude the top-left corner where the back button is
+                if (evt.nativeEvent.pageY < 100 && evt.nativeEvent.pageX < 70) {
+                    return false;
+                }
+                return evt.nativeEvent.pageX < 60; // Increased detection area
+            },
+            // Also take control during movement if needed
+            onMoveShouldSetPanResponder: (evt, gestureState) => {
+                // Exclude the top-left corner where the back button is
+                if (evt.nativeEvent.pageY < 100 && evt.nativeEvent.pageX < 70) {
+                    return false;
+                }
+                return gestureState.dx > 15 && Math.abs(gestureState.dy) < 30 && evt.nativeEvent.pageX < 120;
+            },
+            // Handle the gesture
+            onPanResponderMove: (evt, gestureState) => {
+                // Log gesture for debugging
+                if (gestureState.dx > 20) {
+                    console.log('Back gesture detected:', gestureState.dx);
+                }
+            },
+            // When released, check if we should trigger navigation
+            onPanResponderRelease: (evt, gestureState) => {
+                if (gestureState.dx > 40) {
+                    navigation.goBack();
+                    return true;
+                }
+                return false;
+            },
+            // Ensure this responder has priority
+            onPanResponderTerminationRequest: () => false,
         })
     ).current;
     
@@ -1387,15 +1405,16 @@ const AudioVideoUploadScreen = () => {
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
         >
-            {/* Back Gesture Detector - covers left edge of screen */}
+            {/* Back Gesture Detector - covers left edge of screen but not the back button */}
             <View
                 style={{
                     position: 'absolute',
                     left: 0,
-                    top: 0,
+                    top: 50, // Start below the header area where the back button is
                     bottom: 0,
-                    width: 50,
-                    zIndex: 999,
+                    width: 70,
+                    zIndex: 900,
+                    // backgroundColor: 'rgba(255,0,0,0.1)', // Uncomment to see the detection area during development
                 }}
                 {...backGestureResponder.panHandlers}
             />
@@ -1409,9 +1428,21 @@ const AudioVideoUploadScreen = () => {
            </View>
           
             <View style={styles.topButtonsContainer}>
-            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <MaterialIcons name="arrow-back-ios-new" size={24} color="white" />
-                               </TouchableOpacity>
+            <TouchableOpacity 
+                style={[styles.backButton, {position: 'relative',resizeMode: 'contain' ,justifyContent: 'center',alignItems: 'center'}]} 
+                onPress={() => {
+              
+                    navigation.goBack();
+                }}
+                activeOpacity={0.6}
+                accessible={true}
+                accessibilityLabel="Go back"
+                accessibilityRole="button"
+                accessibilityHint="Navigates to the previous screen"
+                hitSlop={{top: 15, bottom: 15, left: 15, right: 15}} // Increase hit area
+            >
+                <MaterialIcons name="arrow-back-ios-new" size={24} color="white"  style={{marginLeft: -3}}/>
+            </TouchableOpacity>
                 <TouchableOpacity style={styles.topButton} onPress={handleFileSelect}>
                     <Image source={uploadIcon} style={[styles.topIcon]} />
                 </TouchableOpacity>
@@ -1743,13 +1774,22 @@ color:'#000',
         marginTop: 100, // Adjust this value to position the empty state below search box
     },
     backButton: {
-        padding: 8,
+        padding: 10,
         borderRadius: 20,
         backgroundColor: '#007bff',
-       
-        marginRight:10,
-      },
-      headerIcon: {
+        marginRight: 10,
+        height: 40,
+        width: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 5, // Increase elevation
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        zIndex: 2000, // Even higher zIndex
+    },
+    headerIcon: {
         width: 24,
         height: 24,
         resizeMode: 'contain',
@@ -1902,6 +1942,8 @@ color:'#000',
         alignItems: 'center',
         marginHorizontal: 16,
         marginBottom: 1,
+        zIndex: 1200, // Increase zIndex value to be above all other components
+        position: 'relative',
     },
     topButton: {
         backgroundColor: '#FF6600',

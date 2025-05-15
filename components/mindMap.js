@@ -10,9 +10,16 @@ import ViewShot from 'react-native-view-shot';
 import RNFS from 'react-native-fs';
 import { useTheme } from '../context/ThemeContext';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+
 const ForceDirectedGraph = ({ transcription, uid, audioid, xmlData }) => {
   const { getThemeColors } = useTheme();
-  const colors = getThemeColors();
+  const colors = getThemeColors() || {
+    background: '#FFFFFF',
+    text: '#333333',
+    primary: '#007AFF',
+    border: '#E0E0E0'
+  };
+  
   const [graphData, setGraphData] = useState(null);
   const viewShotRef = useRef(null);
   const [loading, setLoading] = useState(false);
@@ -83,7 +90,7 @@ const ForceDirectedGraph = ({ transcription, uid, audioid, xmlData }) => {
         messages: [
           {
             role: "user",
-            content: `Generate a hierarchical XML structure from this meeting transcript: "${transcription}".
+            content: `Generate a hierarchical XML structure from this meeting transcript in the same language as the transcript: "${transcription}".
             Create a tree structure with main topics and subtopics.
             Use this format:
             <meeting>
@@ -103,6 +110,9 @@ const ForceDirectedGraph = ({ transcription, uid, audioid, xmlData }) => {
                 <description>Overall description of topic</description>
               </topic>
             </meeting>`
+            + `
+            Make sure the XML is in the same language as the transcript.
+            `
           }
         ],
         temperature: 0.7,
@@ -155,8 +165,8 @@ const ForceDirectedGraph = ({ transcription, uid, audioid, xmlData }) => {
 
   if (!graphData) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={{color: colors.text}}>Loading graph...</Text>
+      <View style={[styles.loadingContainer, {backgroundColor: colors?.background || '#ffffff'}]}>
+        <Text style={{color: colors?.text || '#000000'}}>Loading graph...</Text>
       </View>
     );
   }
@@ -168,16 +178,26 @@ const ForceDirectedGraph = ({ transcription, uid, audioid, xmlData }) => {
   <head>
     <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+      body {
+        background-color: ${colors?.background || '#ffffff'};
+        color: ${colors?.text || '#000000'};
+        margin: 0;
+        padding: 0;
+      }
+    </style>
   </head>
   <body>
     <div id="chart" style="width: 100%; height: 1200%;"></div>
     <script>
       const chartDom = document.getElementById('chart');
       const myChart = echarts.init(chartDom);
-      const colors = ['#5470C6', '#91CC75', '#EE6666', '#FAC858', '#73C0DE', '#3BA272', '#FC8452', '#9A60B4', '#EA7CCC'];
+      const chartColors = ['#5470C6', '#91CC75', '#EE6666', '#FAC858', '#73C0DE', '#3BA272', '#FC8452', '#9A60B4', '#EA7CCC'];
+      const themeBackground = '${colors?.background || "#ffffff"}';
+      const themeText = '${colors?.text || "#000000"}';
 
       function assignColors(node, index = 0) {
-        node.lineStyle = { color: colors[index % colors.length] };
+        node.lineStyle = { color: chartColors[index % chartColors.length] };
         if (node.children) {
           node.children.forEach((child, idx) => assignColors(child, idx));
         }
@@ -257,6 +277,7 @@ const ForceDirectedGraph = ({ transcription, uid, audioid, xmlData }) => {
       const adjustedGraphData = adjustNodePositions(coloredGraphData);
 
       const option = {
+        backgroundColor: themeBackground,
         tooltip: { trigger: 'item', triggerOn: 'mousemove' },
         series: [{
           type: 'tree',
@@ -272,6 +293,7 @@ const ForceDirectedGraph = ({ transcription, uid, audioid, xmlData }) => {
             verticalAlign: 'middle',
             align: 'right',
             fontSize: 18,
+            color: themeText,
             formatter: (params) => {
               // Wrap text into multiple lines based on node type
               const nodeType = params.data.nodeType || 'topic'; // Default to 'topic'
@@ -288,6 +310,7 @@ const ForceDirectedGraph = ({ transcription, uid, audioid, xmlData }) => {
               position: 'right',
               verticalAlign: 'middle',
               align: 'left',
+              color: themeText,
               formatter: (params) => {
                 // Wrap text into multiple lines based on node type
                 const nodeType = params.data.nodeType || 'description'; // Default to 'description'
@@ -342,7 +365,7 @@ const downloadPDF = async () => {
             body { 
               margin: 0; 
               padding: 0; 
-              background: ${colors.background};
+              background: ${colors?.background || '#ffffff'};
               width: 100%;
               height: 100%;
               overflow: hidden;
@@ -393,7 +416,7 @@ const downloadPDF = async () => {
             const graphData = ${JSON.stringify(graphData)};
             
             const option = {
-              backgroundColor: colors.background,
+              backgroundColor: "${colors?.background || '#ffffff'}",
               tooltip: { 
                 trigger: 'item', 
                 triggerOn: 'mousemove' 
@@ -460,11 +483,11 @@ const downloadPDF = async () => {
               const base64 = myChart.getDataURL({ 
                 type: 'png', 
                 pixelRatio: 2,
-                backgroundColor: colors.background,
+                backgroundColor: "${colors?.background || '#ffffff'}",
                 excludeComponents: ['toolbox']
               });
               window.ReactNativeWebView.postMessage(base64);
-            }, 2000);
+            }, 5000);
           </script>
         </body>
       </html>
@@ -490,7 +513,7 @@ const downloadPDF = async () => {
             directory: 'Documents',
             width: 1684,  // A3 width (landscape)
             height: 1190, // A3 height (landscape)
-            backgroundColor: colors.background,
+            backgroundColor: colors?.background || '#ffffff',
             padding: 0,
             options: {
               landscape: true,
@@ -543,7 +566,7 @@ const downloadPDF = async () => {
         if (!hasProcessedImage) {
           reject(new Error('Timeout generating PDF'));
         }
-      }, 5000);
+      }, 120000);
     });
   } catch (error) {
     console.error('Error generating PDF:', error);
@@ -578,7 +601,7 @@ const handleDownload = async () => {
 };
 
   return (
-    <View style={[styles.container, {backgroundColor: colors.background}]}>
+    <View style={[styles.container, {backgroundColor: colors?.background || '#ffffff'}]}>
       <ViewShot 
         ref={viewShotRef} 
         options={{ format: 'png', quality: 1.0 }}
@@ -589,7 +612,7 @@ const handleDownload = async () => {
           source={{ html: chartHtml }}
           javaScriptEnabled={true}
           domStorageEnabled={true}
-          style={{ height: 600, width: '100%' }}
+          style={{ height: 600, width: '100%', backgroundColor: colors?.background || '#ffffff' }}
           onLoadEnd={() => {
             // Wait for the chart to be fully rendered
             setTimeout(() => {
@@ -604,15 +627,16 @@ const handleDownload = async () => {
       <TouchableOpacity 
       style={[
         styles.iconButton,
-        loading && styles.iconButtonDisabled
+        loading && styles.iconButtonDisabled,
+        { backgroundColor: loading ? (colors?.border || '#cccccc') : (colors?.primary || '#007bff') }
       ]}
       onPress={handleDownload}
       disabled={loading}
     >
       {loading ? (
-        <ActivityIndicator color="#fff" style={styles.loader} />
+        <ActivityIndicator color={colors?.text || '#000000'} style={styles.loader} />
       ) : (
-        <MaterialIcons name="file-download" size={28} color="#fff" />
+        <MaterialIcons name="file-download" size={28} color= '#fff' />
       )}
     </TouchableOpacity>
     </View>
@@ -620,14 +644,13 @@ const handleDownload = async () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   iconButton: {
     position: 'absolute',
     bottom: 16, // distance from bottom
     left: 20,   // distance from left
-    backgroundColor: '#007bff', // blue background
     borderRadius: 30,
     width: 50,
     height: 50,
@@ -636,7 +659,7 @@ const styles = StyleSheet.create({
     zIndex: 1000, // ensure it's on top
   },
   iconButtonDisabled: {
-    backgroundColor: '#cccccc', // greyed out when disabled
+    // styles for disabled state
   },
   loader: {
     width: 28,

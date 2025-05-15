@@ -393,12 +393,12 @@ const ContentWriterScreen = () => {
         <MaterialCommunityIcons 
           name={item.icon} 
           size={normalize(24)} 
-          color={isSelected ? '#FFFFFF' : colors.text} 
+          color={isSelected ? colors.text : colors.text} 
         />
         <Text style={[
           styles.typeName,
           { 
-            color: isSelected ? '#FFFFFF' : colors.text,
+            color: isSelected ? colors.text : colors.text,
             fontWeight: isSelected ? '600' : '500'
           }
         ]}>
@@ -859,6 +859,7 @@ const styles = StyleSheet.create({
   },
   selectedTypeItem: {
     backgroundColor: '#FF6D00',
+    borderColor: '#FF6D00',
   },
   typeName: {
     marginLeft: 8,

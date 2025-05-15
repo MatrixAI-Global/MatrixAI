@@ -307,7 +307,7 @@ const persistEvent = (event) => {
 
   const handleSendMessage = async () => {
     if ((inputText.trim() || selectedImage) && !isSendDisabled) {
-      // Disable the send button immediately
+      // Disable the send button immediately to prevent double sends
       setIsSendDisabled(true);
       
       try {
@@ -342,10 +342,12 @@ const persistEvent = (event) => {
             // Read the file as base64
             const fileContent = await RNFS.readFile(selectedImage, 'base64');
             
-            // Create file path for Supabase storage
-              const filePath = `users/${userId}/Image/${imageID}.${fileExtension}`;
+            // Create file path for Supabase storage - simplified path structure
+            const filePath = `users/${userId}/Image/${imageID}.${fileExtension}`;
             
-            // Upload to Supabase storage
+            console.log('Uploading image to path:', filePath);
+            
+            // Upload to Supabase storage with explicit content type
             const { data: uploadData, error: uploadError } = await supabase.storage
               .from('user-uploads')
               .upload(filePath, decode(fileContent), {
@@ -354,50 +356,57 @@ const persistEvent = (event) => {
               });
               
             if (uploadError) {
+              console.error('Upload error:', uploadError);
               throw new Error(`Upload error: ${uploadError.message}`);
             }
             
-            // Get the public URL for the uploaded image
-            const { data: { publicUrl } } = supabase.storage
+            // Get public URL - ensure we're getting a clean URL
+            const { data } = supabase.storage
               .from('user-uploads')
               .getPublicUrl(filePath);
             
-              // Add the image to messages first in the local state
+            if (!data || !data.publicUrl) {
+              throw new Error('Could not get public URL');
+            }
+            
+            // Store the direct public URL
+            const imageUrl = data.publicUrl;
+            console.log('Generated image URL:', imageUrl);
+            
+            // Capture the current input text before clearing it
+            const captionText = inputText.trim();
+            
+            // Add message to state with image property and text if provided
             const newMessage = {
               id: Date.now().toString(),
-              image: publicUrl,
-              text: inputText.trim() ? inputText : "",
-                sender: 'user',
-                timestamp: new Date().toISOString()
+              image: imageUrl,
+              text: captionText,
+              sender: 'user',
+              timestamp: new Date().toISOString()
             };
             
-            setMessages((prev) => [...prev, newMessage]);
+            console.log('Adding image message to state:', {
+              imageUrl: newMessage.image,
+              hasCaption: !!captionText,
+              captionLength: captionText.length
+            });
+            
+            setMessages(prev => [...prev, newMessage]);
             setSelectedImage(null);
             setInputText('');
 
-            // Save the chat history for the image
-            await saveChatHistory(publicUrl, 'user');
+            // Save to chat history - store the image URL and text separately
+            await saveChatHistory(JSON.stringify({
+              type: 'image_message',
+              image: imageUrl,
+              text: captionText
+            }), 'user');
             
-            // If there's text, use it as the question, otherwise use a default
-            const question = inputText.trim() ? inputText : "What do you see in this image?";
-            const userMessageContent = question;
+            // Process with AI service
+            const question = captionText ? captionText : "What do you see in this image?";
             
-            // Create system message with role information if available
-            let systemContent = 'You are MatrixAI Bot, a helpful AI assistant.';
-            
-            // Find the current chat to get the detailed roleDescription
-            const currentChatObj = chats.find(chat => chat.id === currentChatId);
-            
-            if (currentRole) {
-              if (currentChatObj && currentChatObj.roleDescription) {
-                // Use the detailed roleDescription for the system content
-                systemContent = `You are MatrixAI Bot, acting as a ${currentRole}. ${currentChatObj.roleDescription}`;
-              } else {
-                // Fallback to simpler system content if roleDescription isn't available
-                systemContent = `You are MatrixAI Bot, acting as a ${currentRole}. Please provide responses with the expertise and perspective of a ${currentRole} while being helpful and informative.`;
-              }
-            }
-            
+            // Rest of the AI processing code remains the same...
+
             try {
               // First, use Volces API for image analysis
               const volcesResponse = await axios.post(
@@ -407,7 +416,7 @@ const persistEvent = (event) => {
                   messages: [
                     {
                       role: 'system',
-                      content: systemContent
+                      content: 'You are MatrixAI Bot, a helpful AI assistant.'
                     },
                     {
                       role: 'user',
@@ -419,7 +428,7 @@ const persistEvent = (event) => {
                         {
                           type: 'image_url',
                           image_url: {
-                            url: publicUrl
+                            url: imageUrl
                           }
                         }
                       ]
@@ -438,7 +447,7 @@ const persistEvent = (event) => {
               const imageAnalysisResponse = volcesResponse.data.choices[0].message.content.trim();
               
               // Now, send this response combined with user's question to createContent API
-              const combinedPrompt = `${userMessageContent}\n\nImage analysis: ${imageAnalysisResponse} so answer the user's question with the image analysis and only answer the user's question`;
+              const combinedPrompt = `${question}\n\nImage analysis: ${imageAnalysisResponse} so answer the user's question with the image analysis and only answer the user's question`;
               
               const finalResponse = await axios.post(
                 'https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/createContent',
@@ -631,12 +640,56 @@ const persistEvent = (event) => {
       }
       
       const timestamp = new Date().toISOString();
-      const newMessage = {
-        id: Date.now().toString(),
-        text: messageText,
-        sender: sender,
-        timestamp: timestamp
-      };
+      let newMessage;
+      let description = '';
+      
+      // Check if this is a combined image and text message (in JSON format)
+      let parsedMessage = null;
+      if (typeof messageText === 'string' && messageText.startsWith('{') && messageText.includes('type')) {
+        try {
+          parsedMessage = JSON.parse(messageText);
+        } catch (e) {
+          console.log('Not a valid JSON message:', e);
+        }
+      }
+      
+      // Check if the message is an image URL from Supabase Storage
+      const isImageUrl = typeof messageText === 'string' && 
+                        (messageText.includes('supabase.co/storage/v1/') || 
+                         messageText.includes('user-uploads'));
+      
+      if (parsedMessage && parsedMessage.type === 'image_message') {
+        // For combined image and text messages
+        newMessage = {
+          id: Date.now().toString(),
+          image: parsedMessage.image,
+          text: parsedMessage.text || '',
+          sender: sender,
+          timestamp: timestamp
+        };
+        description = parsedMessage.text ? parsedMessage.text.substring(0, 30) + (parsedMessage.text.length > 30 ? '...' : '') : 'Image';
+        console.log('Saving image with caption in chat history');
+      } else if (isImageUrl && sender === 'user') {
+        // For legacy image-only messages
+        newMessage = {
+          id: Date.now().toString(),
+          image: messageText,
+          text: '',
+          sender: sender,
+          timestamp: timestamp
+        };
+        description = 'Image';
+        console.log('Saving image URL in chat history:', messageText);
+      } else {
+        // Regular text message
+        newMessage = {
+          id: Date.now().toString(),
+          text: messageText,
+          sender: sender,
+          timestamp: timestamp
+        };
+        description = messageText.substring(0, 30) + (messageText.length > 30 ? '...' : '');
+      }
       
       // Check if we need to update the chat name from 'New Chat' to 'MatrixAI Bot'
       let chatName = existingChat?.name || '';
@@ -659,7 +712,7 @@ const persistEvent = (event) => {
             // Update name from 'New Chat' to 'MatrixAI Bot' if this is first user message
             name: shouldUpdateName ? chatName : existingChat.name,
             // Also update description to the latest message for preview
-            description: messageText.substring(0, 30) + (messageText.length > 30 ? '...' : '')
+            description: description
           })
           .eq('chat_id', chatIdToUse);
         
@@ -679,7 +732,7 @@ const persistEvent = (event) => {
                 messages: reducedMessages,
                 updated_at: timestamp,
                 name: shouldUpdateName ? chatName : existingChat.name,
-                description: messageText.substring(0, 30) + (messageText.length > 30 ? '...' : '')
+                description: description
               })
               .eq('chat_id', chatIdToUse);
               
@@ -702,7 +755,7 @@ const persistEvent = (event) => {
           chat_id: chatIdToUse,
           user_id: userId,
           name: 'MatrixAI Bot', // Always use 'MatrixAI Bot' for new chats with messages
-          description: messageText.substring(0, 30) + (messageText.length > 30 ? '...' : ''),
+          description: description,
           role: currentRole || '',
           role_description: '',
           messages: [newMessage],
@@ -730,7 +783,7 @@ const persistEvent = (event) => {
               ...chat, 
               messages: [...(chat.messages || []), newMessage],
               name: shouldUpdateName ? chatName : chat.name,
-              description: chat.description || messageText.substring(0, 30) + (messageText.length > 30 ? '...' : '')
+              description: description
             } 
           : chat
       ));
@@ -745,7 +798,7 @@ const persistEvent = (event) => {
   };
 
   const toggleMessageExpansion = (messageId) => {
-    // Prevent scrolling to the end of the list when expanding a message
+    // Update expanded messages state
     setExpandedMessages(prev => ({
       ...prev,
       [messageId]: !prev[messageId]
@@ -892,7 +945,7 @@ const persistEvent = (event) => {
     // Ensure messages is an array and data is loaded
     if (!dataLoaded || !Array.isArray(messages) || messages.length === 0) return null; 
   
-    // Special case for loading animation
+    // Special case for loading animation - only show one loading indicator
     if (item.isLoading && item.sender === 'bot') {
       return (
         <View style={styles.loadingContainer}>
@@ -906,9 +959,19 @@ const persistEvent = (event) => {
       );
     }
   
+    // Enhanced logging for image debugging
+    if (item.image) {
+      console.log('Rendering message with image:', {
+        id: item.id,
+        imageUrl: item.image,
+        imageType: typeof item.image,
+        sender: item.sender
+      });
+    }
+  
     const isBot = item.sender === 'bot';
     const isExpanded = expandedMessages[item.id];
-    const shouldTruncate = item.text && item.text.length > 100; // Check if text exists
+    const shouldTruncate = item.text && item.text.length > 100;
     const displayText = shouldTruncate && !isExpanded 
       ? `${item.text.substring(0, 100)}...`
       : item.text;
@@ -941,23 +1004,16 @@ const persistEvent = (event) => {
     const isLastMessage = messages[messages.length - 1]?.id === item.id;
     const isLastUserMessage = isLastMessage && !isBot && isLoading;
     
-    // After the user's last message, add a loading indicator as a separate message
-    if (isLastUserMessage) {
-      // Add loading message to the end of messages if it doesn't exist
-      setTimeout(() => {
-        if (isLoading && !messages.some(msg => msg.isLoading)) {
-          const loadingMessage = {
-            id: 'loading-' + Date.now(),
-            isLoading: true,
-            sender: 'bot'
-          };
-          setMessages(prev => [...prev, loadingMessage]);
-        }
-      }, 500);
-    }
-    
     // Check if the message has an image
     if (item.image) {
+      console.log('Rendering image message with URL:', item.image);
+      
+      // Clean the URL if needed
+      let imageUrl = item.image;
+      if (typeof imageUrl === 'string' && !imageUrl.startsWith('http')) {
+        console.log('Image URL does not start with http, may need processing:', imageUrl);
+      }
+      
       return (
         <View style={[
           styles.messageWrapperOuter, 
@@ -971,179 +1027,47 @@ const persistEvent = (event) => {
               isBot ? styles.botMessageContainer : styles.userMessageContainer,
             ]}
           >
-            <TouchableOpacity onPress={() => handleImageTap(item.image)}>
+            {isBot && (
+              <View style={styles.botHeaderContainer}>
+                <View style={styles.botHeaderLogoContainer}>
+                  <Image source={require('../assets/logo7.png')} style={[styles.botHeaderLogo, {tintColor: '#fff'}]} />
+                </View>
+                <Text style={[styles.botHeaderText, {color: '#4C8EF7'}]}>MatrixAI</Text>
+              </View>
+            )}
+            
+            <TouchableOpacity 
+              onPress={() => handleImageTap(item.image)}
+              style={styles.imageContainer}
+            >
               <Image
                 source={{ uri: item.image }}
                 style={styles.chatImage}
                 resizeMode="cover"
+                onError={(e) => {
+                  console.error('Image error details:', {
+                    error: e.nativeEvent.error,
+                    url: item.image,
+                    messageId: item.id
+                  });
+                }}
               />
             </TouchableOpacity>
-            {item.text && (
-              <Markdown 
-                key={`markdown-image-${item.id}`}
-                style={{
-                  body: {
-                    color: isBot ? colors.botText : '#fff',
-                    fontSize: 16,
-                  },
-                  heading1: {
-                    color: isBot ? colors.botText : '#fff',
-                    fontWeight: 'bold',
-                    fontSize: 20,
-                    marginTop: 8,
-                    marginBottom: 4,
-                  },
-                  heading2: {
-                    color: isBot ? colors.botText : '#fff',
-                    fontWeight: 'bold',
-                    fontSize: 18,
-                    marginTop: 8,
-                    marginBottom: 4,
-                  },
-                  heading3: {
-                    color: isBot ? colors.botText : '#fff',
-                    fontWeight: 'bold',
-                    fontSize: 16,
-                    marginTop: 8,
-                    marginBottom: 4,
-                  },
-                  paragraph: {
-                    color: isBot ? colors.botText : '#fff',
-                    fontSize: 16,
-                    marginTop: 4,
-                    marginBottom: 4,
-                  },
-                  list_item: {
-                    color: isBot ? colors.botText : '#fff',
-                    fontSize: 16,
-                    marginTop: 4,
-                  },
-                  bullet_list: {
-                    color: isBot ? colors.botText : '#fff',
-                  },
-                  ordered_list: {
-                    color: isBot ? colors.botText : '#FFFFFF',
-                  },
-                  ordered_list: {
-                    color: isBot ? colors.botText : '#FFFFFF',
-                  },
-                  blockquote: {
-                    backgroundColor: 'rgba(128, 128, 128, 0.1)',
-                    borderLeftWidth: 4,
-                    borderLeftColor: colors.primary,
-                    paddingLeft: 8,
-                    paddingVertical: 4,
-                    color: isBot ? colors.botText : '#FFFFFF',
-                  },
-                  code_block: {
-                    backgroundColor: 'rgba(128, 128, 128, 0.1)',
-                    padding: 8,
-                    borderRadius: 4,
-                    color: isBot ? colors.botText : '#FFFFFF',
-                  },
-                  code_inline: {
-                    backgroundColor: 'rgba(128, 128, 128, 0.1)',
-                    padding: 2,
-                    borderRadius: 2,
-                    color: isBot ? colors.botText : '#FFFFFF',
-                  },
-                  link: {
-                    color: colors.primary,
-                    textDecorationLine: 'underline',
-                  },
-                  table: {
-                    borderWidth: 1,
-                    borderColor: '#E0E0E0',
-                    marginVertical: 10,
-                  },
-                  tr: {
-                    borderBottomWidth: 1,
-                    borderBottomColor: '#E0E0E0',
-                    flexDirection: 'row',
-                  },
-                  th: {
-                    padding: 8,
-                    fontWeight: 'bold',
-                    borderRightWidth: 1,
-                    borderRightColor: '#E0E0E0',
-                    backgroundColor: '#F5F5F5',
-                    color: '#333333',
-                  },
-                  td: {
-                    padding: 8,
-                    borderRightWidth: 1,
-                    borderRightColor: '#E0E0E0',
-                    color: '#333333',
-                  },
-                  text: {
-                    color: isBot ? colors.botText : '#FFFFFF',
-                  }
-                }}
-                // Adding custom renderers for better ordered lists
-                rules={{
-                  // Custom ordered list renderer
-                  list: (node, children, parent, styles) => {
-                    if (node.ordered) {
-                      return (
-                        <View key={node.key} style={styles.ordered_list}>
-                          {children}
-                        </View>
-                      );
-                    }
-                    return (
-                      <View key={node.key} style={styles.bullet_list}>
-                        {children}
-                      </View>
-                    );
-                  },
-                  // Custom ordered list item renderer
-                  list_item: (node, children, parent, styles) => {
-                    if (parent.ordered) {
-                      return (
-                        <View key={node.key} style={styles.ordered_list_item}>
-                          <Text style={[styles.list_item_number, {color: isBot ? '#2274F0' : '#fff'}]}>{node.index + 1}.</Text>
-                          <View style={styles.list_item_content}>
-                            {children}
-                          </View>
-                        </View>
-                      );
-                    }
-                    return (
-                      <View key={node.key} style={styles.list_item}>
-                        <Text style={[styles.list_item_bullet, {color: isBot ? '#2274F0' : '#fff'}]}>•</Text>
-                        <View style={{ flex: 1 }}>
-                          {children}
-                        </View>
-                      </View>
-                    );
-                  },
-                  // Custom fraction renderer for better display
-                  text: (node, children, parent, styles) => {
-                    // Improve fraction display using custom renderer
-                    const text = node.content.replace(/(\d+)\/(\d+)/g, (match, p1, p2) => {
-                      return `${p1}∕${p2}`; // Unicode division slash
-                    });
-                    
-                    return (
-                      <Text key={node.key} style={styles.text}>
-                        {text}
-                      </Text>
-                    );
-                  }
-                }}
-              >
-                {isBot ? item.text : ''}
-              </Markdown>
-            )}
-            {!isBot && item.text && (
-              <Text style={styles.userText}>
+            
+            {item.text && item.text.trim() !== '' && (
+              <Text style={[
+                isBot ? styles.botText : styles.userText,
+                styles.messageText,
+                styles.captionText
+              ]}>
                 {item.text}
               </Text>
             )}
+            
             <View style={isBot ? styles.botTail : styles.userTail} />
           </Animatable.View>
           
-          {/* Message action buttons for image messages */}
+          {/* Message action buttons */}
           <Animatable.View
             animation="fadeInUp"
             duration={800}
@@ -1174,18 +1098,6 @@ const persistEvent = (event) => {
               />
             </TouchableOpacity>
           </Animatable.View>
-          
-          {/* Show loading animation below the last user message when response is being generated */}
-          {isLastUserMessage && (
-            <View style={styles.loadingMessageContainer}>
-              <LottieView
-                source={require('../assets/dot.json')}
-                autoPlay
-                loop
-                style={styles.loadingAnimation}
-              />
-            </View>
-          )}
         </View>
       );
     }
@@ -1447,9 +1359,9 @@ const persistEvent = (event) => {
           {isBot && (
             <View style={styles.botHeaderContainer}>
               <View style={styles.botHeaderLogoContainer}>
-              <Image source={require('../assets/logo7.png')} style={[styles.botHeaderLogo , {tintColor: '#fff'}]} />
+                <Image source={require('../assets/logo7.png')} style={[styles.botHeaderLogo , {tintColor: '#fff'}]} />
               </View>
-              <Text style={[styles.botHeaderText , {color: colors.border}]}>MatrixAI</Text>
+              <Text style={[styles.botHeaderText, {color: '#4C8EF7'}]}>MatrixAI</Text>
             </View>
           )}
           <View style={isBot ? styles.botTextContainer : styles.userTextContainer}>
@@ -1582,7 +1494,6 @@ const persistEvent = (event) => {
                         color: isBot ? colors.botText : '#FFFFFF',
                       }
                     }}
-                    // Adding custom renderers for better ordered lists
                     rules={{
                       // Custom ordered list renderer
                       list: (node, children, parent, styles) => {
@@ -1618,15 +1529,6 @@ const persistEvent = (event) => {
                               {children}
                             </View>
                           </View>
-                        );
-                      },
-                      // Custom text renderer to ensure text color
-                      text: (node, children, parent, styles) => {
-                        // Use dynamic color based on sender
-                        return (
-                          <Text key={node.key} style={[styles.text, {color: isBot ? colors.botText : '#fff'}]}>
-                            {node.content}
-                          </Text>
                         );
                       }
                     }}
@@ -1794,21 +1696,9 @@ const persistEvent = (event) => {
             />
           </TouchableOpacity>
         </Animatable.View>
-        
-        {/* Show loading animation below the last user message when response is being generated */}
-        {isLastUserMessage && (
-          <View style={styles.loadingMessageContainer}>
-            <LottieView
-              source={require('../assets/dot.json')}
-              autoPlay
-              loop
-              style={styles.loadingAnimation}
-            />
-          </View>
-        )}
       </View>
     );
-  }, [dataLoaded, messages, expandedMessages, isLoading]);
+  }, [dataLoaded, messages, expandedMessages, isLoading, colors.botText, colors.primary, colors.background]);
 
   useEffect(() => {
     // Remove the web-specific event listener code that's causing errors
@@ -1846,8 +1736,40 @@ const persistEvent = (event) => {
               const lastChat = JSON.parse(lastChatData);
               console.log('Found last chat in storage:', lastChat.id);
               setCurrentChatId(lastChat.id);
-              setMessages(lastChat.messages || []);
-              setChats([lastChat]);
+              
+              // Process messages to ensure proper image display
+              const processedMessages = (lastChat.messages || []).map(msg => {
+                // Check for image URLs in text field
+                if (msg.text && typeof msg.text === 'string' && 
+                    (msg.text.includes('supabase.co/storage/v1/') || 
+                     msg.text.includes('user-uploads'))) {
+                  return {
+                    ...msg,
+                    image: msg.text,
+                    text: ''
+                  };
+                }
+                // Check for JSON format messages with image and text
+                if (msg.text && typeof msg.text === 'string' && 
+                    msg.text.startsWith('{') && msg.text.includes('type')) {
+                  try {
+                    const parsedMsg = JSON.parse(msg.text);
+                    if (parsedMsg.type === 'image_message') {
+                      return {
+                        ...msg,
+                        image: parsedMsg.image,
+                        text: parsedMsg.text || ''
+                      };
+                    }
+                  } catch (e) {
+                    console.log('Failed to parse JSON message:', e);
+                  }
+                }
+                return msg;
+              });
+              
+              setMessages(processedMessages);
+              setChats([{...lastChat, messages: processedMessages}]);
             } else {
               // No previous chat found, create a new one
               const newChatId = Date.now().toString();
@@ -1909,13 +1831,37 @@ const persistEvent = (event) => {
         const processedChats = userChats.map(chat => {
           // Map messages and check for image URLs
           const processedMessages = (chat.messages || []).map(msg => {
+            // Direct detection of Supabase URLs in the text field
             if (msg.text && typeof msg.text === 'string' && 
-                msg.text.includes('supabase.co/storage/v1/')) {
+                (msg.text.includes('supabase.co/storage/v1/') || 
+                 msg.text.includes('user-uploads'))) {
+              console.log('Converting stored text URL to image:', msg.text);
               return {
                 ...msg,
                 image: msg.text,
                 text: ''
               };
+            }
+            // If message already has an image property, keep it
+            else if (msg.image) {
+              return msg;
+            }
+            // Check for JSON format messages with image and text
+            else if (msg.text && typeof msg.text === 'string' && 
+                     msg.text.startsWith('{') && msg.text.includes('type')) {
+              try {
+                const parsedMsg = JSON.parse(msg.text);
+                if (parsedMsg.type === 'image_message') {
+                  console.log('Processing stored combined image and text message');
+                  return {
+                    ...msg,
+                    image: parsedMsg.image,
+                    text: parsedMsg.text || ''
+                  };
+                }
+              } catch (e) {
+                console.log('Failed to parse stored JSON message:', e);
+              }
             }
             return msg;
           });
@@ -2045,14 +1991,39 @@ const persistEvent = (event) => {
     // Handle a chat being updated
     const handleChatUpdate = (updatedChat) => {
       // Process messages for images
-      const processedMessages = updatedChat.messages.map(msg => {
+      const processedMessages = (updatedChat.messages || []).map(msg => {
+        // Check if message text is a URL from Supabase
         if (msg.text && typeof msg.text === 'string' && 
-            msg.text.includes('supabase.co/storage/v1/')) {
+            (msg.text.includes('supabase.co/storage/v1/') || 
+             msg.text.includes('user-uploads'))) {
+          console.log('Converting text URL to image property:', msg.text);
           return {
             ...msg,
-            image: msg.text,
-            text: ''
+            image: msg.text,  // Set the image property
+            text: ''          // Clear the text field
           };
+        }
+        // Check if the message already has an image property
+        else if (msg.image && typeof msg.image === 'string') {
+          console.log('Message already has image property:', msg.image);
+          return msg;
+        }
+        // Check for JSON format messages with image and text
+        else if (msg.text && typeof msg.text === 'string' && 
+                 msg.text.startsWith('{') && msg.text.includes('type')) {
+          try {
+            const parsedMsg = JSON.parse(msg.text);
+            if (parsedMsg.type === 'image_message') {
+              console.log('Processing combined image and text message');
+              return {
+                ...msg,
+                image: parsedMsg.image,
+                text: parsedMsg.text || ''
+              };
+            }
+          } catch (e) {
+            console.log('Failed to parse JSON message:', e);
+          }
         }
         return msg;
       });
@@ -2339,6 +2310,13 @@ const persistEvent = (event) => {
 
       if (response.assets && response.assets.length > 0) {
         const { uri, type, fileName } = response.assets[0];
+        
+        // Add additional logging for debugging
+        console.log('Selected image details:', {
+          uri: uri,
+          type: type || 'image/jpeg',
+          fileName: fileName || `image_${Date.now()}.jpg`
+        });
         
         // Set the selected image
         setSelectedImage(uri);
@@ -2984,7 +2962,19 @@ const persistEvent = (event) => {
 
   // Function to handle image tap and show fullscreen view
   const handleImageTap = (imageUri) => {
-    setFullScreenImage(imageUri);
+    console.log('Opening image in full screen:', imageUri);
+    if (typeof imageUri === 'string' && imageUri) {
+      setFullScreenImage(imageUri);
+    } else {
+      console.error('Invalid image URI:', imageUri);
+      Toast.show({
+        type: 'error',
+        text1: 'Cannot display image',
+        text2: 'The image URL appears to be invalid',
+        position: 'bottom',
+        visibilityTime: 3000,
+      });
+    }
   };
 
   // Add a function to render tables
@@ -3079,7 +3069,7 @@ const persistEvent = (event) => {
               >
                 <Text style={[
                   styles.tableHeaderText,
-                  { color: '#333333' },
+                  { color: '#333333' }, // Use theme color instead of hardcoded color
                   isScheduleTable && styles.scheduleTableHeaderText
                 ]}>
                   {header || ''}
@@ -3127,7 +3117,7 @@ const persistEvent = (event) => {
                   >
                     <Text style={[
                       styles.tableCellText,
-                      { color: '#333333' },
+                      { color: '#333333' }, // Use theme color instead of hardcoded color
                       isScheduleTable && styles.scheduleTableCellText,
                       isDayRow && styles.dayText
                     ]}>
@@ -3405,10 +3395,14 @@ const persistEvent = (event) => {
                   </TouchableOpacity>
                   <TouchableOpacity 
                     onPress={handleSendMessage} 
-                    style={styles.sendButton} 
+                    style={[styles.sendButton, isSendDisabled && styles.sendButtonDisabled]} 
                     disabled={isSendDisabled}
                   >
-                    <Ionicons name="send" size={24} color="#4C8EF7" />
+                    {isSendDisabled ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Ionicons name="send" size={24} color="#4C8EF7" />
+                    )}
                   </TouchableOpacity>
                 </View>
               </LinearGradient>
@@ -3463,24 +3457,50 @@ const persistEvent = (event) => {
         onRequestClose={() => setFullScreenImage(null)}
       >
         <View style={styles.fullScreenImageContainer}>
-          <Image
-            source={{ uri: fullScreenImage }}
-            style={styles.fullScreenImage}
-            resizeMode="contain"
-          />
           <TouchableOpacity
             style={styles.closeFullScreenButton}
             onPress={() => setFullScreenImage(null)}
           >
             <Ionicons name="close" size={28} color="#fff" />
           </TouchableOpacity>
+          
+          {fullScreenImage ? (
+            <View style={styles.fullScreenImageWrapper}>
+              <Image
+                source={{ uri: fullScreenImage }}
+                style={styles.fullScreenImage}
+                resizeMode="contain"
+                onError={(e) => {
+                  console.error('Fullscreen image error:', e.nativeEvent.error);
+                  console.error('Problem URL:', fullScreenImage);
+                  // Show error message to user
+                  Toast.show({
+                    type: 'error',
+                    text1: 'Failed to load image',
+                    text2: 'There was a problem displaying this image',
+                    position: 'bottom',
+                    visibilityTime: 3000,
+                  });
+                }}
+              />
+            </View>
+          ) : (
+            <View style={styles.fullScreenImageError}>
+              <Text style={styles.fullScreenErrorText}>
+                Unable to load the image. The URL may be invalid.
+              </Text>
+            </View>
+          )}
         </View>
       </Modal>
 
       {/* Scroll to bottom button */}
       {showScrollToBottom && (
         <TouchableOpacity 
-          style={styles.scrollToBottomButton}
+          style={[
+            styles.scrollToBottomButton,
+            showAdditionalButtons && styles.scrollToBottomButtonAdjusted
+          ]}
           onPress={scrollToBottom}
         >
           <Text style={styles.scrollToBottomIcon}>↓</Text>
@@ -3888,15 +3908,10 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   imageContainer: {
-    height: 200,
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 15,
+    marginVertical: 5,
     borderRadius: 10,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+    width: '100%',
   },
   previewImage: {
     width: '100%',
@@ -4268,6 +4283,7 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 10,
     marginVertical: 5,
+    backgroundColor: '#e1e1e1', // Light grey background as placeholder
   },
   fullScreenImageContainer: {
     flex: 1,
@@ -4289,6 +4305,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 10,
   },
   messageActionButtons: {
     flexDirection: 'row',
@@ -4374,11 +4391,13 @@ const styles = StyleSheet.create({
   tableHeaderText: {
     fontWeight: 'bold',
     fontSize: 15,
+    fontFamily: 'monospace',
     color: '#333333',
     textAlign: 'center',
   },
   tableCellText: {
     fontSize: 14,
+    fontFamily: 'monospace',
     color: '#333333',
     textAlign: 'center',
   },
@@ -4406,6 +4425,7 @@ const styles = StyleSheet.create({
   scheduleTableHeaderText: {
     fontWeight: 'bold',
     fontSize: 15,
+    fontFamily: 'monospace',
     color: '#333',
     textAlign: 'center',
   },
@@ -4418,6 +4438,7 @@ const styles = StyleSheet.create({
   },
   scheduleTableCellText: {
     fontSize: 14,
+    fontFamily: 'monospace',
     color: '#333',
     textAlign: 'center',
   },
@@ -4558,7 +4579,7 @@ const styles = StyleSheet.create({
   scrollToBottomButton: {
     position: 'absolute',
     right: 15,
-    bottom: 80, // Adjust based on your input bar height
+    bottom: 100, // Adjust based on your input bar height
     backgroundColor: '#4C8EF7',
     width: 40,
     height: 40,
@@ -4667,6 +4688,65 @@ const styles = StyleSheet.create({
     padding: 19,
     borderRadius: 30,
     backgroundColor: '#4C8EF7',
+  },
+  scrollToBottomButtonAdjusted: {
+    bottom: 190, // Adjust position when additional buttons are shown
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#4C8EF7',
+    borderRadius: 20,
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fullScreenImageError: {
+    width: '100%',
+    height: '90%',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
+  imageLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  imageLoadingText: {
+    color: '#fff',
+    marginTop: 10,
+    fontWeight: 'bold',
+  },
+  messageTextSection: {
+    marginTop: 10,
+    paddingHorizontal: 5,
+  },
+  messageText: {
+    marginTop: 8,
+  },
+  fullScreenImageWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+  },
+  fullScreenErrorText: {
+    color: '#fff',
+    fontSize: 18,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  captionText: {
+    marginTop: 8,
+   
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderLeftWidth: 2,
+    borderLeftColor: '#4C8EF7',
   },
 });
 

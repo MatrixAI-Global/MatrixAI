@@ -2571,7 +2571,7 @@ import Slider from '@react-native-community/slider'; // Import the Slider compon
                 animationType="slide"
                 onRequestClose={() => setIsFullScreen(false)}
             >
-                <View style={styles.fullScreenContainer}>
+                <View style={[styles.fullScreenContainer, {backgroundColor: colors.background}]}>
                     <View style={styles.fullScreenGraphContainer}>
                         <ForceDirectedGraph2 transcription={transcription} uid={uid} audioid={audioid} xmlData={XMLData} />
                     </View>

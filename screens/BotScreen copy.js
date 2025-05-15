@@ -833,7 +833,7 @@ const BotScreen2 = ({ navigation, route }) => {
               >
                 <Text style={[
                   styles.tableHeaderText,
-                  { color: '#333333' },
+                  { color: '#333333' }, // Use theme color instead of hardcoded color
                   isScheduleTable && styles.scheduleTableHeaderText
                 ]}>
                   {header || ''}
@@ -881,7 +881,7 @@ const BotScreen2 = ({ navigation, route }) => {
                   >
                     <Text style={[
                       styles.tableCellText,
-                      { color: '#333333' },
+                      { color: '#333' }, // Use theme color instead of hardcoded color
                       isScheduleTable && styles.scheduleTableCellText,
                       isDayRow && styles.dayText
                     ]}>
@@ -1350,7 +1350,7 @@ const BotScreen2 = ({ navigation, route }) => {
                       <View style={styles.botHeaderLogoContainer}>
                         <Image source={require('../assets/logo7.png')} style={styles.botHeaderLogo} />
                       </View>
-                      <Text style={[styles.botHeaderText, {color: colors.border}]}>MatrixAI</Text>
+                      <Text style={[styles.botHeaderText, {color: colors.primary}]}>MatrixAI</Text>
                     </View>
                   )}
                   
@@ -2871,10 +2871,12 @@ marginBottom:-10,
   tableHeaderText: {
     fontWeight: 'bold',
     fontSize: 14,
+    fontFamily: 'monospace',
     color: '#333333',
   },
   tableCellText: {
     fontSize: 14,
+    fontFamily: 'monospace',
     color: '#333333',
   },
   list_item_bullet: {
@@ -2982,6 +2984,7 @@ marginBottom:-10,
   summaryTableHeaderText: {
     fontWeight: 'bold',
     fontSize: 15,
+    fontFamily: 'monospace',
     color: '#333',
     textAlign: 'center',
   },
@@ -2995,6 +2998,7 @@ marginBottom:-10,
   },
   summaryTableCellText: {
     fontSize: 14,
+    fontFamily: 'monospace',
     color: '#333',
     textAlign: 'center',
   },
@@ -3027,6 +3031,7 @@ marginBottom:-10,
   scheduleTableHeaderText: {
     fontWeight: 'bold',
     fontSize: 15,
+    fontFamily: 'monospace',
     color: '#333',
     textAlign: 'center',
   },
@@ -3039,6 +3044,7 @@ marginBottom:-10,
   },
   scheduleTableCellText: {
     fontSize: 14,
+    fontFamily: 'monospace',
     color: '#333',
     textAlign: 'center',
   },

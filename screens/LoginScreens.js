@@ -6,6 +6,7 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { setupAuthLinking, handleGoogleSignIn } from '../utils/linkingConfig';
 import { debugGoogleAuth } from '../utils/googleAuthDebug';
+import { useTheme } from '../context/ThemeContext';
 
 // Generate a nonce at app startup
 const generateNonce = (length = 32) => {
@@ -19,6 +20,8 @@ const generateNonce = (length = 32) => {
 
 const LoginScreen = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(false);
+  const { getThemeColors } = useTheme();
+  const colors = getThemeColors();
 
   useEffect(() => {
     // Configure Google Sign-In only once when component mounts
@@ -130,7 +133,7 @@ const LoginScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Logo Image */}
       <Image
         source={require('../assets/logo.png')} // Replace with your logo path
@@ -138,7 +141,7 @@ const LoginScreen = ({ navigation }) => {
       />
 
       {/* Welcome Text */}
-      <Text style={styles.title}>Let's Get Started!</Text>
+      <Text style={[styles.title, { color: colors.text }] }>Let's Get Started!</Text>
 
       {/* Social Login Buttons */}
     

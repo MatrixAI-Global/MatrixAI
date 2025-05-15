@@ -7,7 +7,12 @@ import { XMLParser } from 'fast-xml-parser';
 import { useTheme } from '../context/ThemeContext';
 const ForceDirectedGraph2 = ({ transcription, uid, audioid, xmlData }) => {
   const { getThemeColors } = useTheme();
-  const colors = getThemeColors();
+  const colors = getThemeColors() || {
+    background: '#FFFFFF',
+    text: '#333333',
+    primary: '#007AFF',
+    border: '#E0E0E0'
+  };
   const [graphData, setGraphData] = useState(null);
   const openai = new OpenAI({
     baseURL: 'https://api.deepseek.com',
@@ -74,7 +79,7 @@ const ForceDirectedGraph2 = ({ transcription, uid, audioid, xmlData }) => {
         messages: [
           {
             role: "user",
-            content: `Generate a hierarchical XML structure from this meeting transcript: "${transcription}".
+            content: `Generate a hierarchical XML structure from this meeting transcript in the same language as the transcript: "${transcription}".
             Create a tree structure with main topics and subtopics.
             Use this format:
             <meeting>
@@ -94,6 +99,9 @@ const ForceDirectedGraph2 = ({ transcription, uid, audioid, xmlData }) => {
                 <description>Overall description of topic</description>
               </topic>
             </meeting>`
+            + `
+            Make sure the XML is in the same language as the transcript.
+            `
           }
         ],
         temperature: 0.7,
@@ -143,8 +151,8 @@ const ForceDirectedGraph2 = ({ transcription, uid, audioid, xmlData }) => {
 
   if (!graphData) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={{color: colors.text}}>Loading graph...</Text>
+      <View style={[styles.loadingContainer, {backgroundColor: colors?.background || '#ffffff'}]}>
+        <Text style={{color: colors?.text || '#000000'}}>Loading graph...</Text>
       </View>
     );
   }
@@ -156,16 +164,26 @@ const ForceDirectedGraph2 = ({ transcription, uid, audioid, xmlData }) => {
   <head>
     <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+      body {
+        background-color: ${colors?.background || '#ffffff'};
+        color: ${colors?.text || '#000000'};
+        margin: 0;
+        padding: 0;
+      }
+    </style>
   </head>
   <body>
     <div id="chart" style="width: 100%; height: 1200%;"></div>
     <script>
       const chartDom = document.getElementById('chart');
       const myChart = echarts.init(chartDom);
-      const colors = ['#5470C6', '#91CC75', '#EE6666', '#FAC858', '#73C0DE', '#3BA272', '#FC8452', '#9A60B4', '#EA7CCC'];
+      const chartColors = ['#5470C6', '#91CC75', '#EE6666', '#FAC858', '#73C0DE', '#3BA272', '#FC8452', '#9A60B4', '#EA7CCC'];
+      const themeBackground = '${colors?.background || "#ffffff"}';
+      const themeText = '${colors?.text || "#000000"}';
 
       function assignColors(node, index = 0) {
-        node.lineStyle = { color: colors[index % colors.length] };
+        node.lineStyle = { color: chartColors[index % chartColors.length] };
         if (node.children) {
           node.children.forEach((child, idx) => assignColors(child, idx));
         }
@@ -245,6 +263,7 @@ const ForceDirectedGraph2 = ({ transcription, uid, audioid, xmlData }) => {
       const adjustedGraphData = adjustNodePositions(coloredGraphData);
 
       const option = {
+        backgroundColor: themeBackground,
         tooltip: { trigger: 'item', triggerOn: 'mousemove' },
         series: [{
           type: 'tree',
@@ -260,6 +279,7 @@ const ForceDirectedGraph2 = ({ transcription, uid, audioid, xmlData }) => {
             verticalAlign: 'middle',
             align: 'right',
             fontSize: 24,
+            color: themeText,
             formatter: (params) => {
               // Wrap text into multiple lines based on node type
               const nodeType = params.data.nodeType || 'topic'; // Default to 'topic'
@@ -276,6 +296,7 @@ const ForceDirectedGraph2 = ({ transcription, uid, audioid, xmlData }) => {
               position: 'right',
               verticalAlign: 'middle',
               align: 'left',
+              color: themeText,
               formatter: (params) => {
                 // Wrap text into multiple lines based on node type
                 const nodeType = params.data.nodeType || 'description'; // Default to 'description'
@@ -286,7 +307,7 @@ const ForceDirectedGraph2 = ({ transcription, uid, audioid, xmlData }) => {
                   lineHeight: 24, // Adjust line height to match font size
                 }
               }
-            },
+            }
           },
           emphasis: { focus: 'descendant' },
           expandAndCollapse: true,
@@ -310,20 +331,20 @@ const ForceDirectedGraph2 = ({ transcription, uid, audioid, xmlData }) => {
 `;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, {backgroundColor: colors?.background || '#ffffff'}]}>
       <WebView
         originWhitelist={['*']}
         source={{ html: chartHtml }}
         javaScriptEnabled={true}
         domStorageEnabled={true}
-        style={{ flex: 1 }}
+        style={{ flex: 1, backgroundColor: colors?.background || '#ffffff' }}
       />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 });
 

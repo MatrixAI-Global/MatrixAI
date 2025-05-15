@@ -13,6 +13,7 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { setupAuthLinking, handleGoogleSignIn } from '../utils/linkingConfig';
 import { debugGoogleAuth, testRedirectMethods } from '../utils/googleAuthDebug';
 const { width } = Dimensions.get('window');
+import { useTheme } from '../context/ThemeContext';
 
 // Generate a nonce for security purposes
 const generateNonce = (length = 32) => {
@@ -24,13 +25,15 @@ const generateNonce = (length = 32) => {
   return result;
 };
 
-const EmailLoginScreen = ({ navigation }) => {
+    const EmailLoginScreen = ({ navigation }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [isChecked, setChecked] = useState(false);
+    const { getThemeColors } = useTheme();
+    const colors = getThemeColors();
 
     useEffect(() => {
         // Configure Google Sign-In only for iOS
@@ -155,121 +158,193 @@ const EmailLoginScreen = ({ navigation }) => {
         setLoading(true);
     
         try {
-            // Implement retry logic for network issues
-            const loginWithRetry = async (retries = 3, delay = 1000) => {
-                for (let attempt = 0; attempt < retries; attempt++) {
-                    try {
-                        // Use a promise with timeout to handle network issues
-                        const loginPromise = supabase.auth.signInWithPassword({
-                            email: email.trim(),
-                            password: password.trim()
-                        });
-                        
-                        // Create a timeout promise
-                        const timeoutPromise = new Promise((_, reject) => 
-                            setTimeout(() => reject(new Error('Login request timed out')), 10000)
-                        );
-                        
-                        // Race the promises - whichever resolves/rejects first wins
-                        const result = await Promise.race([loginPromise, timeoutPromise]);
-                        return result;
-                    } catch (error) {
-                        console.log(`Login attempt ${attempt + 1} failed:`, error.message);
-                        
-                        // If this was the last attempt, throw the error
-                        if (attempt === retries - 1) throw error;
-                        
-                        // Otherwise wait before retrying
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                        // Increase delay for next attempt
-                        delay *= 1.5;
+            // First, try online authentication with Supabase
+            try {
+                // Implement retry logic for network issues
+                const loginWithRetry = async (retries = 3, delay = 1000) => {
+                    for (let attempt = 0; attempt < retries; attempt++) {
+                        try {
+                            // Use a promise with timeout to handle network issues
+                            const loginPromise = supabase.auth.signInWithPassword({
+                                email: email.trim(),
+                                password: password.trim()
+                            });
+                            
+                            // Create a timeout promise
+                            const timeoutPromise = new Promise((_, reject) => 
+                                setTimeout(() => reject(new Error('Login request timed out')), 10000)
+                            );
+                            
+                            // Race the promises - whichever resolves/rejects first wins
+                            const result = await Promise.race([loginPromise, timeoutPromise]);
+                            return result;
+                        } catch (error) {
+                            console.log(`Login attempt ${attempt + 1} failed:`, error.message);
+                            
+                            // If this was the last attempt, throw the error
+                            if (attempt === retries - 1) throw error;
+                            
+                            // Otherwise wait before retrying
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            // Increase delay for next attempt
+                            delay *= 1.5;
+                        }
                     }
-                }
-            };
-            
-            // Attempt login with retry
-            const { data, error } = await loginWithRetry();
+                };
+                
+                // Attempt login with retry
+                const { data, error } = await loginWithRetry();
 
-            if (error) {
-                // Check if the error is about user not registered
-                if (error.message.includes('Invalid login credentials') || 
-                    error.message.includes('Email not confirmed')) {
-                    
-                    // Check if the user exists but is not registered
-                    const { data: userData, error: userError } = await supabase.auth.admin.getUserByEmail(email.trim());
-                    
-                    if (userError || !userData) {
-                        // User doesn't exist, navigate to signup
-                        Toast.show({
-                            type: 'info',
-                            text1: 'User not found',
-                            text2: 'Please sign up to create an account.',
-                            position: 'bottom'
-                        });
+                if (error) {
+                    // Check if the error is about user not registered
+                    if (error.message.includes('Invalid login credentials') || 
+                        error.message.includes('Email not confirmed')) {
                         
-                        navigation.navigate('SignUpDetails', {
-                            email: email.trim(),
-                            disableEmailInput: false,
-                        });
-                        return;
+                        // Check if the user exists but is not registered
+                        const { data: userData, error: userError } = await supabase.auth.admin.getUserByEmail(email.trim());
+                        
+                        if (userError || !userData) {
+                            // User doesn't exist, navigate to signup
+                            Toast.show({
+                                type: 'info',
+                                text1: 'User not found',
+                                text2: 'Please sign up to create an account.',
+                                position: 'bottom'
+                            });
+                            
+                            navigation.navigate('SignUpDetails', {
+                                email: email.trim(),
+                                disableEmailInput: false,
+                            });
+                            return;
+                        }
+                        
+                        // User exists but email not confirmed
+                        if (error.message.includes('Email not confirmed')) {
+                            Toast.show({
+                                type: 'info',
+                                text1: 'Email not verified',
+                                text2: 'Please verify your email to continue.',
+                                position: 'bottom'
+                            });
+                            
+                            navigation.navigate('EmailVerification', { 
+                                email: email.trim(),
+                                message: 'Please verify your email to continue.'
+                            });
+                            return;
+                        }
                     }
                     
-                    // User exists but email not confirmed
-                    if (error.message.includes('Email not confirmed')) {
-                        Toast.show({
-                            type: 'info',
-                            text1: 'Email not verified',
-                            text2: 'Please verify your email to continue.',
-                            position: 'bottom'
-                        });
-                        
-                        navigation.navigate('EmailVerification', { 
-                            email: email.trim(),
-                            message: 'Please verify your email to continue.'
-                        });
-                        return;
-                    }
+                    throw error;
                 }
                 
-                throw error;
-            }
-            
-            // Check if email is verified
-            if (data.user && !data.user.email_confirmed_at) {
-                Toast.show({
-                    type: 'info',
-                    text1: 'Email not verified',
-                    text2: 'Please verify your email to continue.',
-                    position: 'bottom'
-                });
+                // Check if email is verified
+                if (data.user && !data.user.email_confirmed_at) {
+                    Toast.show({
+                        type: 'info',
+                        text1: 'Email not verified',
+                        text2: 'Please verify your email to continue.',
+                        position: 'bottom'
+                    });
+                    
+                    navigation.navigate('EmailVerification', { 
+                        email: email.trim(),
+                        message: 'Please verify your email to continue.'
+                    });
+                    return;
+                }
+        
+                // If we have user data in the response
+                if (data.user?.id) {
+                    // Store session data
+                    await AsyncStorage.setItem('supabase-session', JSON.stringify(data.session));
+                    
+                    // Store user credentials for possible offline authentication
+                    await AsyncStorage.setItem('auth_credentials', JSON.stringify({
+                        email: email.trim(),
+                        // Store the password hash or a token instead of plain password in a real app
+                        passwordHash: btoa(password.trim())
+                    }));
+                    
+                    // Store user data
+                    await AsyncStorage.setItem('uid', data.user.id);
+                    await AsyncStorage.setItem('userLoggedIn', 'true');
+                    
+                    // Manual refresh of auth state since the listener may not trigger
+                    // This will update the AuthContext state
+                    const { error: refreshError } = await supabase.auth.refreshSession();
+                    if (refreshError) {
+                        console.log('Warning: Failed to refresh session after login:', refreshError.message);
+                    }
+                    
+                    Toast.show({
+                        type: 'success',
+                        text1: 'Success',
+                        text2: 'Login successful!',
+                        position: 'bottom'
+                    });
+                    
+                    // Add a small delay to ensure AsyncStorage is updated
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                    
+                    // Navigate to main screen
+                    navigation.replace('Home');
+                    return;
+                } else {
+                    throw new Error('No user data in response');
+                }
+            } catch (onlineError) {
+                // If online authentication fails, try offline fallback
+                console.log('Online authentication failed, trying offline fallback:', onlineError);
                 
-                navigation.navigate('EmailVerification', { 
-                    email: email.trim(),
-                    message: 'Please verify your email to continue.'
-                });
-                return;
-            }
-    
-            // If we have user data in the response
-            if (data.user?.id) {
-                // Store session data
-                await AsyncStorage.setItem('supabase-session', JSON.stringify(data.session));
-                
-                // Store user data
-                await AsyncStorage.setItem('uid', data.user.id);
-                await AsyncStorage.setItem('userLoggedIn', 'true');
-                
-                Toast.show({
-                    type: 'success',
-                    text1: 'Success',
-                    text2: 'Login successful!',
-                    position: 'bottom'
-                });
-                
-                // Navigate to main screen
-                navigation.replace('Home');
-            } else {
-                throw new Error('No user data in response');
+                if (
+                    onlineError.message.includes('Network request failed') || 
+                    onlineError.message.includes('timed out') ||
+                    onlineError.message.includes('network')
+                ) {
+                    // Try to authenticate with stored credentials
+                    const storedCredentialsString = await AsyncStorage.getItem('auth_credentials');
+                    const storedUid = await AsyncStorage.getItem('uid');
+                    
+                    if (storedCredentialsString && storedUid) {
+                        try {
+                            const storedCredentials = JSON.parse(storedCredentialsString);
+                            
+                            // Simple credential check - in a real app, use a more secure method
+                            if (
+                                storedCredentials.email === email.trim() && 
+                                storedCredentials.passwordHash === btoa(password.trim())
+                            ) {
+                                console.log('Offline authentication successful');
+                                
+                                // Set user as logged in
+                                await AsyncStorage.setItem('userLoggedIn', 'true');
+                                
+                                Toast.show({
+                                    type: 'success',
+                                    text1: 'Success',
+                                    text2: 'Logged in (offline mode)',
+                                    position: 'bottom'
+                                });
+                                
+                                // Navigate to main screen
+                                navigation.replace('Home');
+                                return;
+                            } else {
+                                throw new Error('Invalid credentials for offline login');
+                            }
+                        } catch (offlineError) {
+                            console.error('Offline authentication failed:', offlineError);
+                            throw new Error('Failed to authenticate in offline mode: ' + offlineError.message);
+                        }
+                    } else {
+                        throw new Error('No stored credentials for offline login');
+                    }
+                } else {
+                    // Not a network error, rethrow
+                    throw onlineError;
+                }
             }
         } catch (error) {
             console.error('Error during login:', error);
@@ -281,7 +356,7 @@ const EmailLoginScreen = ({ navigation }) => {
                 error.message.includes('timed out') ||
                 error.message.includes('network')
             ) {
-                errorMessage = 'Network error. Please check your internet connection and try again.';
+                errorMessage = 'Network error. Please check your internet connection and try again. If you\'ve logged in before, we\'ll try to authenticate you offline.';
             }
             
             Toast.show({
@@ -311,7 +386,7 @@ const EmailLoginScreen = ({ navigation }) => {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
             {/* Back Button */}
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
                 <View style={styles.backButtonCircle}>
@@ -320,13 +395,13 @@ const EmailLoginScreen = ({ navigation }) => {
             </TouchableOpacity>
 
             {/* Heading */}
-            <Text style={styles.heading}>Log in and unlock{'\n'}the digital universe</Text>
+            <Text style={[styles.heading, { color: colors.text }]}>Log in and unlock{'\n'}the digital universe</Text>
 
             {/* Email Input */}
             <View style={styles.inputContainer}>
                 <Icon name="mail-outline" size={20} color="#aaa" style={styles.inputIcon} />
                 <TextInput
-                    style={styles.input}
+                    style={[styles.input, { color: colors.text }]}
                     placeholder="Email"
                     placeholderTextColor="#aaa"
                     keyboardType="email-address"
@@ -340,7 +415,7 @@ const EmailLoginScreen = ({ navigation }) => {
             <View style={styles.inputContainer}>
                 <Icon name="lock-closed-outline" size={20} color="#aaa" style={styles.inputIcon} />
                 <TextInput
-                    style={styles.input}
+                    style={[styles.input, { color: colors.text }]}
                     placeholder="Password"
                     placeholderTextColor="#aaa"
                     secureTextEntry={!showPassword}
@@ -416,7 +491,7 @@ const EmailLoginScreen = ({ navigation }) => {
             </View>
 
             {/* Sign Up Link */}
-            <Text style={styles.signupText}>
+            <Text style={[styles.signupText, { color: colors.text }]}>
                 Don't have an account?
                 <Text style={styles.signupLink} onPress={handleSignUp}> Sign up</Text>
             </Text>

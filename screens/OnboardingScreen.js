@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 const { width, height } = Dimensions.get('window');
 import { useTheme } from '../context/ThemeContext';
 
+
 const OnboardingScreen = ({ navigation,onFinish }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const scrollViewRef = useRef(null);
@@ -64,8 +65,8 @@ const OnboardingScreen = ({ navigation,onFinish }) => {
                         <View style={styles.imageContainer}>
                             <Image source={slide.image} style={styles.image} />
                         </View>
-                        <Text style={styles.title}>{slide.title}</Text>
-                        <Text style={styles.description}>{slide.description}</Text>
+                        <Text style={[styles.title, { color: colors.text }]}>{slide.title}</Text>
+                        <Text style={[styles.description, { color: colors.border }]}>{slide.description}</Text>
                     </View>
                 ))}
             </ScrollView>

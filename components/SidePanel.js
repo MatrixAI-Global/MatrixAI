@@ -13,6 +13,7 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../supabaseClient';
 import { clearProStatus } from '../utils/proStatusUtils';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 const PANEL_WIDTH = width * 0.8;
@@ -182,8 +183,39 @@ const SidePanel = ({ isVisible, onClose, navigation }) => {
             try {
               // Clear pro status
               await clearProStatus();
+              
+              // Remove all authentication related data from AsyncStorage
+              const keysToRemove = [
+                'userLoggedIn',
+                'uid',
+                'referralCode',
+                'supabase-session',
+                'coins_count',
+                'pro_status'
+              ];
+              
+              // Get all keys from AsyncStorage to find any additional auth-related ones
+              const allKeys = await AsyncStorage.getAllKeys();
+              const authRelatedKeys = allKeys.filter(key => 
+                key.includes('supabase') || 
+                key.includes('auth') || 
+                key.includes('user') ||
+                key.includes('token') ||
+                key.includes('session')
+              );
+              
+              // Combine all keys to be removed
+              const allKeysToRemove = [...new Set([...keysToRemove, ...authRelatedKeys])];
+              
+              // Clear all relevant keys
+              await AsyncStorage.multiRemove(allKeysToRemove);
+              
               // Sign out from Supabase
               await supabase.auth.signOut();
+              
+              // Add a small delay to ensure all operations complete
+              await new Promise(resolve => setTimeout(resolve, 500));
+              
               // Navigate to login screen
               navigation.reset({
                 index: 0,
@@ -191,6 +223,21 @@ const SidePanel = ({ isVisible, onClose, navigation }) => {
               });
             } catch (error) {
               console.error('Error during logout:', error);
+              
+              // If there's an error, try a more aggressive approach
+              try {
+                // Clear all AsyncStorage as a last resort
+                await AsyncStorage.clear();
+                console.log('AsyncStorage cleared completely');
+                
+                // Navigate to login screen
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'Login' }],
+                });
+              } catch (finalError) {
+                console.error('Critical error during logout:', finalError);
+              }
             }
           }}
         >

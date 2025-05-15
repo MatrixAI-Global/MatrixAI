@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Toast from 'react-native-toast-message';
 import { NavigationContainer } from '@react-navigation/native';
 import { enableScreens } from 'react-native-screens';
+import NetInfo from '@react-native-community/netinfo';
 
 enableScreens();
 import 'react-native-url-polyfill/auto';
@@ -14,6 +15,7 @@ import LoginScreen from './screens/LoginScreens';
 import OTPCodeScreen from './screens/OTPCodeScreen';
 import { View, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
+import { supabase } from './supabaseClient'; // Import Supabase client
 
 import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
 import EmailVerificationScreen from './screens/EmailVerificationScreen';
@@ -110,16 +112,71 @@ const App = () => {
     useEffect(() => {
         const initializeApp = async () => {
             try {
+                // Check network connectivity first
+                const netInfo = await NetInfo.fetch();
+                const isConnected = netInfo.isConnected;
+                
                 // Check login status
                 const userStatus = await AsyncStorage.getItem('userLoggedIn');
-                if (userStatus === 'true') {
+                
+                if (!isConnected) {
+                    // In offline mode, rely solely on AsyncStorage
+                    console.log('Offline mode: Using stored login status');
+                    setIsLoggedIn(userStatus === 'true');
+                    setIsLoading(false);
+                    return;
+                }
+                
+                // If online, check if we have a valid Supabase session
+                const { data: { session } } = await supabase.auth.getSession();
+                const hasValidSession = !!session?.user?.id;
+                
+                // Update login status based on both local storage and session
+                const shouldBeLoggedIn = userStatus === 'true' && hasValidSession;
+                setIsLoggedIn(shouldBeLoggedIn);
+                
+                // If sessions don't match, update localStorage
+                if (userStatus === 'true' && !hasValidSession) {
+                    console.log('Session expired or invalid, updating login status');
+                    
+                    // Try to refresh the session first
+                    const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+                    
+                    if (refreshData?.session) {
+                        console.log('Successfully refreshed expired session');
+                        await AsyncStorage.setItem('uid', refreshData.session.user.id);
+                        setIsLoggedIn(true);
+                    } else {
+                        console.log('Could not refresh session:', refreshError?.message);
+                        await AsyncStorage.setItem('userLoggedIn', 'false');
+                    }
+                } else if (userStatus !== 'true' && hasValidSession) {
+                    console.log('Found valid session, updating login status');
+                    await AsyncStorage.setItem('userLoggedIn', 'true');
+                    await AsyncStorage.setItem('uid', session.user.id);
                     setIsLoggedIn(true);
                 }
                 
                 // Pre-load language preference (LanguageContext will handle this)
-                console.log('App initialized');
+                console.log('App initialized, logged in:', shouldBeLoggedIn);
             } catch (error) {
                 console.error('Error initializing app:', error);
+                // On error, check if we have valid offline credentials
+                try {
+                    const userStatus = await AsyncStorage.getItem('userLoggedIn');
+                    const storedUid = await AsyncStorage.getItem('uid');
+                    
+                    if (userStatus === 'true' && storedUid) {
+                        console.log('Using offline authentication due to initialization error');
+                        setIsLoggedIn(true);
+                    } else {
+                        // Assume not logged in if no valid offline credentials
+                        setIsLoggedIn(false);
+                    }
+                } catch (finalError) {
+                    console.error('Critical error during initialization:', finalError);
+                    setIsLoggedIn(false);
+                }
             } finally {
                 setIsLoading(false);
             }
