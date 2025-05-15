@@ -14,6 +14,7 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   Share,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -21,7 +22,7 @@ import * as Animatable from 'react-native-animatable';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
-import { GestureHandlerRootView, Swipeable, TouchableWithoutFeedback } from 'react-native-gesture-handler';
+import { GestureHandlerRootView, Swipeable} from 'react-native-gesture-handler';
 import ForceDirectedGraph2 from '../components/mindMap2';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import AntDesign from 'react-native-vector-icons/AntDesign';
@@ -900,8 +901,9 @@ const BotScreen2 = ({ navigation, route }) => {
   const renderMessage = ({ item }) => {
     const isBot = item.sender === 'bot';
     const isUser = item.sender === 'user';
-    const isExpanded = expandedMessages[item.id];
-    const shouldTruncate = item.text && item.text.length > 100 && !isExpanded;
+    // Invert the logic: messages are expanded by default, expandedMessages tracks collapsed ones
+    const isCollapsed = expandedMessages[item.id];
+    const shouldTruncate = item.text && item.text.length > 100;
   
     // Function to handle long press
     const handleLongPress = () => {
@@ -1355,10 +1357,14 @@ const BotScreen2 = ({ navigation, route }) => {
                   )}
                   
                   {item.image ? (
-                    <TouchableOpacity onPress={() => handleImageTap(item.image)}>
+                    <TouchableOpacity 
+                      onPress={() => handleImageTap(item.image)}
+                      activeOpacity={0.8}
+                    >
                       <Image
                         source={{ uri: item.image }}
                         style={{ width: 200, height: 200, borderRadius: 10 }}
+                        resizeMode="cover"
                       />
                     </TouchableOpacity>
                   ) : (
@@ -1540,11 +1546,11 @@ const BotScreen2 = ({ navigation, route }) => {
                                 }
                               }}
                             >
-                              {line.text}
+                              {isCollapsed && shouldTruncate ? line.text.substring(0, 100) + '...' : line.text}
                             </Markdown>
                           );
                         } else if (line.isTable) {
-                          return renderTable(line, index);
+                          return !isCollapsed ? renderTable(line, index) : null;
                         } else if (line.isChineseHeading) {
                           return (
                             <View key={`chinese-heading-${index}`} style={styles.chineseHeadingContainer}>
@@ -1581,14 +1587,14 @@ const BotScreen2 = ({ navigation, route }) => {
                             </View>
                           );
                         } else if (line.hasMathExpression) {
-                          return renderTextWithMath(line, index);
+                          return !isCollapsed ? renderTextWithMath(line, index) : null;
                         } else {
                           return (
                             <Text key={`text-${index}`} style={[
                               isBot ? styles.botText : styles.userText,
                               isBot && { color: colors.botText }
                             ]}>
-                              {line.text}
+                              {isCollapsed && shouldTruncate ? line.text.substring(0, 100) + '...' : line.text}
                             </Text>
                           );
                         }
@@ -1601,7 +1607,7 @@ const BotScreen2 = ({ navigation, route }) => {
                       onPress={() => toggleMessageExpansion(item.id)}
                     >
                       <Text style={styles.viewMoreText}>
-                        {isExpanded ? 'View less' : 'View more'}
+                        {isCollapsed ? 'View more' : 'View less'}
                       </Text>
                     </TouchableOpacity>
                   )}
@@ -1656,6 +1662,7 @@ const BotScreen2 = ({ navigation, route }) => {
 
   // Function to handle image tap and show fullscreen view
   const handleImageTap = (imageUri) => {
+    console.log('Image tapped, displaying in fullscreen:', imageUri);
     setFullScreenImage(imageUri);
   };
 
@@ -1953,19 +1960,19 @@ const BotScreen2 = ({ navigation, route }) => {
       <View style={[styles.quickActionContainer , {backgroundColor: colors.background2}]}>
         <TouchableOpacity 
           style={[styles.quickActionButton , {backgroundColor: colors.background2}]}
-          onPress={() => transcription && fetchDeepSeekResponse(`Please provide a summary of this text in very structured format in the original language of the transcription: ${transcription}`)}
+          onPress={() => transcription && fetchDeepSeekResponse(`Please provide a summary of this text in very structured format in the original language of the transcription : ${transcription}`+'make sure to only show the summary in the original language of the transcription')}
         >
           <Text style={styles.quickActionText}>Quick Summary</Text>
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.quickActionButton , {backgroundColor: colors.background2}]}
-          onPress={() => transcription && fetchDeepSeekResponse(`Please extract and list the key points from this text in a structured format in the original language of the transcription: ${transcription}`)}
+          onPress={() => transcription && fetchDeepSeekResponse(`Please extract and list the key points from this text in a structured format in the original language of the transcription: ${transcription}`+'make sure to only show the key points in the original language of the transcription')}
         >
           <Text style={styles.quickActionText}>Key Points</Text>
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.quickActionButton , {backgroundColor: colors.background2}]}
-          onPress={() => transcription && fetchDeepSeekResponse(`Please analyze this text and provide potential solutions or recommendations for any problems or challenges mentioned and in the original language of the transcription: ${transcription}`)}
+          onPress={() => transcription && fetchDeepSeekResponse(`Please analyze this text and provide potential solutions or recommendations for any problems or challenges mentioned and in the original language of the transcription: ${transcription}`+'make sure to only show the solutions or recommendations in the original language of the transcription')}
         >
           <Text style={styles.quickActionText}>Solution</Text>
         </TouchableOpacity>
@@ -2021,7 +2028,7 @@ const BotScreen2 = ({ navigation, route }) => {
         </View>
       </Modal>
 
-      {/* Add the full screen image modal */}
+      {/* Full Screen Image Modal */}
       <Modal
         visible={fullScreenImage !== null}
         transparent={true}
@@ -2029,17 +2036,40 @@ const BotScreen2 = ({ navigation, route }) => {
         onRequestClose={() => setFullScreenImage(null)}
       >
         <View style={styles.fullScreenImageContainer}>
-          <Image
-            source={{ uri: fullScreenImage }}
-            style={styles.fullScreenImage}
-            resizeMode="contain"
-          />
+          {fullScreenImage ? (
+            <Image
+              source={{ uri: fullScreenImage }}
+              style={styles.fullScreenImage}
+              resizeMode="contain"
+              onError={() => {
+                console.error('Failed to load image:', fullScreenImage);
+                Alert.alert(
+                  'Image Error',
+                  'Unable to load the image. The URL may be invalid.',
+                  [{ text: 'OK', onPress: () => setFullScreenImage(null) }]
+                );
+              }}
+            />
+          ) : (
+            <View style={styles.fullScreenImageError}>
+              <Text style={styles.fullScreenErrorText}>
+                Unable to load the image. The URL may be invalid.
+              </Text>
+            </View>
+          )}
           <TouchableOpacity
             style={styles.closeFullScreenButton}
             onPress={() => setFullScreenImage(null)}
           >
             <Ionicons name="close" size={28} color="#fff" />
           </TouchableOpacity>
+          
+          {/* Background overlay to close on tap */}
+          <TouchableOpacity
+            style={styles.fullScreenBackdrop}
+            activeOpacity={1}
+            onPress={() => setFullScreenImage(null)}
+          />
         </View>
       </Modal>
     </SafeAreaView>
@@ -2682,10 +2712,13 @@ marginBottom:-10,
     backgroundColor: 'rgba(0, 0, 0, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
+    width: '100%',
+    height: '100%',
   },
   fullScreenImage: {
-    width: '100%',
-    height: '90%',
+    width: '95%',
+    height: '80%',
+    borderRadius: 5,
   },
   keyboardAvoidingView: {
     width: '100%',
@@ -3163,6 +3196,28 @@ marginBottom:-10,
     padding: 19,
     borderRadius: 30,
     backgroundColor: '#4C8EF7',
+  },
+  fullScreenImageContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullScreenImage: {
+    width: '100%',
+    height: '90%',
+  },
+  closeFullScreenButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
 });
 

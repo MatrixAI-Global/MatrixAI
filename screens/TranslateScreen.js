@@ -52,13 +52,13 @@ import Slider from '@react-native-community/slider'; // Import the Slider compon
       const { audioid ,uid} = route.params || {};
       const scrollY = new Animated.Value(0);
       const playerHeight = scrollY.interpolate({
-          inputRange: [0, 100],
-          outputRange: [120, 35],
+          inputRange: [0, 75, 76, 100],
+          outputRange: [120, 120, 35, 35],
           extrapolate: 'clamp',
       });
       const playerPadding = scrollY.interpolate({
-          inputRange: [0, 200],
-          outputRange: [16, 1],
+          inputRange: [0, 75, 76, 200],
+          outputRange: [16, 16, 1, 1],
           extrapolate: 'clamp',
       });
     
@@ -2004,16 +2004,26 @@ import Slider from '@react-native-community/slider'; // Import the Slider compon
         <Animated.View style={[
             styles.audioControlsContainer2,
           {
+            display: playerHeight.interpolate({
+              inputRange: [75, 76], // Use a very small range for abrupt change
+              outputRange: [1, 0], // 1 = 'flex', 0 = 'none' (REVERSED)
+              extrapolate: 'clamp'
+            }),
             opacity: playerHeight.interpolate({
-              inputRange: [35, 120],
-              outputRange: [1, 0], // Visible at 120, hidden at 35
+              inputRange: [75, 76], // Use a very small range for abrupt change
+              outputRange: [1, 0], // This creates an instant transition (REVERSED)
+              extrapolate: 'clamp'
+            }),
+            zIndex: playerHeight.interpolate({
+              inputRange: [75, 76],
+              outputRange: [10, 0], // REVERSED
               extrapolate: 'clamp'
             }),
             transform: [
               {
                 scale: playerHeight.interpolate({
                   inputRange: [35, 120],
-                  outputRange: [0.8, 1], // Optional: Add a scaling effect
+                  outputRange: [0.8, 1],
                   extrapolate: 'clamp'
                 })
               }
@@ -2096,16 +2106,26 @@ import Slider from '@react-native-community/slider'; // Import the Slider compon
         <Animated.View style={[
           styles.audioControlsContainer,
           {
+            display: playerHeight.interpolate({
+              inputRange: [75, 76], // Use a very small range for abrupt change
+              outputRange: [0, 1], // 0 = 'none', 1 = 'flex' (REVERSED)
+              extrapolate: 'clamp'
+            }),
             opacity: playerHeight.interpolate({
-              inputRange: [35, 120],
-              outputRange: [0, 1], // Visible at 35, hidden at 120
+              inputRange: [75, 76], // Use a very small range for abrupt change
+              outputRange: [0, 1], // This creates an instant transition (REVERSED)
+              extrapolate: 'clamp'
+            }),
+            zIndex: playerHeight.interpolate({
+              inputRange: [75, 76],
+              outputRange: [0, 10], // REVERSED
               extrapolate: 'clamp'
             }),
             transform: [
               {
                 scale: playerHeight.interpolate({
                   inputRange: [35, 120],
-                  outputRange: [0.8, 1], // Optional: Add a scaling effect
+                  outputRange: [0.8, 1],
                   extrapolate: 'clamp'
                 })
               }

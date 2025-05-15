@@ -970,9 +970,10 @@ const persistEvent = (event) => {
     }
   
     const isBot = item.sender === 'bot';
-    const isExpanded = expandedMessages[item.id];
+    // Invert the logic: messages are expanded by default, expandedMessages tracks collapsed ones
+    const isCollapsed = expandedMessages[item.id];
     const shouldTruncate = item.text && item.text.length > 100;
-    const displayText = shouldTruncate && !isExpanded 
+    const displayText = shouldTruncate && isCollapsed 
       ? `${item.text.substring(0, 100)}...`
       : item.text;
 
@@ -1365,9 +1366,177 @@ const persistEvent = (event) => {
             </View>
           )}
           <View style={isBot ? styles.botTextContainer : styles.userTextContainer}>
-            {formatMessageText(displayText, item.sender).map((line, index) => {
-              // Handle markdown content
-              if (line.isMarkdown) {
+            {formatMessageText(item.text, item.sender).map((line, index) => {
+              if (isCollapsed && shouldTruncate && line.isMarkdown) {
+                return (
+                  <Markdown 
+                    key={`markdown-${index}-${line.text.substring(0, 10)}`}
+                    style={{
+                      body: {
+                        color: isBot ? colors.botText : '#fff',
+                        fontSize: 16,
+                      },
+                      heading1: {
+                        color: isBot ? colors.botText : '#fff',
+                        fontWeight: 'bold',
+                        fontSize: 20,
+                        marginTop: 8,
+                        marginBottom: 4,
+                      },
+                      heading2: {
+                        color: isBot ? colors.botText : '#fff',
+                        fontWeight: 'bold',
+                        fontSize: 18,
+                        marginTop: 8,
+                        marginBottom: 4,
+                      },
+                      heading3: {
+                        color: isBot ? colors.botText : '#fff',
+                        fontWeight: 'bold',
+                        fontSize: 16,
+                        marginTop: 8,
+                        marginBottom: 4,
+                      },
+                      paragraph: {
+                        color: isBot ? colors.botText : '#fff',
+                        fontSize: 16,
+                        marginTop: 4,
+                        marginBottom: 4,
+                      },
+                      list_item: {
+                        color: isBot ? colors.botText : '#fff',
+                        fontSize: 16,
+                        marginTop: 4,
+                      },
+                      bullet_list: {
+                        color: isBot ? colors.botText : '#fff',
+                      },
+                      ordered_list: {
+                        marginLeft: 10,
+                      },
+                      ordered_list_item: {
+                        flexDirection: 'row',
+                        alignItems: 'flex-start',
+                        marginBottom: 4,
+                      },
+                      ordered_list_icon: {
+                        marginRight: 5,
+                        fontWeight: 'bold',
+                        color: '#333333',
+                      },
+                      list_item_number: {
+                        marginRight: 5,
+                        fontWeight: 'bold',
+                        fontSize: 16,
+                        color: '#333333',
+                        width: 20,
+                        textAlign: 'right',
+                      },
+                      list_item_content: {
+                        flex: 1,
+                        fontSize: 16,
+                        color: '#333333',
+                      },
+                      list_item_bullet: {
+                        marginRight: 5,
+                        fontSize: 16,
+                        color: '#333333',
+                      },
+                      blockquote: {
+                        backgroundColor: 'rgba(128, 128, 128, 0.1)',
+                        borderLeftWidth: 4,
+                        borderLeftColor: isBot ? colors.primary : '#fff',
+                        paddingLeft: 8,
+                        paddingVertical: 4,
+                        color: isBot ? colors.botText : '#fff',
+                      },
+                      code_block: {
+                        backgroundColor: 'rgba(128, 128, 128, 0.1)',
+                        padding: 8,
+                        borderRadius: 4,
+                        color: isBot ? colors.botText : '#fff',
+                      },
+                      code_inline: {
+                        backgroundColor: 'rgba(128, 128, 128, 0.1)',
+                        padding: 2,
+                        borderRadius: 2,
+                        color: isBot ? colors.botText : '#fff',
+                      },
+                      link: {
+                        color: colors.primary,
+                        textDecorationLine: 'underline',
+                      },
+                      table: {
+                        borderWidth: 1,
+                        borderColor: '#E0E0E0',
+                        marginVertical: 10,
+                      },
+                      tr: {
+                        borderBottomWidth: 1,
+                        borderBottomColor: '#E0E0E0',
+                        flexDirection: 'row',
+                      },
+                      th: {
+                        padding: 8,
+                        fontWeight: 'bold',
+                        borderRightWidth: 1,
+                        borderRightColor: '#E0E0E0',
+                        backgroundColor: '#F5F5F5',
+                        color: '#333333',
+                      },
+                      td: {
+                        padding: 8,
+                        borderRightWidth: 1,
+                        borderRightColor: '#E0E0E0',
+                        color: '#333333',
+                      },
+                      text: {
+                        color: isBot ? colors.botText : '#FFFFFF',
+                      }
+                    }}
+                    rules={{
+                      // Custom ordered list renderer
+                      list: (node, children, parent, styles) => {
+                        if (node.ordered) {
+                          return (
+                            <View key={node.key} style={styles.ordered_list}>
+                              {children}
+                            </View>
+                          );
+                        }
+                        return (
+                          <View key={node.key} style={styles.bullet_list}>
+                            {children}
+                          </View>
+                        );
+                      },
+                      // Custom ordered list item renderer
+                      list_item: (node, children, parent, styles) => {
+                        if (parent.ordered) {
+                          return (
+                            <View key={node.key} style={styles.ordered_list_item}>
+                              <Text style={[styles.list_item_number, {color: isBot ? '#2274F0' : '#fff'}]}>{node.index + 1}.</Text>
+                              <View style={styles.list_item_content}>
+                                {children}
+                              </View>
+                            </View>
+                          );
+                        }
+                        return (
+                          <View key={node.key} style={styles.list_item}>
+                            <Text style={[styles.list_item_bullet, {color: isBot ? '#2274F0' : '#fff'}]}>•</Text>
+                            <View style={{ flex: 1 }}>
+                              {children}
+                            </View>
+                          </View>
+                        );
+                      }
+                    }}
+                  >
+                    {line.text.substring(0, 100) + '...'}
+                  </Markdown>
+                );
+              } else if (line.isMarkdown) {
                 return (
                   <Markdown 
                     key={`markdown-${index}-${line.text.substring(0, 10)}`}
@@ -1540,7 +1709,7 @@ const persistEvent = (event) => {
               
               // Handle table rendering
               if (line.isTable) {
-                return renderTable(line, index);
+                return isCollapsed ? null : renderTable(line, index);
               }
               
               // Handle LaTeX formula
@@ -1639,14 +1808,18 @@ const persistEvent = (event) => {
               
               // Regular text - check for inline math expressions
               else if (isMathExpression(line.text)) {
-                return renderTextWithMath(line, index);
+                return isCollapsed ? (
+                  <Text key={`collapsed-math-${index}`} style={[styles.botText, {color: isBot ? colors.botText : '#fff'}]}>
+                    {line.text.substring(0, 100) + '...'}
+                  </Text>
+                ) : renderTextWithMath(line, index);
               }
               
               // Plain text with no special formatting
               else {
                 return (
                   <Text key={`line-${index}`} style={[styles.botText, {color: isBot ? colors.botText : '#fff'}]}>
-                    {line.text}
+                    {isCollapsed && shouldTruncate ? line.text.substring(0, 100) + '...' : line.text}
                   </Text>
                 );
               }
@@ -1658,7 +1831,7 @@ const persistEvent = (event) => {
               onPress={() => toggleMessageExpansion(item.id)}
             >
               <Text style={styles.viewMoreText}>
-                {isExpanded ? 'View less' : 'View more'}
+                {isCollapsed ? 'View more' : 'View less'}
               </Text>
             </TouchableOpacity>
           )}
@@ -3457,30 +3630,19 @@ const persistEvent = (event) => {
         onRequestClose={() => setFullScreenImage(null)}
       >
         <View style={styles.fullScreenImageContainer}>
-          <TouchableOpacity
-            style={styles.closeFullScreenButton}
-            onPress={() => setFullScreenImage(null)}
-          >
-            <Ionicons name="close" size={28} color="#fff" />
-          </TouchableOpacity>
-          
           {fullScreenImage ? (
             <View style={styles.fullScreenImageWrapper}>
               <Image
                 source={{ uri: fullScreenImage }}
                 style={styles.fullScreenImage}
                 resizeMode="contain"
-                onError={(e) => {
-                  console.error('Fullscreen image error:', e.nativeEvent.error);
-                  console.error('Problem URL:', fullScreenImage);
-                  // Show error message to user
-                  Toast.show({
-                    type: 'error',
-                    text1: 'Failed to load image',
-                    text2: 'There was a problem displaying this image',
-                    position: 'bottom',
-                    visibilityTime: 3000,
-                  });
+                onError={() => {
+                  console.error('Failed to load image:', fullScreenImage);
+                  Alert.alert(
+                    'Image Error',
+                    'Unable to load the image. The URL may be invalid.',
+                    [{ text: 'OK', onPress: () => setFullScreenImage(null) }]
+                  );
                 }}
               />
             </View>
@@ -3491,6 +3653,19 @@ const persistEvent = (event) => {
               </Text>
             </View>
           )}
+          <TouchableOpacity
+            style={styles.closeFullScreenButton}
+            onPress={() => setFullScreenImage(null)}
+          >
+            <Ionicons name="close" size={28} color="#fff" />
+          </TouchableOpacity>
+          
+          {/* Background overlay to close on tap */}
+          <TouchableOpacity
+            style={styles.fullScreenBackdrop}
+            activeOpacity={1}
+            onPress={() => setFullScreenImage(null)}
+          />
         </View>
       </Modal>
 
@@ -4290,10 +4465,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
+    width: '100%',
+    height: '100%',
+  },
+  fullScreenImageWrapper: {
+    width: '90%',
+    height: '80%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   fullScreenImage: {
     width: '100%',
-    height: '90%',
+    height: '100%',
+    borderRadius: 5,
   },
   closeFullScreenButton: {
     position: 'absolute',
@@ -4701,9 +4885,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   fullScreenImageError: {
-    width: '100%',
-    height: '90%',
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    padding: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 10,
+  },
+  fullScreenErrorText: {
+    color: '#fff',
+    fontSize: 16,
+    textAlign: 'center',
   },
   imageLoadingOverlay: {
     position: 'absolute',
@@ -4734,12 +4923,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.9)',
   },
-  fullScreenErrorText: {
-    color: '#fff',
-    fontSize: 18,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
   captionText: {
     marginTop: 8,
    
@@ -4747,6 +4930,14 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderLeftWidth: 2,
     borderLeftColor: '#4C8EF7',
+  },
+  fullScreenBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
   },
 });
 

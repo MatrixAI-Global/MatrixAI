@@ -17,7 +17,8 @@ import {
   Platform,
   StatusBar,
   PixelRatio,
-  Alert
+  Alert,
+  KeyboardAvoidingView
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -60,7 +61,7 @@ const DetectAIScreen = () => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const historySlideAnim = useRef(new Animated.Value(width)).current;
+  const historySlideAnim = useRef(new Animated.Value(width * 0.7)).current;
   const resultOpacity = useRef(new Animated.Value(0)).current;
   const meterAnim = useRef(new Animated.Value(0)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
@@ -82,12 +83,43 @@ const DetectAIScreen = () => {
     },
   ]);
 
+  // Add refs for ScrollView and input container
+  const scrollViewRef = useRef(null);
+  const inputContainerRef = useRef(null);
+  
   // Add keyboard listener
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
       'keyboardDidShow',
-      () => {
+      (event) => {
         setKeyboardVisible(true);
+        // When keyboard shows, scroll to ensure the entire input is visible
+        if (inputContainerRef.current && scrollViewRef.current) {
+          // Use timeout to ensure component measurements are complete
+          setTimeout(() => {
+            inputContainerRef.current.measureLayout(
+              scrollViewRef.current,
+              (x, y) => {
+                // Get keyboard height
+                const keyboardHeight = event.endCoordinates.height;
+                // Calculate the position to scroll to ensure entire input is visible
+                const inputHeight = 220; // Approximate height of input container
+                const screenHeight = Dimensions.get('window').height;
+                const inputBottomPosition = y + inputHeight;
+                const visibleAreaHeight = screenHeight - keyboardHeight;
+                
+                // If input bottom would be covered by keyboard, scroll to make it fully visible
+                if (inputBottomPosition > visibleAreaHeight) {
+                  scrollViewRef.current.scrollTo({
+                    y: y - 20, // Add padding at the top for better visibility
+                    animated: true,
+                  });
+                }
+              },
+              () => console.log('Failed to measure')
+            );
+          }, 100);
+        }
       }
     );
     const keyboardDidHideListener = Keyboard.addListener(
@@ -168,9 +200,9 @@ const DetectAIScreen = () => {
   const toggleHistory = () => {
     setHistoryOpen(!historyOpen);
     
-    // Use device width for animation
+    // Animate to 70% of the screen width
     Animated.timing(historySlideAnim, {
-      toValue: historyOpen ? width : 0,
+      toValue: historyOpen ? width * 0.7 : 0,
       duration: 300,
       easing: Easing.ease,
       useNativeDriver: true,
@@ -505,13 +537,17 @@ const DetectAIScreen = () => {
       </Animated.View>
       
       {/* Main container */}
-      <View style={styles.mainContainer}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1, backgroundColor: colors.background }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
         <ScrollView 
+          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          bounces={false}
         >
           <View style={styles.contentWrapper}>
             {/* Welcome Banner with matching container */}
@@ -601,7 +637,10 @@ const DetectAIScreen = () => {
             </View>
             
             {/* Responsive Input Section */}
-            <View style={styles.standardContainer}>
+            <View 
+              ref={inputContainerRef}
+              style={styles.standardContainer}
+            >
               <View style={styles.inputContainer}>
                 <View style={styles.sectionHeaderContainer}>
                   <MaterialCommunityIcons name="text-box-search-outline" size={normalize(20)} color={colors.primary} />
@@ -634,15 +673,52 @@ const DetectAIScreen = () => {
                   
                   <View style={[styles.textInputWrapper]}>
                     <TextInput
-                      style={[styles.textInput, { color: colors.text, height: Math.max(150 * scale, 150) }]}
+                      style={[styles.textInput, { 
+                        color: colors.text, 
+                        height: 160, // Fixed height for approximately 8 lines
+                        paddingTop: 8,
+                        textAlignVertical: 'top'
+                      }]}
                       placeholder="Enter or paste text to analyze for AI detection..."
                       placeholderTextColor={'#A3A3A3FF'}
                       value={inputText}
                       onChangeText={setInputText}
                       multiline
-                      numberOfLines={8}
+                      numberOfLines={8} // Fixed number of lines
                       textAlignVertical="top"
                       editable={!isAnalyzing}
+                      onFocus={() => {
+                        // When input is focused, scroll to make the entire input visible
+                        if (inputContainerRef.current && scrollViewRef.current) {
+                          setTimeout(() => {
+                            inputContainerRef.current.measureLayout(
+                              scrollViewRef.current,
+                              (x, y) => {
+                                scrollViewRef.current.scrollTo({
+                                  y: y - 20, // Add padding at the top for better visibility
+                                  animated: true,
+                                });
+                              },
+                              () => console.log('Failed to measure')
+                            );
+                          }, 100);
+                        }
+                      }}
+                      onContentSizeChange={() => {
+                        // When content changes size (like adding new lines), ensure input remains visible
+                        if (keyboardVisible && inputContainerRef.current && scrollViewRef.current) {
+                          inputContainerRef.current.measureLayout(
+                            scrollViewRef.current,
+                            (x, y) => {
+                              scrollViewRef.current.scrollTo({
+                                y: y - 20,
+                                animated: true,
+                              });
+                            },
+                            () => console.log('Failed to measure')
+                          );
+                        }
+                      }}
                     />
                     
                     {/* Scan line animation */}
@@ -856,56 +932,56 @@ const DetectAIScreen = () => {
             )}
           </View>
         </ScrollView>
-      </View>
+      </KeyboardAvoidingView>
       
-      {/* History Panel with Improved UX for Small Screens */}
+      {/* Overlay for History Panel */}
+      {historyOpen && (
+        <TouchableOpacity 
+          style={styles.overlay}
+          activeOpacity={0.5}
+          onPress={toggleHistory}
+        />
+      )}
+      
+      {/* History Panel */}
       <Animated.View 
         style={[styles.historyPanel, {
-          backgroundColor: currentTheme === 'dark' ? 'rgba(20, 20, 30, 0.95)' : 'rgba(245, 245, 255, 0.95)',
-          transform: [{ translateX: historySlideAnim }]
+          backgroundColor: colors.background,
+          transform: [{ translateX: historySlideAnim }],
+          width: width * 0.7, // 70% of screen width
         }]}
       >
-        <View style={[styles.historyHeader, { 
-          borderBottomColor: currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
-        }]}>
-          <View style={styles.historyHeaderContent}>
-            <MaterialCommunityIcons name="history" size={normalize(24)} color={colors.primary} />
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={styles.historyHeader}>
             <Text style={[styles.historyTitle, { color: colors.text }]}>
-              Analysis History
+              History
             </Text>
+            <TouchableOpacity onPress={toggleHistory}>
+              <MaterialIcons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity 
-            style={styles.closeButton} 
-            onPress={toggleHistory}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <MaterialIcons name="close" size={normalize(24)} color={colors.text} />
-          </TouchableOpacity>
-        </View>
-        
-        {historyItems.length > 0 ? (
-          <FlatList
-            data={historyItems}
-            renderItem={renderHistoryItem}
-            keyExtractor={item => item.id}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.historyList}
-          />
-        ) : (
-          <View style={styles.emptyHistoryContainer}>
-            <MaterialCommunityIcons 
-              name="history" 
-              size={normalize(48)} 
-              color={colors.textSecondary} 
+          
+          {historyItems.length > 0 ? (
+            <FlatList
+              data={historyItems}
+              renderItem={renderHistoryItem}
+              keyExtractor={item => item.id}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.historyList}
             />
-            <Text style={[styles.emptyHistoryText, { color: colors.textSecondary }]}>
-              No analysis history yet
-            </Text>
-            <Text style={[styles.emptyHistorySubtext, { color: colors.textSecondary }]}>
-              Your previous analyses will appear here
-            </Text>
-          </View>
-        )}
+          ) : (
+            <View style={styles.emptyHistoryContainer}>
+              <MaterialCommunityIcons 
+                name="history" 
+                size={48} 
+                color={colors.textSecondary} 
+              />
+              <Text style={[styles.emptyHistoryText, { color: colors.textSecondary }]}>
+                No history found
+              </Text>
+            </View>
+          )}
+        </SafeAreaView>
       </Animated.View>
     </SafeAreaView>
   );
@@ -1118,12 +1194,13 @@ const styles = StyleSheet.create({
   },
   textInputWrapper: {
     padding: responsiveSpacing(12),
-    minHeight: 160 * scale,
+    minHeight: 160,
+    maxHeight: 160, // Fixed height for the input
     position: 'relative',
   },
   textInput: {
     fontSize: normalize(16),
-    minHeight: 150 * scale,
+    flex: 1,
   },
   textInputFooter: {
     flexDirection: 'row',
@@ -1395,21 +1472,26 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     right: 0,
-    width: '100%',
     height: '100%',
     zIndex: 10,
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(0, 0, 0, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: -2,
+      height: 0,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   historyHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: responsiveSpacing(16),
+    padding: 16,
     borderBottomWidth: 1,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + responsiveSpacing(16) : responsiveSpacing(16),
-  },
-  historyHeaderContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
   },
   historyTitle: {
     fontSize: normalize(18),
@@ -1503,6 +1585,15 @@ const styles = StyleSheet.create({
     fontSize: normalize(14),
     marginTop: responsiveSpacing(4),
     opacity: 0.7,
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 9,
   },
 });
 

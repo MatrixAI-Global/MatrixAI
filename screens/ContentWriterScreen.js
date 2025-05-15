@@ -16,7 +16,8 @@ import {
   Keyboard,
   StatusBar,
   Platform,
-  PixelRatio
+  PixelRatio,
+  KeyboardAvoidingView
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -61,7 +62,7 @@ const ContentWriterScreen = () => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const historySlideAnim = useRef(new Animated.Value(width)).current;
+  const historySlideAnim = useRef(new Animated.Value(width * 0.7)).current;
   const resultOpacity = useRef(new Animated.Value(0)).current;
   const resultTranslateY = useRef(new Animated.Value(20)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
@@ -94,12 +95,44 @@ const ContentWriterScreen = () => {
     },
   ]);
 
+  // Add a ref for the ScrollView
+  const scrollViewRef = useRef(null);
+  // Add a ref for the input container
+  const promptInputRef = useRef(null);
+
   // Add keyboard listener
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
       'keyboardDidShow',
-      () => {
+      (event) => {
         setKeyboardVisible(true);
+        // When keyboard shows, scroll to ensure the entire input is visible
+        if (promptInputRef.current && scrollViewRef.current) {
+          // Use timeout to ensure component measurements are complete
+          setTimeout(() => {
+            promptInputRef.current.measureLayout(
+              scrollViewRef.current,
+              (x, y) => {
+                // Get keyboard height
+                const keyboardHeight = event.endCoordinates.height;
+                // Calculate the position to scroll to ensure entire input is visible
+                const inputHeight = 220; // Approximate height of input container
+                const screenHeight = Dimensions.get('window').height;
+                const inputBottomPosition = y + inputHeight;
+                const visibleAreaHeight = screenHeight - keyboardHeight;
+                
+                // If input bottom would be covered by keyboard, scroll to make it fully visible
+                if (inputBottomPosition > visibleAreaHeight) {
+                  scrollViewRef.current.scrollTo({
+                    y: y - 20, // Add padding at the top for better visibility
+                    animated: true,
+                  });
+                }
+              },
+              () => console.log('Failed to measure')
+            );
+          }, 100);
+        }
       }
     );
     const keyboardDidHideListener = Keyboard.addListener(
@@ -180,9 +213,9 @@ const ContentWriterScreen = () => {
   const toggleHistory = () => {
     setHistoryOpen(!historyOpen);
     
-    // Use device width for animation
+    // Animate to 70% of the screen width
     Animated.timing(historySlideAnim, {
-      toValue: historyOpen ? width : 0,
+      toValue: historyOpen ? width * 0.7 : 0,
       duration: 300,
       easing: Easing.ease,
       useNativeDriver: true,
@@ -510,232 +543,292 @@ const ContentWriterScreen = () => {
       </Animated.View>
       
       {/* Main Content */}
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1, backgroundColor: colors.background }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        <View style={styles.contentWrapper}>
-          {/* Welcome Banner with matching container */}
-          <View style={styles.standardContainer}>
-            <Animated.View style={[styles.welcomeBanner, { 
-              opacity: fadeAnim,
-              transform: [{ translateY: Animated.multiply(Animated.subtract(1, fadeAnim), 20) }]
-            }]}>
-              <LinearGradient
-                colors={currentTheme === 'dark' ? 
-                  ['#FF6D00', '#F57C00'] : 
-                  ['#FFF3E0', '#FFE0B2']}
-                style={styles.bannerGradient}
-              >
-                <View style={styles.bannerContent}>
-                  <View style={styles.bannerTextContent}>
-                    <Text style={[styles.bannerTitle, { color: colors.text }]}>
-                      AI Content Writer
-                    </Text>
-                    <Text style={[styles.bannerSubtitle, { color: colors.textSecondary }]}>
-                      Generate professional content for articles, emails, blogs and more
-                    </Text>
-                  </View>
-                  <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-                    <View style={styles.iconContainer}>
-                      <LinearGradient
-                        colors={['#FF6D00', '#F57C00']}
-                        style={styles.iconGradient}
-                      >
-                        <MaterialCommunityIcons name="text-box-outline" size={32} color="#FFFFFF" />
-                      </LinearGradient>
-                    </View>
-                  </Animated.View>
-                </View>
-              </LinearGradient>
-            </Animated.View>
-          </View>
-          
-          {/* Content Type Selector */}
-          <View style={styles.standardContainer}>
-            <View style={styles.typeContainer}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Content Type</Text>
-              <FlatList
-                data={contentTypes}
-                renderItem={renderContentTypeItem}
-                keyExtractor={item => item.id}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.typeList}
-              />
-            </View>
-          </View>
-          
-          {/* Prompt Input */}
-          <View style={styles.standardContainer}>
-            <View style={styles.promptContainer}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>What to write about?</Text>
-              <View style={[styles.promptInputWrapper, { 
-                backgroundColor: colors.card,
-                borderColor: colors.border
+        <ScrollView 
+          ref={scrollViewRef}
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          bounces={true}
+        >
+          <View style={styles.contentWrapper}>
+            {/* Welcome Banner with matching container */}
+            <View style={styles.standardContainer}>
+              <Animated.View style={[styles.welcomeBanner, { 
+                opacity: fadeAnim,
+                transform: [{ translateY: Animated.multiply(Animated.subtract(1, fadeAnim), 20) }]
               }]}>
-                <TextInput
-                  style={[styles.promptInput, { color: colors.text }]}
-                  placeholder="Enter your topic or request..."
-                  placeholderTextColor={'#A3A3A3FF'}
-                  value={prompt}
-                  onChangeText={setPrompt}
-                  multiline
-                  numberOfLines={3}
-                  textAlignVertical="top"
-                  editable={!isGenerating}
+                <LinearGradient
+                  colors={currentTheme === 'dark' ? 
+                    ['#FF6D00', '#F57C00'] : 
+                    ['#FFF3E0', '#FFE0B2']}
+                  style={styles.bannerGradient}
+                >
+                  <View style={styles.bannerContent}>
+                    <View style={styles.bannerTextContent}>
+                      <Text style={[styles.bannerTitle, { color: colors.text }]}>
+                        AI Content Writer
+                      </Text>
+                      <Text style={[styles.bannerSubtitle, { color: colors.textSecondary }]}>
+                        Generate professional content for articles, emails, blogs and more
+                      </Text>
+                    </View>
+                    <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                      <View style={styles.iconContainer}>
+                        <LinearGradient
+                          colors={['#FF6D00', '#F57C00']}
+                          style={styles.iconGradient}
+                        >
+                          <MaterialCommunityIcons name="text-box-outline" size={32} color="#FFFFFF" />
+                        </LinearGradient>
+                      </View>
+                    </Animated.View>
+                  </View>
+                </LinearGradient>
+              </Animated.View>
+            </View>
+            
+            {/* Content Type Selector */}
+            <View style={styles.standardContainer}>
+              <View style={styles.typeContainer}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Content Type</Text>
+                <FlatList
+                  data={contentTypes}
+                  renderItem={renderContentTypeItem}
+                  keyExtractor={item => item.id}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.typeList}
                 />
               </View>
             </View>
-          </View>
-          
-          {/* Generate Button */}
-          {!generatedContent && (
-            <View style={styles.standardContainer}>
-              <TouchableOpacity 
-                style={[styles.generateButton, {
-                  backgroundColor: colors.primary,
-                  opacity: isGenerating || prompt.trim() === '' ? 0.7 : 1
-                }]}
-                onPress={handleGenerate}
-                disabled={isGenerating || prompt.trim() === ''}
-              >
-                {isGenerating ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Text style={styles.generateButtonText}>Generate</Text>
-                    <MaterialCommunityIcons 
-                      name={getContentTypeIcon()} 
-                      size={20} 
-                      color="#FFFFFF" 
-                    />
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-          )}
-          
-          {/* Result Section */}
-          {generatedContent !== '' && (
-            <View style={styles.standardContainer}>
-              <Animated.View style={[styles.resultContainer, {
-                opacity: resultOpacity,
-                transform: [{ translateY: resultTranslateY }]
-              }]}>
-                <View style={styles.resultHeader}>
-                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Generated Content</Text>
-                  <TouchableOpacity 
-                    style={styles.newContentButton}
-                    onPress={handleClearForm}
-                  >
-                    <MaterialIcons name="refresh" size={20} color={colors.primary} />
-                    <Text style={[styles.newContentButtonText, { color: colors.primary }]}>
-                      New Content
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                
-                <View style={[styles.contentBox, {
+            
+            {/* Prompt Input */}
+            <View 
+              ref={promptInputRef}
+              style={styles.standardContainer}
+            >
+              <View style={styles.promptContainer}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>What to write about?</Text>
+                <View style={[styles.promptInputWrapper, { 
                   backgroundColor: colors.card,
                   borderColor: colors.border
                 }]}>
-                  <ScrollView 
-                    style={styles.contentScroll}
-                    nestedScrollEnabled={true}
-                  >
-                    <Text style={[styles.contentText, { color: colors.text }]}>
-                      {generatedContent}
-                    </Text>
-                  </ScrollView>
+                  <TextInput
+                    style={[styles.promptInput, { 
+                      color: colors.text,
+                      height: 160, // Fixed height for approximately 8 lines
+                      paddingTop: 8,
+                      textAlignVertical: 'top'
+                    }]}
+                    placeholder="Enter your topic or request..."
+                    placeholderTextColor={'#A3A3A3FF'}
+                    value={prompt}
+                    onChangeText={setPrompt}
+                    multiline
+                    numberOfLines={8} // Fixed number of lines
+                    textAlignVertical="top"
+                    editable={!isGenerating}
+                    onFocus={() => {
+                      // When input is focused, scroll to make the entire input visible
+                      if (promptInputRef.current && scrollViewRef.current) {
+                        setTimeout(() => {
+                          promptInputRef.current.measureLayout(
+                            scrollViewRef.current,
+                            (x, y) => {
+                              scrollViewRef.current.scrollTo({
+                                y: y - 20, // Add padding at the top for better visibility
+                                animated: true,
+                              });
+                            },
+                            () => console.log('Failed to measure')
+                          );
+                        }, 100);
+                      }
+                    }}
+                    onContentSizeChange={() => {
+                      // When content changes size (like adding new lines), ensure input remains visible
+                      if (keyboardVisible && promptInputRef.current && scrollViewRef.current) {
+                        promptInputRef.current.measureLayout(
+                          scrollViewRef.current,
+                          (x, y) => {
+                            scrollViewRef.current.scrollTo({
+                              y: y - 20,
+                              animated: true,
+                            });
+                          },
+                          () => console.log('Failed to measure')
+                        );
+                      }
+                    }}
+                  />
                 </View>
-                
-                <View style={styles.actionButtons}>
-                  <TouchableOpacity 
-                    style={[styles.actionButton, { backgroundColor: colors.card }]}
-                    onPress={copyToClipboard}
-                  >
-                    <MaterialIcons 
-                      name={isCopied ? "check" : "content-copy"} 
-                      size={22} 
-                      color={isCopied ? "#4CAF50" : colors.text} 
-                    />
-                    <Text style={[styles.actionButtonText, { 
-                      color: isCopied ? "#4CAF50" : colors.text 
-                    }]}>
-                      {isCopied ? "Copied" : "Copy"}
-                    </Text>
-                  </TouchableOpacity>
+              </View>
+            </View>
+            
+            {/* Generate Button */}
+            {!generatedContent && (
+              <View style={styles.standardContainer}>
+                <TouchableOpacity 
+                  style={[styles.generateButton, {
+                    backgroundColor: colors.primary,
+                    opacity: isGenerating || prompt.trim() === '' ? 0.7 : 1
+                  }]}
+                  onPress={handleGenerate}
+                  disabled={isGenerating || prompt.trim() === ''}
+                >
+                  {isGenerating ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Text style={styles.generateButtonText}>Generate</Text>
+                      <MaterialCommunityIcons 
+                        name={getContentTypeIcon()} 
+                        size={20} 
+                        color="#FFFFFF" 
+                      />
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
+            
+            {/* Result Section */}
+            {generatedContent !== '' && (
+              <View style={styles.standardContainer}>
+                <Animated.View style={[styles.resultContainer, {
+                  opacity: resultOpacity,
+                  transform: [{ translateY: resultTranslateY }]
+                }]}>
+                  <View style={styles.resultHeader}>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Generated Content</Text>
+                    <TouchableOpacity 
+                      style={styles.newContentButton}
+                      onPress={handleClearForm}
+                    >
+                      <MaterialIcons name="refresh" size={20} color={colors.primary} />
+                      <Text style={[styles.newContentButtonText, { color: colors.primary }]}>
+                        New Content
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                   
-                  <TouchableOpacity 
-                    style={[styles.actionButton, { backgroundColor: colors.card }]}
-                    onPress={shareContent}
-                  >
-                    <MaterialIcons name="share" size={22} color={colors.text} />
-                    <Text style={[styles.actionButtonText, { color: colors.text }]}>
-                      Share
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </Animated.View>
-            </View>
-          )}
-          
-          {/* Processing Animation */}
-          {isGenerating && (
-            <View style={styles.processingContainer}>
-              <LottieView 
-                source={require('../assets/image2.json')}
-                autoPlay
-                loop
-                style={styles.lottieAnimation}
-              />
-              <Text style={[styles.processingText, { color: colors.text }]}>
-                Creating your content...
-              </Text>
-            </View>
-          )}
-        </View>
-      </ScrollView>
+                  <View style={[styles.contentBox, {
+                    backgroundColor: colors.card,
+                    borderColor: colors.border
+                  }]}>
+                    <ScrollView 
+                      style={styles.contentScroll}
+                      nestedScrollEnabled={true}
+                    >
+                      <Text style={[styles.contentText, { color: colors.text }]}>
+                        {generatedContent}
+                      </Text>
+                    </ScrollView>
+                  </View>
+                  
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity 
+                      style={[styles.actionButton, { backgroundColor: colors.card }]}
+                      onPress={copyToClipboard}
+                    >
+                      <MaterialIcons 
+                        name={isCopied ? "check" : "content-copy"} 
+                        size={22} 
+                        color={isCopied ? "#4CAF50" : colors.text} 
+                      />
+                      <Text style={[styles.actionButtonText, { 
+                        color: isCopied ? "#4CAF50" : colors.text 
+                      }]}>
+                        {isCopied ? "Copied" : "Copy"}
+                      </Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={[styles.actionButton, { backgroundColor: colors.card }]}
+                      onPress={shareContent}
+                    >
+                      <MaterialIcons name="share" size={22} color={colors.text} />
+                      <Text style={[styles.actionButtonText, { color: colors.text }]}>
+                        Share
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </Animated.View>
+              </View>
+            )}
+            
+            {/* Processing Animation */}
+            {isGenerating && (
+              <View style={styles.processingContainer}>
+                <LottieView 
+                  source={require('../assets/image2.json')}
+                  autoPlay
+                  loop
+                  style={styles.lottieAnimation}
+                />
+                <Text style={[styles.processingText, { color: colors.text }]}>
+                  Creating your content...
+                </Text>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+      
+      {/* Overlay - add this */}
+      {historyOpen && (
+        <TouchableOpacity 
+          style={styles.overlay}
+          activeOpacity={0.5}
+          onPress={toggleHistory}
+        />
+      )}
       
       {/* History Panel */}
       <Animated.View 
         style={[styles.historyPanel, {
           backgroundColor: colors.background,
-          transform: [{ translateX: historySlideAnim }]
+          transform: [{ translateX: historySlideAnim }],
+          width: width * 0.7, // 70% of screen width
         }]}
       >
-        <View style={styles.historyHeader}>
-          <Text style={[styles.historyTitle, { color: colors.text }]}>
-            Content History
-          </Text>
-          <TouchableOpacity onPress={toggleHistory}>
-            <MaterialIcons name="close" size={24} color={colors.text} />
-          </TouchableOpacity>
-        </View>
-        
-        {historyItems.length > 0 ? (
-          <FlatList
-            data={historyItems}
-            renderItem={renderHistoryItem}
-            keyExtractor={item => item.id}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.historyList}
-          />
-        ) : (
-          <View style={styles.emptyHistoryContainer}>
-            <MaterialCommunityIcons 
-              name="history" 
-              size={48} 
-              color={colors.textSecondary} 
-            />
-            <Text style={[styles.emptyHistoryText, { color: colors.textSecondary }]}>
-              No history found
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={styles.historyHeader}>
+            <Text style={[styles.historyTitle, { color: colors.text }]}>
+              Content History
             </Text>
+            <TouchableOpacity onPress={toggleHistory}>
+              <MaterialIcons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
           </View>
-        )}
+          
+          {historyItems.length > 0 ? (
+            <FlatList
+              data={historyItems}
+              renderItem={renderHistoryItem}
+              keyExtractor={item => item.id}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.historyList}
+            />
+          ) : (
+            <View style={styles.emptyHistoryContainer}>
+              <MaterialCommunityIcons 
+                name="history" 
+                size={48} 
+                color={colors.textSecondary} 
+              />
+              <Text style={[styles.emptyHistoryText, { color: colors.textSecondary }]}>
+                No history found
+              </Text>
+            </View>
+          )}
+        </SafeAreaView>
       </Animated.View>
     </SafeAreaView>
   );
@@ -874,11 +967,12 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     padding: 12,
-    minHeight: 100,
+    minHeight: 160,
+    maxHeight: 160, // Fixed height for the input
   },
   promptInput: {
     fontSize: 16,
-    minHeight: 80,
+    flex: 1,
   },
   generateButton: {
     width: '100%',
@@ -961,13 +1055,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginLeft: 8,
   },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 9,
+  },
   historyPanel: {
     position: 'absolute',
     top: 0,
     right: 0,
-    width: '100%',
     height: '100%',
     zIndex: 10,
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(0, 0, 0, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: -2,
+      height: 0,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   historyHeader: {
     flexDirection: 'row',
@@ -983,18 +1095,23 @@ const styles = StyleSheet.create({
   },
   historyList: {
     padding: 16,
+    paddingBottom: 40,
   },
   historyItem: {
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
+    marginHorizontal: 8, // Add some margin on the sides for better appearance
   },
   historyItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
   },
   historyItemTextContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
   },
   historyItemTitle: {
     fontSize: 16,

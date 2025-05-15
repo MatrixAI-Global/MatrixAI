@@ -113,7 +113,7 @@ export const translations = {
     "humaniseText": "Humanise Text",
     "detectAI": "Detect AI",
     "contentWriter": "Content Writer",
-    "processAndAnalyzeVideos": "Process and analyze videos",
+    "processAndAnalyzeVideos": "Generate videos",
     "generateImages": "Generate images",
     "createSlideDecksAutomatically": "Create slide decks automatically",
     "convertSpeechToText": "Convert speech to text",
@@ -235,7 +235,7 @@ export const translations = {
     "humaniseText": "人類化文本",
     "detectAI": "檢測AI",
     "contentWriter": "內容寫作",
-    "processAndAnalyzeVideos": "處理和分析視頻",
+    "processAndAnalyzeVideos": "生成視頻",
     "generateImages": "生成圖像",
     "createSlideDecksAutomatically": "自動創建演示文稿",
     "convertSpeechToText": "轉換語音為文本",
@@ -358,7 +358,7 @@ export const translations = {
     "humaniseText": "人类化文本",
     "detectAI": "检测AI",
     "contentWriter": "内容写作",
-    "processAndAnalyzeVideos": "处理和分析视频",
+    "processAndAnalyzeVideos": "生成视频",
     "generateImages": "生成图像",
     "createSlideDecksAutomatically": "自动创建演示文稿",
     "convertSpeechToText": "转换语音为文本",
@@ -371,7 +371,7 @@ export const translations = {
     "humaniseText": "人类化文本",
     "detectAI": "检测AI",
     "contentWriter": "内容写作",
-    "processAndAnalyzeVideos": "处理和分析视频",
+    "processAndAnalyzeVideos": "生成视频",
   }
 };
 
