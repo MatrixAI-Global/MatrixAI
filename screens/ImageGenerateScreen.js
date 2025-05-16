@@ -14,15 +14,22 @@ import {
   Dimensions,
   FlatList,
   ActivityIndicator,
-  Alert
+  Alert,
+  ToastAndroid,
+  PermissionsAndroid,
+  Modal
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { useAuthUser } from '../hooks/useAuthUser';
+import { useCoinsSubscription } from '../hooks/useCoinsSubscription';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import RNFS from 'react-native-fs';
 import Share from 'react-native-share';
+import Toast from 'react-native-toast-message';
+import { PERMISSIONS, request, RESULTS } from 'react-native-permissions';
+import { CameraRoll } from '@react-native-camera-roll/camera-roll';
 const { width, height } = Dimensions.get('window');
 
 const ImageGenerateScreen = () => {
@@ -33,13 +40,19 @@ const ImageGenerateScreen = () => {
   const [transcription, setTranscription] = useState(
     'Start writing to generate Images (eg: generate tree with red apples)'
   );
-  const fadeAnim = new Animated.Value(0);
-  const scaleAnim = new Animated.Value(0);
-  const sendRotation = new Animated.Value(0);
+  
+  // Initialize animated values with useRef to prevent re-creation on re-renders
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0)).current;
+  const sendRotation = useRef(new Animated.Value(0)).current;
+  const historySlideAnim = useRef(new Animated.Value(width)).current;
+  
   const navigation = useNavigation();
   const [historyOpen, setHistoryOpen] = useState(false);
-  const historySlideAnim = useRef(new Animated.Value(width)).current;
   const { uid, loading } = useAuthUser();
+  const coinCount = useCoinsSubscription(uid);
+  const [lowBalanceModalVisible, setLowBalanceModalVisible] = useState(false);
+  const [requiredCoins, setRequiredCoins] = useState(0);
   
   // Replace mock data with actual state
   const [imageHistory, setImageHistory] = useState([]);
@@ -48,6 +61,33 @@ const ImageGenerateScreen = () => {
   const [historyPage, setHistoryPage] = useState(1);
   const [hasMoreImages, setHasMoreImages] = useState(false);
   const imagesPerPage = 10;
+  const [downloadingImageId, setDownloadingImageId] = useState(null);
+  
+  // Run animations on mount
+  useEffect(() => {
+    // Start animations when component mounts
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 1000,
+        easing: Easing.ease,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 5,
+        useNativeDriver: true,
+      }),
+      Animated.loop(
+        Animated.timing(sendRotation, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      )
+    ]).start();
+  }, [fadeAnim, scaleAnim, sendRotation]);
   
   // Fetch image history when history panel is opened
   useEffect(() => {
@@ -148,33 +188,12 @@ const ImageGenerateScreen = () => {
       setIsLoading(false);
     }
   };
-  
-  React.useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 1000,
-        easing: Easing.ease,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 5,
-        useNativeDriver: true,
-      }),
-      Animated.loop(
-        Animated.timing(sendRotation, {
-          toValue: 1,
-          duration: 2000,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        })
-      )
-    ]).start();
-  }, []);
 
   const toggleHistory = () => {
+    // Toggle the history state
     setHistoryOpen(!historyOpen);
+    
+    // Animate the panel
     Animated.timing(historySlideAnim, {
       toValue: historyOpen ? width : 0,
       duration: 300,
@@ -198,65 +217,87 @@ const ImageGenerateScreen = () => {
   };
 
   const handleGenerate = () => {
-    navigation.navigate('CreateImageScreen', { message: transcription });
+    // Check if user has enough coins (3) for Generate I
+    if (coinCount >= 3) {
+      navigation.navigate('CreateImageScreen', { message: transcription });
+    } else {
+      setRequiredCoins(3);
+      setLowBalanceModalVisible(true);
+    }
   };
+  
   const handleGenerate2 = () => {
-    navigation.navigate('CreateImageScreen2', { message: transcription });
+    // Check if user has enough coins (12) for Generate IV
+    if (coinCount >= 12) {
+      navigation.navigate('CreateImageScreen2', { message: transcription });
+    } else {
+      setRequiredCoins(12);
+      setLowBalanceModalVisible(true);
+    }
   };
 
-  const renderHistoryItem = ({ item }) => (
-    <View style={[styles.historyItem, {backgroundColor: colors.border}]}>
-      <Image 
-        source={{ uri: item.image_url }} 
-        style={styles.historyImage}
-        resizeMode="cover"
-      />
-      <View style={[styles.historyItemContent, {backgroundColor: colors.border}]}>
-        <Text style={[styles.historyDate, {color: colors.text}]}>
-          {new Date(item.created_at).toLocaleDateString()}
-        </Text>
-        <Text style={[styles.historyPrompt, {color: colors.text}]} numberOfLines={2}>
-          {item.prompt_text}
-        </Text>
-        <View style={styles.historyActions}>
-          <TouchableOpacity 
-            style={[styles.historyActionButton, {backgroundColor: colors.background2}]}
-            onPress={() => handleRemoveImage(item.image_id)}
-          >
-            <MaterialIcons name="delete" size={20} color={colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.historyActionButton, {backgroundColor: colors.background2}]}
-            onPress={() => handleDownloadImage(item.image_url)}
-          >
-            <MaterialIcons name="file-download" size={20} color={colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.historyActionButton, {backgroundColor: colors.background2}]}
-            onPress={() => handleShareImage(item.image_url)}
-          >
-            <MaterialIcons name="ios-share" size={20} color={colors.text} />
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  );
+  const navigateToSubscription = () => {
+    setLowBalanceModalVisible(false);
+    navigation.navigate('SubscriptionScreen');
+  };
 
-  const handleDownloadImage = async (imageUrl) => {
+  const handleDownloadImage = async (imageUrl, imageId) => {
     try {
-      // Create a path to save the image
+      // Set downloading state
+      setDownloadingImageId(imageId);
+      
+      // Request storage permission (for Android)
+      if (Platform.OS === 'android') {
+        const permission = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+          {
+            title: 'Storage Permission',
+            message: 'Matrix AI needs access to your storage to save images.',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          },
+        );
+        
+        if (permission !== PermissionsAndroid.RESULTS.GRANTED) {
+          Toast.show({
+            type: 'error',
+            text1: 'Permission Denied',
+            text2: 'Cannot save image without storage permission',
+            position: 'bottom',
+          });
+          setDownloadingImageId(null);
+          return;
+        }
+      } else if (Platform.OS === 'ios') {
+        // For iOS, request photo library permission
+        const permission = await request(PERMISSIONS.IOS.PHOTO_LIBRARY);
+        if (permission !== RESULTS.GRANTED) {
+          Toast.show({
+            type: 'error',
+            text1: 'Permission Denied',
+            text2: 'Cannot save image without photo library permission',
+            position: 'bottom',
+          });
+          setDownloadingImageId(null);
+          return;
+        }
+      }
+      
+      // Create appropriate filename
       const filename = imageUrl.substring(imageUrl.lastIndexOf('/') + 1);
       const extension = filename.split('.').pop() || 'jpg';
       const newFilename = `matrix_ai_image_${Date.now()}.${extension}`;
       
-      // Get the appropriate directory path for iOS
-      const dirs = Platform.OS === 'ios' ? RNFS.DocumentDirectoryPath : RNFS.DownloadDirectoryPath;
-      const filePath = `${dirs}/${newFilename}`;
+      // Determine where to save the file based on platform
+      const targetPath = Platform.OS === 'ios' 
+        ? `${RNFS.DocumentDirectoryPath}/${newFilename}`
+        : `${RNFS.PicturesDirectoryPath}/${newFilename}`;
       
       // Download the file
       const download = RNFS.downloadFile({
         fromUrl: imageUrl,
-        toFile: filePath,
+        toFile: targetPath,
         background: true,
         discretionary: true,
       });
@@ -265,17 +306,41 @@ const ImageGenerateScreen = () => {
       const result = await download.promise;
       
       if (result.statusCode === 200) {
-        Alert.alert(
-          'Download Complete',
-          'Image has been saved to your device.',
-          [{ text: 'OK' }]
-        );
+        // For Android: Make the file visible in gallery
+        if (Platform.OS === 'android') {
+          // Use ToastAndroid for native toast on Android
+          ToastAndroid.show('Image saved to gallery', ToastAndroid.SHORT);
+          
+          // Use the MediaScanner to refresh the gallery
+          await RNFS.scanFile(targetPath);
+        } else if (Platform.OS === 'ios') {
+          // For iOS: Save to Camera Roll
+          await CameraRoll.save(`file://${targetPath}`, {
+            type: 'photo',
+            album: 'MatrixAI'
+          });
+          
+          // Show toast notification
+          Toast.show({
+            type: 'success',
+            text1: 'Download Complete',
+            text2: 'Image has been saved to your Photos',
+            position: 'bottom',
+          });
+        }
       } else {
         throw new Error('Download failed with status code: ' + result.statusCode);
       }
     } catch (error) {
       console.error('Error downloading image:', error);
-      Alert.alert('Error', 'Failed to download the image. Please try again.');
+      Toast.show({
+        type: 'error',
+        text1: 'Download Failed',
+        text2: 'Could not save the image. Please try again.',
+        position: 'bottom',
+      });
+    } finally {
+      setDownloadingImageId(null);
     }
   };
   
@@ -323,6 +388,49 @@ const ImageGenerateScreen = () => {
       }
     }
   };
+
+  const renderHistoryItem = ({ item }) => (
+    <View style={[styles.historyItem, {backgroundColor: colors.border}]}>
+      <Image 
+        source={{ uri: item.image_url }} 
+        style={styles.historyImage}
+        resizeMode="cover"
+      />
+      <View style={[styles.historyItemContent, {backgroundColor: colors.border}]}>
+        <Text style={[styles.historyDate, {color: colors.text}]}>
+          {new Date(item.created_at).toLocaleDateString()}
+        </Text>
+        <Text style={[styles.historyPrompt, {color: colors.text}]} numberOfLines={2}>
+          {item.prompt_text}
+        </Text>
+        <View style={styles.historyActions}>
+          <TouchableOpacity 
+            style={[styles.historyActionButton, {backgroundColor: colors.background2}]}
+            onPress={() => handleRemoveImage(item.image_id)}
+          >
+            <MaterialIcons name="delete" size={20} color={colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.historyActionButton, {backgroundColor: colors.background2}]}
+            onPress={() => handleDownloadImage(item.image_url, item.image_id)}
+            disabled={downloadingImageId === item.image_id}
+          >
+            {downloadingImageId === item.image_id ? (
+              <ActivityIndicator size="small" color={colors.text} />
+            ) : (
+              <MaterialIcons name="file-download" size={20} color={colors.text} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.historyActionButton, {backgroundColor: colors.background2}]}
+            onPress={() => handleShareImage(item.image_url)}
+          >
+            <MaterialIcons name="ios-share" size={20} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
 
   return (
     <View style={{flex: 1}}>
@@ -374,7 +482,7 @@ const ImageGenerateScreen = () => {
                 <View style={styles.generateContent}>
                   <Text style={styles.generateText}>Generate I</Text>
                   <View style={styles.horizontalContent}>
-                    <Text style={styles.coinText}>-1</Text>
+                    <Text style={styles.coinText}>-3</Text>
                     <Image source={require('../assets/coin.png')} style={styles.coinIcon} />
                   </View>
                 </View>
@@ -390,7 +498,7 @@ const ImageGenerateScreen = () => {
                 <View style={styles.generateContent}>
                   <Text style={styles.generateText}>Generate IV</Text>
                   <View style={styles.horizontalContent}>
-                    <Text style={styles.coinText}>-4</Text>
+                    <Text style={styles.coinText}>-12</Text>
                     <Image source={require('../assets/coin.png')} style={styles.coinIcon} />
                   </View>
                 </View>
@@ -500,6 +608,42 @@ const ImageGenerateScreen = () => {
           </>
         )}
       </Animated.View>
+
+      {/* Low Balance Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={lowBalanceModalVisible}
+        onRequestClose={() => setLowBalanceModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, {backgroundColor: colors.background2}]}>
+            <Image 
+              source={require('../assets/coin.png')} 
+              style={styles.modalCoinImage} 
+            />
+            <Text style={[styles.modalTitle, {color: colors.text}]}>Insufficient Balance</Text>
+            <Text style={[styles.modalMessage, {color: colors.text}]}>
+              You need {requiredCoins} coins to generate this image.
+              Your current balance is {coinCount} coins.
+            </Text>
+            <View style={styles.modalButtonsContainer}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]} 
+                onPress={() => setLowBalanceModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.rechargeButton]} 
+                onPress={navigateToSubscription}
+              >
+                <Text style={styles.rechargeButtonText}>Recharge Now</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -806,6 +950,70 @@ const styles = StyleSheet.create({
   viewMoreText: {
     color: '#fff',
     fontSize: 14,
+    fontWeight: '500',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    width: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 15,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalCoinImage: {
+    width: 60,
+    height: 60,
+    marginBottom: 10,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  modalMessage: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  modalButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  modalButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    alignItems: 'center',
+    flex: 1,
+    marginHorizontal: 5,
+  },
+  cancelButton: {
+    backgroundColor: '#E0E0E0',
+  },
+  rechargeButton: {
+    backgroundColor: '#007BFF',
+  },
+  cancelButtonText: {
+    color: '#333',
+    fontWeight: '500',
+  },
+  rechargeButtonText: {
+    color: '#fff',
     fontWeight: '500',
   },
 });

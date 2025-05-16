@@ -539,6 +539,58 @@ const AudioVideoUploadScreen = () => {
         }
     };
 
+    // Function to properly truncate text regardless of character type
+    const truncateText = (text, maxLength) => {
+        if (!text) return 'Unknown File';
+        
+        // For Chinese and other wide characters, we should count them differently
+        // Each character might take more visual space
+        
+        let truncated = '';
+        let count = 0;
+        
+        for (let i = 0; i < text.length; i++) {
+            const char = text[i];
+            
+            // Count wide characters (like Chinese) as 2, others as 1
+            // This is a simple approach - CJK characters and emojis take more space
+            const isCJK = /[\u4e00-\u9fff\u3000-\u30ff\u3400-\u4dbf]/.test(char);
+            count += isCJK ? 1.5 : 1;
+            
+            if (count > maxLength) {
+                return truncated + '...';
+            }
+            
+            truncated += char;
+        }
+        
+        return text;
+    };
+
+    // Function to convert UTC time to Hong Kong time (UTC+8)
+    const convertToHKTime = (utcTimeString) => {
+        if (!utcTimeString) return 'Unknown Date';
+        
+        const date = new Date(utcTimeString);
+        // Convert to HK time (UTC+8)
+        date.setHours(date.getHours() + 8);
+        
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        
+        return `${day}/${month} ${hours}:${minutes}`;
+    };
+
+    // Function to get Hong Kong time ISO string
+    const getHKTimeISOString = () => {
+        const now = new Date();
+        // Add 8 hours for Hong Kong time (UTC+8)
+        now.setHours(now.getHours() + 8);
+        return now.toISOString();
+    };
+
     const handleUpload = async (file, duration) => {
         if (!file) {
             Alert.alert('Error', 'No file selected');
@@ -647,7 +699,7 @@ const AudioVideoUploadScreen = () => {
                         audio_url: publicUrl,
                         file_path: filePath,  // Sanitized file path
                         duration: parseInt(duration, 10),
-                        uploaded_at: new Date().toISOString(),
+                        uploaded_at: getHKTimeISOString(), // Use Hong Kong time
                     }
                 ]);
                 
@@ -1177,22 +1229,20 @@ const AudioVideoUploadScreen = () => {
                         style={[styles.fileIcon]}
                     />
                 <View style={styles.detailsRow}>
-    <Text style={[styles.fileName, {color: colors.text}]} numberOfLines={1}>
-        {item.audio_name ? (item.audio_name.length > 13 ? `${item.audio_name.substring(0, 13)}...` : item.audio_name) : 'Unknown File'}
-    </Text>
-    <View style={styles.fileDetails}>
-        <MaterialIcons name="access-time" size={14} color={'#C3C3C3FF'} marginRight={2}/>
-        <Text style={[styles.detailText, {color: colors.text}]}>
-        {formatDuration(item.duration)}
-      </Text>
-        <MaterialIcons name="calendar-month" size={14} color={'#C3C3C3FF'} marginRight={2}/>
-        <Text style={[styles.detailText, {color: colors.text}]}>
-            {item.uploaded_at ? 
-                `${item.uploaded_at.split('T')[0].split('-')[2]}/${item.uploaded_at.split('T')[0].split('-')[1]} ${item.uploaded_at.split('T')[1].substring(0, 5)}` 
-                : 'Unknown Date'}
-        </Text>
-    </View>
-</View>
+                    <Text style={[styles.fileName, {color: colors.text}]} numberOfLines={1}>
+                        {truncateText(item.audio_name || 'Unknown File', 18)}
+                    </Text>
+                    <View style={styles.fileDetails}>
+                        <MaterialIcons name="access-time" size={14} color={'#C3C3C3FF'} marginRight={2}/>
+                        <Text style={[styles.detailText, {color: colors.text}]}>
+                            {formatDuration(item.duration)}
+                        </Text>
+                        <MaterialIcons name="calendar-month" size={14} color={'#C3C3C3FF'} marginRight={2}/>
+                        <Text style={[styles.detailText, {color: colors.text}]}>
+                            {convertToHKTime(item.uploaded_at)}
+                        </Text>
+                    </View>
+                </View>
 
                         <TouchableOpacity
                         style={[styles.actionButton, {backgroundColor: colors.border}]}

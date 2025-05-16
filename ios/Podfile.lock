@@ -1341,6 +1341,27 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
+  - react-native-cameraroll (7.10.0):
+    - DoubleConversion
+    - glog
+    - hermes-engine
+    - RCT-Folly (= 2024.11.18.00)
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - Yoga
   - react-native-document-picker (9.3.1):
     - DoubleConversion
     - glog
@@ -2422,6 +2443,7 @@ DEPENDENCIES:
   - "react-native-audio-waveform (from `../node_modules/@simform_solutions/react-native-audio-waveform`)"
   - react-native-blob-util (from `../node_modules/react-native-blob-util`)
   - "react-native-blur (from `../node_modules/@react-native-community/blur`)"
+  - "react-native-cameraroll (from `../node_modules/@react-native-camera-roll/camera-roll`)"
   - react-native-document-picker (from `../node_modules/react-native-document-picker`)
   - react-native-get-random-values (from `../node_modules/react-native-get-random-values`)
   - react-native-html-to-pdf (from `../node_modules/react-native-html-to-pdf`)
@@ -2590,6 +2612,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-blob-util"
   react-native-blur:
     :path: "../node_modules/@react-native-community/blur"
+  react-native-cameraroll:
+    :path: "../node_modules/@react-native-camera-roll/camera-roll"
   react-native-document-picker:
     :path: "../node_modules/react-native-document-picker"
   react-native-get-random-values:
@@ -2766,6 +2790,7 @@ SPEC CHECKSUMS:
   react-native-audio-waveform: af3ccd55a785d1049791693f521da2815694a10d
   react-native-blob-util: f82bbc6f071231ae76e1c03b77290de1781df313
   react-native-blur: c4d838e8cd2896379328aec8a600c6ddad589c78
+  react-native-cameraroll: b93d0a5f753817f337cb32a5e245814f6961c628
   react-native-document-picker: bfe9c7d72908d2faba56a4765373c6367090ae2e
   react-native-get-random-values: d16467cf726c618e9c7a8c3c39c31faa2244bbba
   react-native-html-to-pdf: 7a49e6c58ac5221bcc093027b195f4b214f27a9d
@@ -2818,7 +2843,7 @@ SPEC CHECKSUMS:
   RNFS: 89de7d7f4c0f6bafa05343c578f61118c8282ed8
   RNGestureHandler: 8b1080a6db0be82dbca18550d6212b885bfab6b2
   RNGoogleSignin: 5e115ab981ba1a9f5fae37000f49cd996c394df0
-  RNPermissions: 6ec445d97d6707163c69067a6b96bf839ca6f286
+  RNPermissions: 92028a254205bb90314ed0252bfc39367c85ca1f
   RNReanimated: 04813c30d3c04044c32c60379945b71e0c6c950f
   RNScreens: b32d0d59b53acb574fa795a9343591ef4e7ab7c2
   RNShare: b971da64389826106ba22e9bd4497fbe8481dfc4
@@ -2839,6 +2864,6 @@ SPEC CHECKSUMS:
   VisionCamera: f56eaedde0d3fa095143b78374d29e89e71735f9
   Yoga: b94ff2d7559cb66837c97a3f394ddb817faad4d6
 
-PODFILE CHECKSUM: 2e123523f608b25bb2e26d16dda1afb116e25dd1
+PODFILE CHECKSUM: bc21523344bb353b7c6fdbe0e0b1e8c19086ec7d
 
 COCOAPODS: 1.16.2

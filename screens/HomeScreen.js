@@ -138,14 +138,7 @@ const HomeScreen = () => {
       colors: ['#2962FF', '#2979FF'],
       screen: 'ImageTextScreen'
     },
-    {
-      id: 'ppt',
-      title: t('presentationAI'),
-      description: t('createSlideDecksAutomatically'),
-      icon: <MaterialCommunityIcons name="file-presentation-box" size={26} color="#FFFFFF" />,
-      colors: ['#00BFA5', '#009688'],
-      screen: 'PPTGenerateScreen'
-    },
+   
     {
       id: 'speech',
       title: t('speechToText'),
@@ -451,7 +444,7 @@ const styles = StyleSheet.create({
   // Hero Section
   heroSection: {
     marginHorizontal: 16,
-    marginVertical: 16,
+    marginVertical: -16,
     borderRadius: 24,
     overflow: 'hidden',
     shadowColor: '#000',

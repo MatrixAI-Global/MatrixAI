@@ -43,7 +43,13 @@ const TransactionScreen2 = ({ navigation }) => {
     switch (transactionName.toLowerCase()) {
       case 'audio transcription':
         return 'audio-file';
-      case 'image':
+      case 'image generation':
+        return 'image';
+      case 'matrix bot':
+        return 'chat';
+      case 'image to text':
+        return 'image';
+      case 'text to image':
         return 'image';
       default:
         return 'video-file';

@@ -15,6 +15,8 @@ import {
   ScrollView,
   Share,
   TouchableWithoutFeedback,
+  ActivityIndicator,
+  Animated,
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -33,6 +35,8 @@ import { useTheme } from '../context/ThemeContext';
 import Clipboard from '@react-native-clipboard/clipboard';
 import Markdown from 'react-native-markdown-display';
 import MathView from 'react-native-math-view';
+import { useCoinsSubscription } from '../hooks/useCoinsSubscription';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 // Function to decode base64 to ArrayBuffer
 const decode = (base64) => {
@@ -137,13 +141,14 @@ const BotScreen2 = ({ navigation, route }) => {
     navigation.navigate('CameraScreen');
   };
 
-  const saveChatHistory = async (messageText, sender) => {
+  const saveChatHistory = async (messageText, sender, coinsDeducted = 0) => {
     try {
       const response = await axios.post('https://matrix-server.vercel.app/sendChat', {
         uid,
         chatid: audioid, // Using audioid as chatid
         updatedMessage: messageText,
         sender,
+        coinsDeducted,
       });
       console.log('Message saved:', response.data);
     } catch (error) {
@@ -246,16 +251,19 @@ const BotScreen2 = ({ navigation, route }) => {
             const imageAnalysisResponse = volcesResponse.data.choices[0].message.content.trim();
             
             // Now, send this response combined with user's question to createContent API
-            const combinedPrompt = `${userMessageContent}\n\nImage analysis: ${imageAnalysisResponse} so answer the user's question with the image analysis and only answer the user's question`;
+            const combinedPrompt = `${inputText || question}\n\nImage analysis: ${imageAnalysisResponse} so answer the user's question with the image analysis and only answer the user's question`;
             
             const finalResponse = await axios.post(
               'https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/createContent',
               {
-                prompt: combinedPrompt
+                prompt: combinedPrompt,
+                systemMessage: 'You are MatrixAI Bot, a helpful AI assistant.',
+                uid: uid
               },
               {
                 headers: {
-                  'Content-Type': 'application/json'
+                  'Content-Type': 'application/json',
+                  'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdGdkaGVoeGhnYXJrb252cGZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ2Njg4MTIsImV4cCI6MjA1MDI0NDgxMn0.mY8nx-lKrNXjJxHU7eEja3-fTSELQotOP4aZbxvmNPY'
                 }
               }
             );
@@ -263,14 +271,17 @@ const BotScreen2 = ({ navigation, route }) => {
             // Extract the final response - use Volces response as fallback
             const finalBotMessage = finalResponse.data.output.text || imageAnalysisResponse;
             
+            // Get coins deducted if available
+            const coinsDeducted = finalResponse.data.coinsDeducted || 0;
+            
             // Add the bot's response to messages
             setMessages((prev) => [
               ...prev,
-              { id: Date.now().toString(), text: finalBotMessage, sender: 'bot' },
+              { id: Date.now().toString(), text: finalBotMessage, sender: 'bot', coinsDeducted },
             ]);
             
             // Save the chat history for the bot response
-            await saveChatHistory(finalBotMessage, 'bot');
+            await saveChatHistory(finalBotMessage, 'bot', coinsDeducted);
             
             // Clear the image and text
             setSelectedImage(null);
@@ -302,6 +313,13 @@ const BotScreen2 = ({ navigation, route }) => {
           saveChatHistory(inputText, 'user');
           fetchDeepSeekResponse(inputText);
           setInputText('');
+          
+          // Ensure scroll to bottom after sending a message
+          setTimeout(() => {
+            if (flatListRef.current) {
+              flatListRef.current.scrollToEnd({ animated: true });
+            }
+          }, 100);
           
           // Re-enable the send button after a short delay to prevent double-sends
           setTimeout(() => {
@@ -338,16 +356,22 @@ const BotScreen2 = ({ navigation, route }) => {
         userMessageContent = "Previous conversation:\n" + contextString + "\n\nUser's new message: " + userMessageContent;
       }
 
+      // Define system message
+      let systemContent = 'You are MatrixAI Bot, a helpful AI assistant.';
+      
       // Make API call
       const response = await axios.post(
         'https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/createContent',
         {
-          prompt: userMessageContent
+          prompt: userMessageContent,
+          systemMessage: systemContent,
+          uid: uid,
         },
         {
           headers: {
-            'Content-Type': 'application/json'
-          }
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdGdkaGVoeGhnYXJrb252cGZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ2Njg4MTIsImV4cCI6MjA1MDI0NDgxMn0.mY8nx-lKrNXjJxHU7eEja3-fTSELQotOP4aZbxvmNPY',
+          },
         }
       );
       
@@ -356,14 +380,44 @@ const BotScreen2 = ({ navigation, route }) => {
       
       // Remove markdown formatting if needed
       botMessage = botMessage.replace(/(\*\*|\#\#)/g, "");
+      
+      // Get coins deducted if available
+      const coinsDeducted = response.data.coinsDeducted || 0;
 
       setMessages((prev) => [
         ...prev,
-        { id: Date.now().toString(), text: botMessage, sender: 'bot' },
+        { id: Date.now().toString(), text: botMessage, sender: 'bot', coinsDeducted },
       ]);
-      saveChatHistory(botMessage, 'bot'); // Save bot response
+      
+      // Save bot response with coins info
+      saveChatHistory(botMessage, 'bot', coinsDeducted);
+      
+      // Ensure scroll to bottom after receiving response
+      setTimeout(() => {
+        if (flatListRef.current) {
+          flatListRef.current.scrollToEnd({ animated: true });
+        }
+      }, 100);
     } catch (error) {
       console.error('Error fetching response:', error);
+      
+      // If we have network errors, retry
+      if (retryCount < maxRetries && (error.message.includes('timeout') || error.message.includes('network'))) {
+        console.log(`Retrying (${retryCount + 1}/${maxRetries}) after delay of ${retryDelay}ms...`);
+        setTimeout(() => {
+          fetchDeepSeekResponse(userMessage, retryCount + 1);
+        }, retryDelay);
+        return;
+      }
+      
+      // Handle error case by showing error message
+      setMessages((prev) => [
+        ...prev,
+        { id: Date.now().toString(), text: "Sorry, I encountered an error. Please try again.", sender: 'bot' },
+      ]);
+      
+      // Save error message to chat history
+      saveChatHistory("Sorry, I encountered an error. Please try again.", 'bot');
     } finally {
       setIsLoading(false);
     }
@@ -549,12 +603,55 @@ const BotScreen2 = ({ navigation, route }) => {
             hasVariables);
   };
 
+  // Function to detect if the text has math subscripts
+  const hasMathSubscripts = (text) => {
+    return /([a-zA-Z])_(\d)|([a-zA-Z])_n|([a-zA-Z])_i|([a-zA-Z])_j|([a-zA-Z])_k|([a-zA-Z])_a|([a-zA-Z])_x|([a-zA-Z])_\{([^}]+)\}/.test(text);
+  };
+
+  // Function to detect ChatGPT style section titles and parse them properly
+  const detectAndFormatTitles = (text) => {
+    if (!text) return text;
+    
+    // Look for patterns like "## Title" at the beginning of a message or line
+    const lines = text.split('\n');
+    let formattedText = '';
+    let inSection = false;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      
+      // Check for markdown headings (## Title)
+      if (/^##\s+(.+)/.test(line)) {
+        const title = line.replace(/^##\s+/, '');
+        formattedText += `\n\n<strong class="title">${title}</strong>\n\n`;
+        inSection = true;
+      } 
+      // Check for title with colon at end (Title:)
+      else if (/^([A-Z][^:.!?]*):$/.test(line)) {
+        const title = line.replace(/:$/, '');
+        formattedText += `\n\n<strong class="title">${title}</strong>\n\n`;
+        inSection = true;
+      }
+      // Regular text
+      else {
+        formattedText += line + '\n';
+      }
+    }
+    
+    return formattedText.trim();
+  };
+
   // Function to process and format the message text
   const formatMessageText = (text, sender) => {
     if (!text) return [];
     
     const isBot = sender === 'bot';
     const isChineseContent = /[\u3400-\u9FBF]/.test(text);
+    
+    // Apply the title detection and formatting for bot messages
+    if (isBot) {
+      text = detectAndFormatTitles(text);
+    }
     
     // Check if the text is already in markdown format or should be converted to markdown
     const hasExistingMarkdown = /(\#{1,3}\s.+)|(\*\*.+\*\*)|(^\s*[\*\-]\s.+)|(^\s*\d+\.\s.+)|(^>.+)|(^\`\`.+\`\`)/.test(text);
@@ -570,6 +667,10 @@ const BotScreen2 = ({ navigation, route }) => {
         
         // Convert bullet points to markdown bullet lists
         text = text.replace(/^[\-•][ \t]+(.+)/gm, '* $1');
+        
+        // For section titles that look like natural language questions or statements
+        // Detect patterns like "What is X?" or "How to X" at the beginning of paragraphs
+        text = text.replace(/^(What is|How to|Why|When|Where|Who|How can|How do|Is there)([^?:.!]*[?:.!])/gim, '## $1$2');
         
         // Convert lines that end with colon and look like headings to markdown headings
         text = text.replace(/^([A-Z][^.!?:]*):$/gm, '## $1');
@@ -1315,12 +1416,6 @@ const BotScreen2 = ({ navigation, route }) => {
           >
             <Ionicons name="git-network-outline" size={24} color="#fff" />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.swipeButton}
-            onPress={() => handleGeneratePPT(item)}
-          >
-            <AntDesign name="pptfile1" size={24} color="#fff" />
-          </TouchableOpacity>
         </View>
       );
     };
@@ -1380,21 +1475,25 @@ const BotScreen2 = ({ navigation, route }) => {
                                   fontSize: 16,
                                 },
                                 heading1: {
-                                  color: isBot ? colors.botText : '#333333',
+                                  color: isBot ? colors.primary : '#333333',
                                   fontWeight: 'bold',
-                                  fontSize: 20,
-                                  marginTop: 8,
-                                  marginBottom: 4,
+                                  fontSize: 22,
+                                  marginTop: 12,
+                                  marginBottom: 6,
+                                  borderBottomWidth: 1,
+                                  borderBottomColor: colors.border,
+                                  paddingBottom: 6,
                                 },
                                 heading2: {
-                                  color: isBot ? colors.botText : '#333333',
+                                  color: isBot ? colors.primary : '#333333',
                                   fontWeight: 'bold',
                                   fontSize: 18,
-                                  marginTop: 8,
-                                  marginBottom: 4,
+                                  marginTop: 10,
+                                  marginBottom: 5,
+                                  paddingBottom: 4,
                                 },
                                 heading3: {
-                                  color: isBot ? colors.botText : '#333333',
+                                  color: isBot ? colors.primary : '#333333',
                                   fontWeight: 'bold',
                                   fontSize: 16,
                                   marginTop: 8,
@@ -1641,17 +1740,11 @@ const BotScreen2 = ({ navigation, route }) => {
                   />
                 </TouchableOpacity>
                 <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => handleGenerateMindmap(item)}
-          >
-            <Ionicons name="git-network-outline" size={18} color="#666" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => handleGeneratePPT(item)}
-          >
-            <AntDesign name="pptfile1" size={18} color="#666" />
-          </TouchableOpacity>
+                  style={styles.actionButton}
+                  onPress={() => handleGenerateMindmap(item)}
+                >
+                  <Ionicons name="git-network-outline" size={18} color="#666" />
+                </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -1828,6 +1921,22 @@ const BotScreen2 = ({ navigation, route }) => {
     }
   };
 
+  useEffect(() => {
+    // This will ensure the FlatList scrolls to the end when a new message is added
+    if (messages.length > 0 && flatListRef.current) {
+      setTimeout(() => {
+        if (flatListRef.current) {
+          flatListRef.current.scrollToEnd({ animated: true });
+        }
+      }, 100);
+      
+      // Re-enable the send button after a short delay to prevent double-sends
+      setTimeout(() => {
+        setIsSendDisabled(false);
+      }, 1000);
+    }
+  }, [messages.length]);
+
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
       {/* Header */}  
@@ -1864,14 +1973,16 @@ const BotScreen2 = ({ navigation, route }) => {
             keyExtractor={(item) => item.id}
             renderItem={renderMessage}
             contentContainerStyle={[styles.chat,]}
-            // Only scroll to end when new messages arrive, not when expanding
             onContentSizeChange={() => {
-              if (messages.length > 0 && messages[messages.length - 1].sender === 'bot' && messages[messages.length - 1].id !== lastScrolledMessageId.current) {
-                lastScrolledMessageId.current = messages[messages.length - 1].id;
-                setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+              if (flatListRef.current) {
+                flatListRef.current.scrollToEnd({ animated: true });
               }
             }}
-            // Remove automatic scrolling on layout
+            onLayout={() => {
+              if (flatListRef.current && messages.length > 0) {
+                flatListRef.current.scrollToEnd({ animated: false });
+              }
+            }}
             ref={flatListRef}
             style={{ marginBottom: showAdditionalButtons ? 220 : 120 }}
             ListEmptyComponent={
@@ -2012,18 +2123,24 @@ const BotScreen2 = ({ navigation, route }) => {
         animationType="slide"
         onRequestClose={() => setIsFullScreen(false)}
       >
-        <View style={styles.fullScreenContainer}>
+        <View style={[styles.fullScreenContainer, {backgroundColor: colors.background}]}>
           <View style={styles.fullScreenGraphContainer}>
             <ForceDirectedGraph2 message={selectedMessage?.text || ''} uid={uid} audioid={audioid}/>
           </View>
           <TouchableOpacity
             onPress={() => setIsFullScreen(false)}
-            style={styles.closeFullScreenButton}
+            style={[styles.closeFullScreenButton, {
+              width: 50,
+              height: 50,
+              borderRadius: 25,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.25,
+              shadowRadius: 3.84,
+              elevation: 5,
+            }]}
           >
-            <Image
-              source={require('../assets/close.png')}
-              style={styles.closeIcon}
-            />
+            <Ionicons name="close" size={30} color="#fff" />
           </TouchableOpacity>
         </View>
       </Modal>
@@ -2035,11 +2152,11 @@ const BotScreen2 = ({ navigation, route }) => {
         animationType="fade"
         onRequestClose={() => setFullScreenImage(null)}
       >
-        <View style={styles.fullScreenImageContainer}>
+        <View style={[styles.fullScreenImageContainer]}>
           {fullScreenImage ? (
             <Image
               source={{ uri: fullScreenImage }}
-              style={styles.fullScreenImage}
+              style={[styles.fullScreenImage, {backgroundColor: colors.background2}]}
               resizeMode="contain"
               onError={() => {
                 console.error('Failed to load image:', fullScreenImage);
@@ -2211,16 +2328,22 @@ const styles = StyleSheet.create({
   botText: {
     fontSize: 16,
     color: '#333333', // Default color that will be overridden with inline style
+    lineHeight: 24,
   },
   headingText: {
     fontWeight: 'bold',
-    fontSize: 17,
-    marginVertical: 4,
+    fontSize: 18,
+    marginVertical: 8,
+    color: '#4C8EF7',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    paddingBottom: 5,
   },
   subheadingText: {
-  
+    fontWeight: 'bold',
     fontSize: 16,
-    marginVertical: 2,
+    marginVertical: 6,
+    color: '#4C8EF7',
   },
   userText: {
     color: '#FFFFFF',
@@ -3173,52 +3296,108 @@ marginBottom:-10,
   botHeaderContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
-  
+    marginBottom: 10,
   },
   botHeaderLogo: {
     width: 30,
     height: 30,
     tintColor: '#fff',
-  
   },
   botHeaderText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#555',
+    color: '#4C8EF7',
   },
   botHeaderLogoContainer: {
     width: 35,
     height: 35,
-    marginRight: 5,
+    marginRight: 8,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 19,
     borderRadius: 30,
     backgroundColor: '#4C8EF7',
   },
-  fullScreenImageContainer: {
+  
+  // Add ChatGPT-style title container
+  titleContainer: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    paddingBottom: 8,
+    marginBottom: 10,
+    marginTop: 5,
+  },
+  titleText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#4C8EF7',
+  },
+  
+  // Enhanced list styles to look more like ChatGPT
+  list_item: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginVertical: 4,
+    paddingRight: 10,
+  },
+  list_item_bullet: {
+    marginRight: 8,
+    fontSize: 16,
+    color: '#4C8EF7',
+    width: 15,
+    textAlign: 'center',
+  },
+  list_item_number: {
+    marginRight: 8,
+    fontWeight: 'bold',
+    fontSize: 16,
+    color: '#4C8EF7',
+    width: 22,
+    textAlign: 'right',
+  },
+  list_item_content: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  fullScreenImage: {
-    width: '100%',
-    height: '90%',
+  
+  // Improve code block styling
+  code_block: {
+    backgroundColor: '#F6F8FA',
+    padding: 12,
+    borderRadius: 6,
+    fontFamily: 'monospace',
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    marginVertical: 8,
   },
-  closeFullScreenButton: {
-    position: 'absolute',
-    top: 40,
-    right: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
+  code_inline: {
+    backgroundColor: '#F6F8FA',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    fontFamily: 'monospace',
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
+  
+  // Improve blockquote styling
+  blockquote: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#4C8EF7',
+    paddingLeft: 12,
+    marginVertical: 8,
+    backgroundColor: '#F6F8FA',
+    paddingVertical: 8,
+    paddingRight: 8,
+    borderRadius: 0,
+  },
+  blockquoteText: {
+    fontStyle: 'italic',
+    color: '#333333',
+  },
+  
+  // ... existing styles ...
 });
 
 export default BotScreen2;

@@ -29,6 +29,7 @@ import { PDFDocument, rgb, PNGImage } from 'react-native-pdf-lib';
 import LottieView from 'lottie-react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { svg2png } from 'svg-png-converter';
 import RNFS from 'react-native-fs';
 import { Alert } from 'react-native';
@@ -2597,12 +2598,18 @@ import Slider from '@react-native-community/slider'; // Import the Slider compon
                     </View>
                     <TouchableOpacity 
                         onPress={() => setIsFullScreen(false)} 
-                        style={styles.closeFullScreenButton}
+                        style={[styles.closeFullScreenButton, {
+                            width: 50,
+                            height: 50,
+                            borderRadius: 25,
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.25,
+                            shadowRadius: 3.84,
+                            elevation: 5,
+                        }]}
                     >
-                        <Image
-                            source={require('../assets/close.png')}
-                            style={styles.closeIcon}
-                        />
+                        <Ionicons name="close" size={30} color="#fff" />
                     </TouchableOpacity>
                 </View>
             </Modal>
@@ -2799,9 +2806,10 @@ const styles = StyleSheet.create({
         backgroundColor: 'white', // Acts as the mask
     },
     audioPlayerContainer: {
-        marginTop: 1,
+        marginTop: 4,
         alignItems: 'center',
         justifyContent: 'center',
+        marginBottom: 2,
     },
     audioControlsContainer: {
         position: 'absolute',

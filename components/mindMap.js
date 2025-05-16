@@ -179,17 +179,61 @@ const ForceDirectedGraph = ({ transcription, uid, audioid, xmlData }) => {
     <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
-      body {
-        background-color: ${colors?.background || '#ffffff'};
-        color: ${colors?.text || '#000000'};
+      html, body {
+        height: 100%;
+        width: 100%;
         margin: 0;
         padding: 0;
+        overflow: hidden;
+        background-color: ${colors?.background || '#ffffff'};
+        color: ${colors?.text || '#000000'};
+      }
+      #chart {
+        width: 100%;
+        height: 200%;
       }
     </style>
   </head>
   <body>
-    <div id="chart" style="width: 100%; height: 1200%;"></div>
+    <div id="chart"></div>
     <script>
+      // Function to detect optimal chart size based on complexity
+      function detectOptimalChartSize(data) {
+        const countNodes = (nodes) => {
+          let count = 0;
+          if (!nodes) return count;
+          count += nodes.length;
+          nodes.forEach(node => {
+            if (node.children && node.children.length) {
+              count += countNodes(node.children);
+            }
+          });
+          return count;
+        };
+        
+        const nodeCount = countNodes(data);
+        const depth = (nodes, level = 0) => {
+          if (!nodes || !nodes.length) return level;
+          let maxDepth = level;
+          nodes.forEach(node => {
+            if (node.children && node.children.length) {
+              const childDepth = depth(node.children, level + 1);
+              maxDepth = Math.max(maxDepth, childDepth);
+            }
+          });
+          return maxDepth;
+        };
+        
+        const maxDepth = depth(data);
+        
+        return {
+          repulsion: Math.max(1000, 800 + nodeCount * 10),
+          edgeLength: Math.max(300, 200 + (maxDepth * 20)),
+          layerSpacing: Math.max(120, 80 + maxDepth * 20),
+          nodeSpacing: Math.max(60, 40 + nodeCount)
+        };
+      }
+
       const chartDom = document.getElementById('chart');
       const myChart = echarts.init(chartDom);
       const chartColors = ['#5470C6', '#91CC75', '#EE6666', '#FAC858', '#73C0DE', '#3BA272', '#FC8452', '#9A60B4', '#EA7CCC'];
@@ -205,12 +249,13 @@ const ForceDirectedGraph = ({ transcription, uid, audioid, xmlData }) => {
       }
 
       const coloredGraphData = ${JSON.stringify(graphData)}.map((node, idx) => assignColors(node, idx));
+      const { repulsion, edgeLength, layerSpacing, nodeSpacing } = detectOptimalChartSize(coloredGraphData);
 
       // Function to wrap text into multiple lines with dynamic max length
       function wrapText(text, nodeType) {
-        let maxLineLength = 20; // Default for topic and subtopic nodes
+        let maxLineLength = 16; // Reduced for topic and subtopic nodes
         if (nodeType === 'description') {
-          maxLineLength = 90; // For description nodes
+          maxLineLength = 70; // Reduced for description nodes
         }
 
         const words = text.split(' ');
@@ -239,53 +284,16 @@ const ForceDirectedGraph = ({ transcription, uid, audioid, xmlData }) => {
         return lines * fontSize * lineHeight;
       }
 
-      // Function to calculate dynamic spacing for nodes
-      function calculateDynamicSpacing(data) {
-        const maxLabelHeight = Math.max(
-          ...data.map(node => calculateLabelHeight(node.name))
-        );
-        return {
-          layerSpacing: maxLabelHeight * 3, // Triple the max label height for vertical spacing
-          nodeSpacing: maxLabelHeight * 2, // Double the max label height for horizontal spacing
-        };
-      }
-
-      const { layerSpacing, nodeSpacing } = calculateDynamicSpacing(coloredGraphData);
-
-      // Custom layout algorithm to adjust node positions
-      function adjustNodePositions(data) {
-        const layers = {};
-        data.forEach(node => {
-          if (!layers[node.depth]) {
-            layers[node.depth] = [];
-          }
-          layers[node.depth].push(node);
-        });
-
-        Object.values(layers).forEach(layer => {
-          let yOffset = 0;
-          layer.forEach(node => {
-            const labelHeight = calculateLabelHeight(node.name);
-            node.y = yOffset + labelHeight / 2; // Center the node vertically
-            yOffset += labelHeight + nodeSpacing; // Add spacing between nodes
-          });
-        });
-
-        return data;
-      }
-
-      const adjustedGraphData = adjustNodePositions(coloredGraphData);
-
       const option = {
         backgroundColor: themeBackground,
         tooltip: { trigger: 'item', triggerOn: 'mousemove' },
         series: [{
           type: 'tree',
-          data: adjustedGraphData,
-          top: '5%',
-          left: '20%',
-          bottom: '5%',
-          right: '20%',
+          data: coloredGraphData,
+          top: '2%',
+          left: '8%',
+          bottom: '2%',
+          right: '25%', // Increased right margin to prevent text cutoff
           roam: true,
           symbolSize: 8,
           label: {
@@ -311,6 +319,7 @@ const ForceDirectedGraph = ({ transcription, uid, audioid, xmlData }) => {
               verticalAlign: 'middle',
               align: 'left',
               color: themeText,
+              distance: 15, // Added distance to prevent text cutoff
               formatter: (params) => {
                 // Wrap text into multiple lines based on node type
                 const nodeType = params.data.nodeType || 'description'; // Default to 'description'
@@ -327,15 +336,15 @@ const ForceDirectedGraph = ({ transcription, uid, audioid, xmlData }) => {
           expandAndCollapse: true,
           initialTreeDepth: 3,
           force: {
-            repulsion: 1000, // Significantly increase repulsion to push nodes further apart
-            gravity: 0.1,   // Adjust gravity to control how tightly nodes are pulled together
-            edgeLength: 300, // Increase edge length to control the distance between connected nodes
-            layoutAnimation: true, // Enable layout animation for smoother transitions
+            repulsion: repulsion, // Dynamic repulsion based on graph complexity
+            gravity: 0.1,
+            edgeLength: edgeLength, // Dynamic edge length
+            layoutAnimation: true,
           },
-          // Add dynamic vertical spacing between layers
-          layerSpacing: layerSpacing, // Dynamic vertical spacing
-          // Add dynamic horizontal spacing between nodes
-          nodeSpacing: nodeSpacing,  // Dynamic horizontal spacing
+          layerSpacing: layerSpacing,  // Dynamic vertical spacing
+          nodeSpacing: nodeSpacing,   // Dynamic horizontal spacing
+          zoom: 0.8, // Add slight zoom out to fit more content
+          center: ['40%', '50%'] // Center the tree
         }],
       };
       myChart.setOption(option);
@@ -371,26 +380,75 @@ const downloadPDF = async () => {
               overflow: hidden;
             }
             #chart { 
-              width: 1500px; 
-              height: 600px;
-              margin: 0;
+              width: 100%;
+              height: 100%;
+              position: absolute;
+              top: 0;
+              left: 0;
+              right: 0;
+              bottom: 0;
             }
           </style>
         </head>
         <body>
           <div id="chart"></div>
           <script>
+            // Function to detect optimal chart size based on graph complexity
+            function detectOptimalChartSize(data) {
+              const countNodes = (nodes) => {
+                let count = 0;
+                if (!nodes) return count;
+                count += nodes.length;
+                nodes.forEach(node => {
+                  if (node.children && node.children.length) {
+                    count += countNodes(node.children);
+                  }
+                });
+                return count;
+              };
+              
+              const nodeCount = countNodes(data);
+              const depth = (nodes, level = 0) => {
+                if (!nodes || !nodes.length) return level;
+                let maxDepth = level;
+                nodes.forEach(node => {
+                  if (node.children && node.children.length) {
+                    const childDepth = depth(node.children, level + 1);
+                    maxDepth = Math.max(maxDepth, childDepth);
+                  }
+                });
+                return maxDepth;
+              };
+              
+              const maxDepth = depth(data);
+              
+              // Calculate dimensions based on complexity
+              // Use larger dimensions for more complex graphs
+              const width = Math.max(3000, 1200 + nodeCount * 70);
+              const height = Math.max(2000, 1000 + maxDepth * 200);
+              
+              return { width, height };
+            }
+            
+            const graphData = ${JSON.stringify(graphData)};
+            const { width, height } = detectOptimalChartSize(graphData);
+            
+            // Set chart container size
+            document.getElementById('chart').style.width = width + 'px';
+            document.getElementById('chart').style.height = height + 'px';
+            document.body.style.backgroundColor = "${colors?.background || '#ffffff'}";
+            
             const chartDom = document.getElementById('chart');
             const myChart = echarts.init(chartDom, null, {
               renderer: 'svg',
-              width: 1000,
-              height: 600
+              width: width,
+              height: height
             });
             
             function wrapText(text, nodeType) {
-              let maxLineLength = 20;
+              let maxLineLength = 16; // Reduced to avoid text cutoff
               if (nodeType === 'description') {
-                maxLineLength = 90;
+                maxLineLength = 70; // Reduced for description nodes
               }
 
               const words = text.split(' ');
@@ -412,8 +470,6 @@ const downloadPDF = async () => {
 
               return lines.join('\\n');
             }
-
-            const graphData = ${JSON.stringify(graphData)};
             
             const option = {
               backgroundColor: "${colors?.background || '#ffffff'}",
@@ -425,11 +481,11 @@ const downloadPDF = async () => {
                 type: 'tree',
                 data: graphData,
                 top: '5%',
-                left: '2%',
+                left: '5%',
                 bottom: '5%',
-                right: '15%',
+                right: '25%', // Increased right margin to prevent text cutoff
                 symbolSize: 8,
-                initialTreeDepth: -1,
+                initialTreeDepth: -1, // Expand all nodes
                 orient: 'LR',
                 label: {
                   position: 'left',
@@ -452,6 +508,7 @@ const downloadPDF = async () => {
                     position: 'right',
                     verticalAlign: 'middle',
                     align: 'left',
+                    distance: 15, // Added distance to prevent text cutoff
                     formatter: (params) => {
                       const nodeType = params.data.nodeType || 'description';
                       return wrapText(params.name, nodeType);
@@ -503,16 +560,45 @@ const downloadPDF = async () => {
         try {
           const pdfOptions = {
             html: `
+              <!DOCTYPE html>
               <html>
-                <body style="margin: 0; padding: 0;">
-                  <img src="${base64Image}" style="width: 100%; height: auto; display: block;" />
+                <head>
+                  <meta charset="utf-8">
+                  <style>
+                    html, body {
+                      margin: 0;
+                      padding: 0;
+                      background-color: ${colors?.background || '#ffffff'};
+                      width: 100%;
+                      height: 100%;
+                      overflow: hidden;
+                    }
+                    .img-container {
+                      background-color: ${colors?.background || '#ffffff'};
+                      width: 100%;
+                      height: 100%;
+                      position: relative;
+                      overflow: hidden;
+                    }
+                    img {
+                      max-width: 100%;
+                      width: 100%;
+                      display: block;
+                      background-color: ${colors?.background || '#ffffff'};
+                    }
+                  </style>
+                </head>
+                <body>
+                  <div class="img-container">
+                    <img src="${base64Image}" />
+                  </div>
                 </body>
               </html>
             `,
             fileName: `mindmap_${Date.now()}`,
             directory: 'Documents',
-            width: 1684,  // A3 width (landscape)
-            height: 1190, // A3 height (landscape)
+            width: 2480,  // A2 width (landscape)
+            height: 1754, // A2 height (landscape)
             backgroundColor: colors?.background || '#ffffff',
             padding: 0,
             options: {
@@ -520,12 +606,12 @@ const downloadPDF = async () => {
               printBackground: true,
               preferCSSPageSize: true,
               margin: {
-                top: '5mm',
-                right: '5mm',
-                bottom: '5mm',
-                left: '5mm'
+                top: '0mm',
+                right: '0mm',
+                bottom: '0mm',
+                left: '0mm'
               },
-              pageSize: 'A3'
+              pageSize: { width: 2480, height: 1754 }  // Custom size (close to A2)
             }
           };
 
@@ -588,7 +674,9 @@ const handleDownload = async () => {
     await Share.open({
       url: `file://${filePath}`,
       type: 'application/pdf',
-      title: 'Mind Map PDF'
+      title: 'Mind Map PDF',
+      showAppsToView: true,
+      excludedActivityTypes: []
     });
 
     Alert.alert('Success', 'PDF has been downloaded successfully!');
@@ -612,7 +700,7 @@ const handleDownload = async () => {
           source={{ html: chartHtml }}
           javaScriptEnabled={true}
           domStorageEnabled={true}
-          style={{ height: 600, width: '100%', backgroundColor: colors?.background || '#ffffff' }}
+          style={{ height: 650, width: '100%', backgroundColor: colors?.background || '#ffffff' }}
           onLoadEnd={() => {
             // Wait for the chart to be fully rendered
             setTimeout(() => {

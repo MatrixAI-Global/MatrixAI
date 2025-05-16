@@ -165,16 +165,26 @@ const ForceDirectedGraph2 = ({ transcription, uid, audioid, xmlData }) => {
     <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
-      body {
-        background-color: ${colors?.background || '#ffffff'};
-        color: ${colors?.text || '#000000'};
+      html, body {
+        height: 100%;
+        width: 100%;
         margin: 0;
         padding: 0;
+        overflow: hidden;
+        background-color: ${colors?.background || '#ffffff'};
+        color: ${colors?.text || '#000000'};
+      }
+      #chart {
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
       }
     </style>
   </head>
   <body>
-    <div id="chart" style="width: 100%; height: 1200%;"></div>
+    <div id="chart"></div>
     <script>
       const chartDom = document.getElementById('chart');
       const myChart = echarts.init(chartDom);
@@ -331,21 +341,28 @@ const ForceDirectedGraph2 = ({ transcription, uid, audioid, xmlData }) => {
 `;
 
   return (
-    <View style={[styles.container, {backgroundColor: colors?.background || '#ffffff'}]}>
+    <View style={[styles.container, {backgroundColor: colors?.background || '#ffffff', flex: 1, height: '100%'}]}>
       <WebView
         originWhitelist={['*']}
         source={{ html: chartHtml }}
         javaScriptEnabled={true}
         domStorageEnabled={true}
-        style={{ flex: 1, backgroundColor: colors?.background || '#ffffff' }}
+        style={{ flex: 1, height: '100%', backgroundColor: colors?.background || '#ffffff' }}
       />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  container: { 
+    flex: 1, 
+    height: '100%'
+  },
+  loadingContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
 });
 
 export default ForceDirectedGraph2;

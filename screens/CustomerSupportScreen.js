@@ -13,7 +13,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-const FAQItem = ({ question, answer,navigation }) => {
+import { ThemedView, ThemedText, ThemedCard } from '../components/ThemedView';
+
+const FAQItem = ({ question, answer, navigation }) => {
   const [expanded, setExpanded] = useState(false);
   const animation = new Animated.Value(expanded ? 1 : 0);
   const { getThemeColors } = useTheme();
@@ -34,9 +36,13 @@ const FAQItem = ({ question, answer,navigation }) => {
   });
 
   return (
-    <TouchableOpacity style={styles.faqItem} onPress={toggleExpand} activeOpacity={0.7}>
+    <TouchableOpacity 
+      style={[styles.faqItem, {borderBottomColor: colors.border, backgroundColor: colors.card}]} 
+      onPress={toggleExpand} 
+      activeOpacity={0.7}
+    >
       <View style={styles.faqHeader}>
-        <Text style={[styles.faqQuestion, {color: colors.text}]}>{question}</Text>
+        <ThemedText style={[styles.faqQuestion, {color: colors.text}]}>{question}</ThemedText>
         <Animated.View
           style={{
             transform: [
@@ -53,7 +59,7 @@ const FAQItem = ({ question, answer,navigation }) => {
         </Animated.View>
       </View>
       <Animated.View style={[styles.faqBody, { height: bodyHeight }]}>
-        <Text style={[styles.faqAnswer, {color: colors.text}]}>{answer}</Text>
+        <ThemedText style={[styles.faqAnswer, {color: colors.textSecondary || colors.text + '99'}]}>{answer}</ThemedText>
       </Animated.View>
     </TouchableOpacity>
   );
@@ -86,7 +92,7 @@ const CustomerSupportScreen = ({ navigation }) => {
       icon: 'chatbubbles-outline',
       title: 'Give Feedback',
       description: 'Give feedback to our support team',
-        action: () => navigation.navigate('FeedbackScreen'),
+      action: () => navigation.navigate('FeedbackScreen'),
     },
     {
       icon: 'mail-outline',
@@ -94,66 +100,66 @@ const CustomerSupportScreen = ({ navigation }) => {
       description: 'Get help via email',
       action: () => Linking.openURL('mailto:support@matrixai.com'),
     },
-    // {
-    //   icon: 'call-outline',
-    //   title: 'Phone Support',
-    //   description: 'Talk to our team',
-    //   action: () => Linking.openURL('tel:+1234567890'),
-    // },
   ];
+
+  const SupportMenuItem = ({ icon, title, description, onPress }) => (
+    <TouchableOpacity 
+      style={[styles.menuItem, {backgroundColor: colors.card, borderBottomColor: colors.border}]} 
+      onPress={onPress}
+    >
+      <View style={styles.iconContainer}>
+        <Ionicons name={icon} size={24} color={colors.primary} />
+      </View>
+      <View style={styles.menuContent}>
+        <ThemedText style={[styles.menuLabel, {color: colors.text}]}>{title}</ThemedText>
+        <ThemedText style={[styles.menuDescription, {color: colors.textSecondary || colors.text + '99'}]}>{description}</ThemedText>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color={colors.text + '80'} />
+    </TouchableOpacity>
+  );
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
-      <View style={[styles.header, {backgroundColor: colors.background , borderBottomWidth: 0.8, borderColor: colors.border}]}>
-      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+      <View style={[styles.header, {backgroundColor: colors.background, borderBottomWidth: 0.8, borderColor: colors.border}]}>
+        <View style={styles.headerLeftSection}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <MaterialIcons name="arrow-back-ios-new" size={24} color="white" />
-                               </TouchableOpacity>
-        <Text style={[styles.headerTitle, {color: colors.text}]}>Help & Support</Text>
+          </TouchableOpacity>
+          <ThemedText style={[styles.headerTitle, {color: colors.text}]}>Help & Support</ThemedText>
+        </View>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={[styles.supportOptionsContainer, {backgroundColor: colors.background2}]}>
+      <ScrollView 
+        style={[styles.content, {backgroundColor: colors.background}]} 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <ThemedText style={[styles.sectionTitle, {color: colors.text}]}>Contact Us</ThemedText>
+        
+        <ThemedCard style={[styles.menuContainer, {backgroundColor: colors.card, borderWidth: 0.8, borderColor: colors.border}]}>
           {supportOptions.map((option, index) => (
-            <TouchableOpacity
+            <SupportMenuItem
               key={index}
-              style={styles.supportOption}
+              icon={option.icon}
+              title={option.title}
+              description={option.description}
               onPress={option.action}
-            >
-              <View style={[styles.supportOptionIcon, {backgroundColor: colors.background2}]}>
-                <Ionicons name={option.icon} size={24} color="#007AFF" />
-              </View>
-              <View style={styles.supportOptionContent}>
-                <Text style={[styles.supportOptionTitle, {color: colors.text}]}>{option.title}</Text>
-                <Text style={[styles.supportOptionDescription, {color: colors.text}]  }>
-                  {option.description}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#666" />
-            </TouchableOpacity>
+            />
           ))}
-        </View>
+        </ThemedCard>
 
-        <Text style={[styles.sectionTitle, {color: colors.text}]}>Frequently Asked Questions</Text>
-        <View style={[styles.faqContainer, {backgroundColor: colors.background2}]}>
+        <ThemedText style={[styles.sectionTitle, {color: colors.text}]}>Frequently Asked Questions</ThemedText>
+        
+        <ThemedCard style={[styles.menuContainer, {backgroundColor: colors.card, borderWidth: 0.8, borderColor: colors.border}]}>
           {faqs.map((faq, index) => (
-            <FAQItem key={index} question={faq.question} answer={faq.answer} navigation={navigation} colors={colors.text} />
+            <FAQItem 
+              key={index} 
+              question={faq.question} 
+              answer={faq.answer} 
+              navigation={navigation} 
+            />
           ))}
-        </View>
-
-        {/* <View style={styles.communityCard}>
-          <View style={styles.communityIcon}>
-            <Ionicons name="people-outline" size={24} color="#007AFF" />
-          </View>
-          <View style={styles.communityContent}>
-            <Text style={styles.communityTitle}>Join our Community</Text>
-            <Text style={styles.communityDescription}>
-              Get help from other users and share your experience
-            </Text>
-          </View>
-          <TouchableOpacity style={styles.joinButton}>
-            <Text style={styles.joinButtonText}>Join Now</Text>
-          </TouchableOpacity>
-        </View> */}
+        </ThemedCard>
       </ScrollView>
     </SafeAreaView>
   );
@@ -162,103 +168,74 @@ const CustomerSupportScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7F7F7',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
-   
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    justifyContent: 'space-between',
+  },
+  headerLeftSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   backButton: {
     padding: 8,
     borderRadius: 20,
     backgroundColor: '#007bff',
-   
-    marginRight:10,
-  },
-  headerIcon: {
-    width: 24,
-    height: 24,
-    resizeMode: 'contain',
+    marginRight: 10,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginLeft: 16,
-    color: '#333',
   },
   content: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 10,
   },
-  supportOptionsContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 8,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  supportOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-  
-  },
-  supportOptionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F0F8FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  supportOptionContent: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  supportOptionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-
-  },
-  supportOptionDescription: {
-    fontSize: 12,
-  
-    marginTop: 4,
+  scrollContent: {
+    paddingBottom: 10,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    marginVertical: 10,
+    marginLeft: 10,
+  },
+  menuContainer: {
+    padding: 10,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 16,
   },
-  faqContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 8,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    width: '100%',
+  },
+  iconContainer: {
+    marginRight: 15,
+  },
+  menuContent: {
+    flex: 1,
+  },
+  menuLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  menuDescription: {
+    fontSize: 12,
+    marginTop: 4,
   },
   faqItem: {
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
     overflow: 'hidden',
+    width: '100%',
   },
   faqHeader: {
     flexDirection: 'row',
@@ -270,65 +247,14 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
   },
   faqBody: {
     overflow: 'hidden',
   },
   faqAnswer: {
     fontSize: 14,
-    color: '#666',
     paddingHorizontal: 16,
     paddingBottom: 16,
-  },
-  communityCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  communityIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#F0F8FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  communityContent: {
-    flex: 1,
-    marginLeft: 16,
-  },
-  communityTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  communityDescription: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
-  joinButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  joinButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
   },
 });
 

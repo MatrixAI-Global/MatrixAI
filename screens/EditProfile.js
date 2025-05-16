@@ -188,18 +188,19 @@ const EditProfile = ({ navigation }) => {
   };
 
   const renderField = (label, value, field) => (
-    <View style={[styles.fieldContainer, {backgroundColor: colors.background2}]}>
+    <TouchableOpacity 
+      style={[styles.fieldContainer, {backgroundColor: colors.card, borderBottomWidth: 1, borderBottomColor: colors.border}]}
+      onPress={() => {
+        setEditingField(field);
+        setTempValue(value?.toString() || '');
+      }}
+    >
       <View style={styles.fieldHeader}>
+        <View style={styles.iconContainer}>
+          <Ionicons name={field === 'name' ? 'person-outline' : field === 'age' ? 'calendar-outline' : 'transgender-outline'} size={20} color={colors.primary} />
+        </View>
         <ThemedText style={[styles.fieldLabel, {color: colors.text}]}>{label}</ThemedText>
-        <TouchableOpacity
-          style={styles.editButton}
-          onPress={() => {
-            setEditingField(field);
-            setTempValue(value?.toString() || '');
-          }}
-        >
-          <Ionicons name="pencil" size={20} color={colors.primary} />
-        </TouchableOpacity>
+        <Ionicons name="chevron-forward" size={20} color={colors.text + '80'} />
       </View>
       {editingField === field ? (
         <TextInput
@@ -217,7 +218,7 @@ const EditProfile = ({ navigation }) => {
       ) : (
         <ThemedText style={[styles.fieldValue, {color: colors.text}]}>{value || t('notSet')}</ThemedText>
       )}
-    </View>
+    </TouchableOpacity>
   );
 
   if (loading) {
@@ -265,14 +266,19 @@ const EditProfile = ({ navigation }) => {
           </View>
         </View>
 
-        <ThemedCard style={[styles.card, {backgroundColor: colors.background2}]}>
+        <ThemedCard style={[styles.card, {backgroundColor: colors.card, borderWidth: 0.8, borderColor: colors.border}]}>
           {renderField(t('name'), profileData.name, 'name')}
           {renderField(t('age'), profileData.age, 'age')}
           {renderField(t('gender'), profileData.gender, 'gender')}
-          <View style={styles.fieldContainer}>
-            <ThemedText style={[styles.fieldLabel, {color: colors.text}]}>{t('email')}</ThemedText>
+          <TouchableOpacity style={[styles.fieldContainer, {backgroundColor: colors.card, borderBottomWidth: 0}]}>
+            <View style={styles.fieldHeader}>
+              <View style={styles.iconContainer}>
+                <Ionicons name="mail-outline" size={20} color={colors.primary} />
+              </View>
+              <ThemedText style={[styles.fieldLabel, {color: colors.text}]}>{t('email')}</ThemedText>
+            </View>
             <ThemedText style={[styles.fieldValue, {color: colors.text}]}>{profileData.email}</ThemedText>
-          </View>
+          </TouchableOpacity>
         </ThemedCard>
 
         {isEdited && (
@@ -366,8 +372,8 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 20,
+    padding: 10,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -376,28 +382,33 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   fieldContainer: {
-    marginBottom: 16,
+    flexDirection: 'column',
+    paddingVertical: 15,
+    width: '100%',
   },
   fieldHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+  },
+  iconContainer: {
+    marginRight: 15,
   },
   fieldLabel: {
-    fontSize: 14,
-    color: '#666',
+    flex: 1,
+    fontSize: 16,
+    color: '#000',
     fontWeight: '500',
   },
   fieldValue: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '600',
-  },
-  editButton: {
-    padding: 8,
+    fontSize: 14,
+    color: '#666',
+    marginTop: 5,
+    marginLeft: 35,
   },
   input: {
     fontSize: 16,

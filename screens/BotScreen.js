@@ -41,6 +41,8 @@ import Clipboard from '@react-native-clipboard/clipboard';
 import Markdown from 'react-native-markdown-display';
 import MathJax from 'react-native-mathjax-html-to-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useCoinsSubscription } from '../hooks/useCoinsSubscription';
+import { useAuthUser } from '../hooks/useAuthUser';
 
 // Function to decode base64 to ArrayBuffer
 const decode = (base64) => {
@@ -84,6 +86,14 @@ const persistEvent = (event) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [currentRole, setCurrentRole] = useState('');
+  
+  // Add states for coins management
+  const { data: sessionData } = supabase.auth.getSession();
+  const { uid, loading } = useAuthUser();    
+  const coinCount = useCoinsSubscription(uid);
+  const [lowBalanceModalVisible, setLowBalanceModalVisible] = useState(false);
+  const [requiredCoins, setRequiredCoins] = useState(1);
+  const [lastCoinsDeducted, setLastCoinsDeducted] = useState(0);
   
   // Modified image handling
   const [selectedImage, setSelectedImage] = useState(null);
@@ -228,6 +238,13 @@ const persistEvent = (event) => {
 
   const fetchDeepSeekResponse = async (userMessage, retryCount = 0) => {
     try {
+      // Check if user has enough coins (1 coin required for chat)
+      if (coinCount < 1) {
+        setRequiredCoins(1);
+        setLowBalanceModalVisible(true);
+        return;
+      }
+      
       setIsLoading(true);
       
       // Get the current role context
@@ -248,10 +265,12 @@ const persistEvent = (event) => {
         {
           prompt: userMessage,
           systemMessage: systemContent,
+          uid: uid,
         },
         {
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdGdkaGVoeGhnYXJrb252cGZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ2Njg4MTIsImV4cCI6MjA1MDI0NDgxMn0.mY8nx-lKrNXjJxHU7eEja3-fTSELQotOP4aZbxvmNPY',
           },
         }
       );
@@ -259,21 +278,33 @@ const persistEvent = (event) => {
       // Process the response
       if (response.data && response.data.output && response.data.output.text) {
         const botMessage = response.data.output.text;
+        const coinsDeducted = response.data.coinsDeducted || 1; // Default to 1 if not specified
+        
+        // Store the coins deducted for UI display
+        setLastCoinsDeducted(coinsDeducted);
         
         // Remove the loading indicator and add the bot's response
         setMessages(prev => {
           // Filter out any loading messages
           const messagesWithoutLoading = prev.filter(msg => !msg.isLoading);
-          // Add the bot's response
+          // Add the bot's response with coins info
           return [...messagesWithoutLoading, {
             id: Date.now().toString(),
             text: botMessage,
-            sender: 'bot'
+            sender: 'bot',
+            coinsDeducted: coinsDeducted
           }];
         });
         
         // Save the chat history for the bot response
-        await saveChatHistory(botMessage, 'bot');
+        await saveChatHistory(botMessage, 'bot', coinsDeducted);
+        
+        // Ensure scroll to bottom after receiving bot response
+        setTimeout(() => {
+          if (flatListRef.current) {
+            flatListRef.current.scrollToEnd({ animated: true });
+          }
+        }, 100);
       } else {
         throw new Error('Invalid response format');
       }
@@ -300,6 +331,13 @@ const persistEvent = (event) => {
       
       // Save the error message
       await saveChatHistory('Sorry, I encountered an error. Could you try again?', 'bot');
+      
+      // Ensure scroll to bottom even after error
+      setTimeout(() => {
+        if (flatListRef.current) {
+          flatListRef.current.scrollToEnd({ animated: true });
+        }
+      }, 100);
     } finally {
       setIsLoading(false);
     }
@@ -535,12 +573,26 @@ const persistEvent = (event) => {
             // Clear input
             setInputText('');
             setIsTyping(false);
+            
+            // Ensure scroll to bottom after sending a message
+            setTimeout(() => {
+              if (flatListRef.current) {
+                flatListRef.current.scrollToEnd({ animated: true });
+              }
+            }, 100);
 
             // Save the user's message to Supabase
             await saveChatHistory(inputText, 'user');
             
             // Process the message with an AI service
             await fetchDeepSeekResponse(inputText);
+            
+            // Scroll to bottom after getting the response
+            setTimeout(() => {
+              if (flatListRef.current) {
+                flatListRef.current.scrollToEnd({ animated: true });
+              }
+            }, 200);
           } catch (error) {
             console.error('Error in message handling:', error);
             
@@ -569,7 +621,7 @@ const persistEvent = (event) => {
     }
   };
 
-  const saveChatHistory = async (messageText, sender) => {
+  const saveChatHistory = async (messageText, sender, coinsDeducted = 0) => {
     try {
       // Get current user session
       const { data: { session } } = await supabase.auth.getSession();
@@ -948,12 +1000,12 @@ const persistEvent = (event) => {
     // Special case for loading animation - only show one loading indicator
     if (item.isLoading && item.sender === 'bot') {
       return (
-        <View style={styles.loadingContainer}>
+        <View style={[styles.loadingContainer, { marginTop: -80 }]}>
           <LottieView
             source={require('../assets/dot.json')}
             autoPlay
             loop
-            style={styles.loadingAnimation}
+            style={[styles.loadingAnimation, { marginBottom: 30 }]}
           />
         </View>
       );
@@ -3311,7 +3363,7 @@ const persistEvent = (event) => {
     if (flatListRef.current && messages.length > 0) {
       // Use requestAnimationFrame for smoother scrolling
       requestAnimationFrame(() => {
-        flatListRef.current.scrollToEnd({ animated: false });
+        flatListRef.current.scrollToEnd({ animated: true });
       });
     }
   };
@@ -3337,6 +3389,60 @@ const persistEvent = (event) => {
       }
     }
   }, [messages]);
+
+  const navigateToSubscription = () => {
+    setLowBalanceModalVisible(false);
+    navigation.navigate('SubscriptionScreen');
+  };
+  
+  // Update the renderItem function to include coin deduction UI
+  const renderItem = ({ item, index }) => {
+    // ... existing renderItem code ...
+
+    // Add coin display for bot messages if coins were deducted
+    if (item.sender === 'bot' && item.coinsDeducted) {
+      return (
+        <View>
+          {/* Existing message UI */}
+          <View style={[
+            styles.messageContainer,
+            item.sender === 'user' ? styles.userMessageContainer : styles.botMessageContainer,
+            { backgroundColor: item.sender === 'user' ? colors.primary : colors.background2 }
+          ]}>
+            {/* ... existing message content ... */}
+            {/* Add your existing message rendering code here */}
+          </View>
+          
+          {/* Coin deduction indicator */}
+          {item.coinsDeducted > 0 && (
+            <Animatable.View 
+              animation="fadeIn" 
+              duration={500} 
+              style={styles.coinIndicator}
+            >
+              <Image 
+                source={require('../assets/coin.png')} 
+                style={styles.coinIcon} 
+              />
+              <Text style={styles.coinText}>-{item.coinsDeducted}</Text>
+            </Animatable.View>
+          )}
+        </View>
+      );
+    }
+    
+    // Return regular message for user messages or bot messages without coin deduction
+    return (
+      <View style={[
+        styles.messageContainer,
+        item.sender === 'user' ? styles.userMessageContainer : styles.botMessageContainer,
+        { backgroundColor: item.sender === 'user' ? colors.primary : colors.background2 }
+      ]}>
+        {/* ... existing message content ... */}
+        {/* Add your existing message rendering code here */}
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
@@ -3383,7 +3489,7 @@ const persistEvent = (event) => {
       <KeyboardAvoidingView 
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
       >
         {/* Chat List */}
         <View style={{ flex: 1 }}>
@@ -3405,7 +3511,16 @@ const persistEvent = (event) => {
                 style={styles.messagesList}
                 onScroll={handleScroll}
                 scrollEventThrottle={400}
-                onContentSizeChange={() => scrollToBottom()}
+                onContentSizeChange={() => {
+                  if (flatListRef.current) {
+                    flatListRef.current.scrollToEnd({ animated: true });
+                  }
+                }}
+                onLayout={() => {
+                  if (flatListRef.current && messages.length > 0) {
+                    flatListRef.current.scrollToEnd({ animated: false });
+                  }
+                }}
                 maintainVisibleContentPosition={{
                   minIndexForVisible: 0,
                   autoscrollToTopThreshold: 10
@@ -3681,6 +3796,42 @@ const persistEvent = (event) => {
           <Text style={styles.scrollToBottomIcon}>↓</Text>
         </TouchableOpacity>
       )}
+      
+      {/* Add Low Balance Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={lowBalanceModalVisible}
+        onRequestClose={() => setLowBalanceModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, {backgroundColor: colors.background2}]}>
+            <Image 
+              source={require('../assets/coin.png')} 
+              style={styles.modalCoinImage} 
+            />
+            <Text style={[styles.modalTitle, {color: colors.text}]}>Insufficient Balance</Text>
+            <Text style={[styles.modalMessage, {color: colors.text}]}>
+              You need {requiredCoins} coins to use this feature.
+              Your current balance is {coinCount} coins.
+            </Text>
+            <View style={styles.modalButtonsContainer}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]} 
+                onPress={() => setLowBalanceModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.rechargeButton]} 
+                onPress={navigateToSubscription}
+              >
+                <Text style={styles.rechargeButtonText}>Recharge Now</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -3926,7 +4077,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginVertical: 10,
     marginLeft: 1,
-
+    marginTop: -50, // Move the animation higher by adding negative top margin
     padding: 15,
     borderRadius: 15,
     maxWidth: 150,
@@ -4938,6 +5089,93 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 1,
+  },
+  // Add new styles for coin display
+  coinIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    marginRight: 10,
+    marginTop: 2,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  coinIcon: {
+    width: 14,
+    height: 14,
+    marginRight: 4,
+  },
+  coinText: {
+    fontSize: 12,
+    color: '#FF6B6B',
+    fontWeight: '500',
+  },
+  
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    width: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 15,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalCoinImage: {
+    width: 60,
+    height: 60,
+    marginBottom: 10,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  modalMessage: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  modalButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  modalButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    alignItems: 'center',
+    flex: 1,
+    marginHorizontal: 5,
+  },
+  cancelButton: {
+    backgroundColor: '#E0E0E0',
+  },
+  rechargeButton: {
+    backgroundColor: '#007BFF',
+  },
+  cancelButtonText: {
+    color: '#333',
+    fontWeight: '500',
+  },
+  rechargeButtonText: {
+    color: '#fff',
+    fontWeight: '500',
   },
 });
 

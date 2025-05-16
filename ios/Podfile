@@ -25,6 +25,7 @@ prepare_react_native_project!
 # Configure permissions - only enable the ones needed
 setup_permissions([
   'Microphone',
+  'PhotoLibrary',
 ])
 
 linkage = ENV['USE_FRAMEWORKS']

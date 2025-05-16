@@ -552,4 +552,12 @@ const App = () => {
     );
 };
 
-export default App;
+// Add Toast outside of the main component
+export default () => {
+  return (
+    <>
+      <App />
+      <Toast />
+    </>
+  );
+};
