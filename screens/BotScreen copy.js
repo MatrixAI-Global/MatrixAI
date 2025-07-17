@@ -69,6 +69,10 @@ const BotScreen2 = ({ navigation, route }) => {
   useEffect(() => {
     return () => {
       isMounted.current = false;
+      // Cleanup timeout ref to prevent memory leaks
+      if (sendTimeoutRef.current) {
+        clearTimeout(sendTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -109,6 +113,7 @@ const BotScreen2 = ({ navigation, route }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isApiLoading, setIsApiLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [isImageProcessing, setIsImageProcessing] = useState(false);
   const [expandedMessages, setExpandedMessages] = useState({});
   const [fullTranscription, setFullTranscription] = useState('');
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -117,6 +122,9 @@ const BotScreen2 = ({ navigation, route }) => {
   const [isSendDisabled, setIsSendDisabled] = useState(false); // New state to track send button disabled state
   const swipeableRefs = useRef({});
   const lastScrolledMessageId = useRef(null);
+
+  // Add debounce ref to prevent rapid successive calls
+  const sendTimeoutRef = useRef(null);
 
   const toggleMessageExpansion = (messageId) => {
     // Prevent scrolling to the end of the list when expanding a message
@@ -157,7 +165,13 @@ const BotScreen2 = ({ navigation, route }) => {
   };
 
   const handleSendMessage = async () => {
-    if ((inputText.trim() || selectedImage) && !isSendDisabled) {
+    // Enhanced protection against double-sends
+    if ((inputText.trim() || selectedImage) && !isSendDisabled && !isLoading) {
+      // Clear any existing timeout
+      if (sendTimeoutRef.current) {
+        clearTimeout(sendTimeoutRef.current);
+      }
+      
       // Disable the send button immediately
       setIsSendDisabled(true);
       
@@ -167,6 +181,10 @@ const BotScreen2 = ({ navigation, route }) => {
         // If there's an image, process it
         if (selectedImage) {
           try {
+            setIsImageProcessing(true);
+           
+            console.log('Compressing image for faster processing...');
+            
             // Generate a unique image ID
             const imageID = Date.now().toString(36) + Math.random().toString(36).substring(2, 15);
             const fileExtension = imageFileName ? imageFileName.split('.').pop() : 'jpg';
@@ -203,85 +221,61 @@ const BotScreen2 = ({ navigation, route }) => {
             };
             
             setMessages((prev) => [...prev, newMessage]);
-            setSelectedImage(null);
-            setInputText('');
-
+            
             // Save the chat history for the image
             await saveChatHistory(publicUrl, 'user');
             
-            // If there's text, use it as the question, otherwise use a default
-            const question = "What do you see in this image?";
+            // Create a streaming bot message that will be updated in real-time
+            const streamingMessageId = 'streaming-' + Date.now().toString();
+            let streamingContent = '';
             
-            // Send request using Volces API for image analysis first
-            const volcesResponse = await axios.post(
-              'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
-              {
-                model: 'doubao-vision-pro-32k-241028',
-                messages: [
-                  {
-                    role: 'system',
-                    content: 'You are MatrixAI Bot, a helpful AI assistant.'
-                  },
-                  {
-                    role: 'user',
-                    content: [
-                      {
-                        type: 'text',
-                        text: question
-                      },
-                      {
-                        type: 'image_url',
-                        image_url: {
-                          url: publicUrl
-                        }
-                      }
-                    ]
-                  }
-                ]
-              },
-              {
-                headers: {
-                  'Authorization': 'Bearer 95fad12c-0768-4de2-a4c2-83247337ea89',
-                  'Content-Type': 'application/json'
+            // Add initial empty streaming message
+            setMessages(prev => {
+              // Filter out any loading messages
+              const messagesWithoutLoading = prev.filter(msg => !msg.isLoading);
+              // Add the streaming message
+              return [...messagesWithoutLoading, {
+                id: streamingMessageId,
+                text: '',
+                sender: 'bot',
+                isStreaming: true
+              }];
+            });
+
+            // Define chunk handler for real-time updates
+            const handleChunk = (chunk) => {
+              streamingContent += chunk;
+              
+              // Update the streaming message in real-time
+              setMessages(prev => prev.map(msg => 
+                msg.id === streamingMessageId 
+                  ? { ...msg, text: streamingContent }
+                  : msg
+              ));
+              
+              // Auto-scroll to bottom as content streams in
+              setTimeout(() => {
+                if (flatListRef.current) {
+                  flatListRef.current.scrollToEnd({ animated: true });
                 }
-              }
-            );
+              }, 50);
+            };
+
+            // Use the question from input or default
+            const question = inputText.trim() || "What do you see in this image? Please analyze and describe it in detail.";
             
-            // Extract the response from Volces API
-            const imageAnalysisResponse = volcesResponse.data.choices[0].message.content.trim();
+            // Get streaming response with image
+            const fullResponse = await sendMessageToAI(question, publicUrl, handleChunk);
             
-            // Now, send this response combined with user's question to createContent API
-            const combinedPrompt = `${inputText || question}\n\nImage analysis: ${imageAnalysisResponse} so answer the user's question with the image analysis and only answer the user's question`;
-            
-            const finalResponse = await axios.post(
-              'https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/createContent',
-              {
-                prompt: combinedPrompt,
-                systemMessage: 'You are MatrixAI Bot, a helpful AI assistant.',
-                uid: uid
-              },
-              {
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdGdkaGVoeGhnYXJrb252cGZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ2Njg4MTIsImV4cCI6MjA1MDI0NDgxMn0.mY8nx-lKrNXjJxHU7eEja3-fTSELQotOP4aZbxvmNPY'
-                }
-              }
-            );
-            
-            // Extract the final response - use Volces response as fallback
-            const finalBotMessage = finalResponse.data.output.text || imageAnalysisResponse;
-            
-            // Get coins deducted if available
-            const coinsDeducted = finalResponse.data.coinsDeducted || 0;
-            
-            // Add the bot's response to messages
-            setMessages((prev) => [
-              ...prev,
-              { id: Date.now().toString(), text: finalBotMessage, sender: 'bot', coinsDeducted },
-            ]);
+            // Finalize the streaming message
+            setMessages(prev => prev.map(msg => 
+              msg.id === streamingMessageId 
+                ? { ...msg, text: fullResponse, isStreaming: false, coinsDeducted: 1 }
+                : msg
+            ));
             
             // Save the chat history for the bot response
-            await saveChatHistory(finalBotMessage, 'bot', coinsDeducted);
+            await saveChatHistory(fullResponse, 'bot', 1);
             
             // Clear the image and text
             setSelectedImage(null);
@@ -297,10 +291,11 @@ const BotScreen2 = ({ navigation, route }) => {
             ]);
           } finally {
             setIsLoading(false);
-            // Re-enable the send button after a short delay
-            setTimeout(() => {
+            setIsImageProcessing(false);
+            // Re-enable the send button with a minimum delay to prevent rapid successive sends
+            sendTimeoutRef.current = setTimeout(() => {
               setIsSendDisabled(false);
-            }, 1000);
+            }, 1500); // Increased delay to 1.5 seconds
           }
         } else {
           // Regular text message handling
@@ -321,103 +316,244 @@ const BotScreen2 = ({ navigation, route }) => {
             }
           }, 100);
           
-          // Re-enable the send button after a short delay to prevent double-sends
-          setTimeout(() => {
+          // Re-enable the send button with a minimum delay to prevent rapid successive sends
+          sendTimeoutRef.current = setTimeout(() => {
             setIsSendDisabled(false);
-          }, 1000);
+          }, 1500); // Increased delay to 1.5 seconds
         }
       } catch (error) {
         console.error("Error sending message:", error);
         Alert.alert("Error", "Failed to send message. Please try again.");
         
-        // Re-enable the send button
-        setTimeout(() => {
+        // Re-enable the send button with a minimum delay
+        sendTimeoutRef.current = setTimeout(() => {
           setIsSendDisabled(false);
-        }, 1000);
+        }, 1500);
       }
     }
   };
 
-  const fetchDeepSeekResponse = async (userMessage, retryCount = 0) => {
-    const maxRetries = 5;
-    const retryDelay = Math.min(Math.pow(2, retryCount) * 1000, 60000);
-
-    setIsLoading(true);
-    try {
-      // Prepare message history for context
-      const contextMessages = messageHistory.slice(-5); // Include last 5 messages for context
-      const contextString = contextMessages.map(msg => 
-        `${msg.role === 'assistant' ? 'AI' : 'User'}: ${msg.content}`
-      ).join('\n');
-      
-      // Create a prompt with context
-      let userMessageContent = userMessage;
-      if (contextMessages.length > 0) {
-        userMessageContent = "Previous conversation:\n" + contextString + "\n\nUser's new message: " + userMessageContent;
-      }
-
-      // Define system message
-      let systemContent = 'You are MatrixAI Bot, a helpful AI assistant.';
-      
-      // Make API call
-      const response = await axios.post(
-        'https://ddtgdhehxhgarkonvpfq.supabase.co/functions/v1/createContent',
-        {
-          prompt: userMessageContent,
-          systemMessage: systemContent,
-          uid: uid,
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdGdkaGVoeGhnYXJrb252cGZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ2Njg4MTIsImV4cCI6MjA1MDI0NDgxMn0.mY8nx-lKrNXjJxHU7eEja3-fTSELQotOP4aZbxvmNPY',
+  // New streaming API function compatible with React Native
+  const sendMessageToAI = async (message, imageUrl = null, onChunk = null) => {
+    return new Promise((resolve, reject) => {
+      try {
+        // Prepare messages array
+        const messages = [
+          {
+            role: "system",
+            content: [
+              {
+                type: "text", 
+                text: "You are an AI tutor assistant helping students with their homework and studies. Provide helpful, educational responses with clear explanations and examples that students can easily understand. Use proper markdown formatting for better readability."
+              }
+            ]
           },
-        }
-      );
-      
-      // Extract AI response
-      let botMessage = response.data.output.text;
-      
-      // Remove markdown formatting if needed
-      botMessage = botMessage.replace(/(\*\*|\#\#)/g, "");
-      
-      // Get coins deducted if available
-      const coinsDeducted = response.data.coinsDeducted || 0;
+          {
+            role: "user",
+            content: []
+          }
+        ];
 
-      setMessages((prev) => [
-        ...prev,
-        { id: Date.now().toString(), text: botMessage, sender: 'bot', coinsDeducted },
-      ]);
+        // Add text content
+        messages[1].content.push({
+          type: "text",
+          text: `Please help me with this question or topic: ${message}`
+        });
+
+        // Add image if provided
+        if (imageUrl) {
+          messages[1].content.push({
+            type: "image_url",
+            image_url: {
+              url: imageUrl
+            }
+          });
+        }
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions', true);
+        xhr.setRequestHeader('Authorization', 'Bearer sk-256fda005a1445628fe2ceafcda9e389');
+        xhr.setRequestHeader('Content-Type', 'application/json');
+
+        let fullContent = '';
+        let processedLength = 0; // Track how much we've already processed
+        let isFirstChunk = true;
+
+        xhr.onreadystatechange = function() {
+          if (xhr.readyState === 3 || xhr.readyState === 4) {
+            const responseText = xhr.responseText;
+            
+            // Only process new content that we haven't seen before
+            const newContent = responseText.substring(processedLength);
+            if (newContent) {
+              processedLength = responseText.length; // Update processed length
+              const lines = newContent.split('\n');
+              
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  const data = line.slice(6).trim();
+                  if (data === '[DONE]') {
+                    console.log('✅ Stream marked as DONE');
+                    continue;
+                  }
+                  
+                  try {
+                    const parsed = JSON.parse(data);
+                    const content_chunk = parsed.choices?.[0]?.delta?.content;
+                    
+                    if (content_chunk) {
+                      if (isFirstChunk) {
+                        console.log('📝 First content chunk received');
+                        isFirstChunk = false;
+                      }
+                      
+                      fullContent += content_chunk;
+                      
+                      // Call the chunk callback immediately for real-time updates
+                      if (onChunk) {
+                        onChunk(content_chunk);
+                      }
+                    }
+                  } catch (parseError) {
+                    // Skip invalid JSON lines
+                    continue;
+                  }
+                }
+              }
+            }
+            
+            // If request is complete
+            if (xhr.readyState === 4) {
+              if (xhr.status === 200) {
+                console.log('✅ AI Tutor API request completed successfully');
+                console.log('📊 Final content length:', fullContent.length);
+                resolve(fullContent.trim() || 'I apologize, but I could not generate a response. Please try again.');
+              } else {
+                console.error('❌ API request failed:', xhr.status, xhr.statusText);
+                reject(new Error(`API call failed: ${xhr.status} ${xhr.statusText}`));
+              }
+            }
+          }
+        };
+
+        xhr.onerror = function() {
+          console.error('💥 XMLHttpRequest error');
+          reject(new Error('Failed to get response from AI. Please try again.'));
+        };
+
+        xhr.ontimeout = function() {
+          console.error('💥 XMLHttpRequest timeout');
+          reject(new Error('Request timed out. Please try again.'));
+        };
+
+        xhr.timeout = 60000; // 60 second timeout
+
+        const requestBody = JSON.stringify({
+          model: "qwen-vl-max",
+          messages: messages,
+          stream: true
+        });
+
+        console.log('📊 Sending request to API...');
+        xhr.send(requestBody);
+
+      } catch (error) {
+        console.error('💥 Error in sendMessageToAI:', error);
+        reject(new Error('Failed to get response from AI. Please try again.'));
+      }
+    });
+  };
+
+  const fetchDeepSeekResponse = async (userMessage, retryCount = 0) => {
+    try {
+      setIsLoading(true);
       
-      // Save bot response with coins info
-      saveChatHistory(botMessage, 'bot', coinsDeducted);
+      // Create a streaming bot message that will be updated in real-time
+      const streamingMessageId = 'streaming-' + Date.now().toString();
+      let streamingContent = '';
       
-      // Ensure scroll to bottom after receiving response
+      // Add initial empty streaming message
+      setMessages(prev => {
+        // Filter out any loading messages
+        const messagesWithoutLoading = prev.filter(msg => !msg.isLoading);
+        // Add the streaming message
+        return [...messagesWithoutLoading, {
+          id: streamingMessageId,
+          text: '',
+          sender: 'bot',
+          isStreaming: true
+        }];
+      });
+
+      // Define chunk handler for real-time updates
+      const handleChunk = (chunk) => {
+        streamingContent += chunk;
+        
+        // Update the streaming message in real-time
+        setMessages(prev => prev.map(msg => 
+          msg.id === streamingMessageId 
+            ? { ...msg, text: streamingContent }
+            : msg
+        ));
+        
+        // Auto-scroll to bottom as content streams in
+        setTimeout(() => {
+          if (flatListRef.current) {
+            flatListRef.current.scrollToEnd({ animated: true });
+          }
+        }, 50);
+      };
+
+      // Get streaming response
+      const fullResponse = await sendMessageToAI(userMessage, null, handleChunk);
+      
+      // Finalize the streaming message
+      setMessages(prev => prev.map(msg => 
+        msg.id === streamingMessageId 
+          ? { ...msg, text: fullResponse, isStreaming: false, coinsDeducted: 1 }
+          : msg
+      ));
+      
+      // Save the chat history for the bot response
+      await saveChatHistory(fullResponse, 'bot', 1);
+      
+      // Ensure scroll to bottom after receiving bot response
       setTimeout(() => {
         if (flatListRef.current) {
           flatListRef.current.scrollToEnd({ animated: true });
         }
       }, 100);
-    } catch (error) {
-      console.error('Error fetching response:', error);
       
-      // If we have network errors, retry
-      if (retryCount < maxRetries && (error.message.includes('timeout') || error.message.includes('network'))) {
-        console.log(`Retrying (${retryCount + 1}/${maxRetries}) after delay of ${retryDelay}ms...`);
-        setTimeout(() => {
-          fetchDeepSeekResponse(userMessage, retryCount + 1);
-        }, retryDelay);
-        return;
+    } catch (error) {
+      console.error('Error fetching streaming response:', error);
+      
+      // If we need to handle network errors, we can retry
+      if (retryCount < 1 && (error.message.includes('timeout') || error.message.includes('network'))) {
+        console.log('Retrying due to possible network error...');
+        return fetchDeepSeekResponse(userMessage, retryCount + 1);
       }
       
-      // Handle error case by showing error message
-      setMessages((prev) => [
-        ...prev,
-        { id: Date.now().toString(), text: "Sorry, I encountered an error. Please try again.", sender: 'bot' },
-      ]);
+      // Remove the loading indicator and add an error message
+      setMessages(prev => {
+        // Filter out any loading or streaming messages
+        const messagesWithoutLoading = prev.filter(msg => !msg.isLoading && !msg.isStreaming);
+        // Add the error message
+        return [...messagesWithoutLoading, {
+          id: Date.now().toString(),
+          text: 'Sorry, I encountered an error. Could you try again?',
+          sender: 'bot'
+        }];
+      });
       
-      // Save error message to chat history
-      saveChatHistory("Sorry, I encountered an error. Please try again.", 'bot');
+      // Save the error message
+      await saveChatHistory('Sorry, I encountered an error. Could you try again?', 'bot');
+      
+      // Ensure scroll to bottom even after error
+      setTimeout(() => {
+        if (flatListRef.current) {
+          flatListRef.current.scrollToEnd({ animated: true });
+        }
+      }, 100);
     } finally {
       setIsLoading(false);
     }
@@ -859,49 +995,72 @@ const BotScreen2 = ({ navigation, route }) => {
       return null;
     }
     
-    // Find the maximum text length in each column to calculate proportional widths
+    // Process table data to remove asterisks/stars from content
+    const processedTableHeaders = tableData.tableHeaders.map(header => 
+      header ? header.replace(/\*\*/g, '').replace(/\*/g, '').trim() : '');
+    
+    const processedTableData = tableData.tableData.map(row => 
+      row.map(cell => cell ? cell.toString().replace(/\*\*/g, '').replace(/\*/g, '').trim() : ''));
+    
+    // Calculate column widths based on content
     const getMaxTextLengthForColumn = (colIndex) => {
-      const headerLength = tableData.tableHeaders[colIndex]?.length || 0;
-      const cellLengths = tableData.tableData.map(row => (row[colIndex]?.length || 0));
+      const headerLength = processedTableHeaders[colIndex]?.length || 0;
+      const cellLengths = processedTableData.map(row => (row[colIndex]?.length || 0));
       return Math.max(headerLength, ...cellLengths);
     };
     
-    // Calculate width percentages based on content length
-    const columnCount = tableData.tableHeaders.length;
+    const columnCount = processedTableHeaders.length;
     const columnLengths = Array.from({ length: columnCount }, (_, i) => getMaxTextLengthForColumn(i));
-    const totalLength = columnLengths.reduce((sum, len) => sum + len, 0);
     
-    // Determine if table needs horizontal scrolling (more than 3 columns or very long content)
-    const hasLongContent = tableData.tableHeaders.some(header => header && header.length > 20) || 
-                           tableData.tableData.some(row => 
-                             row.some(cell => cell && cell.length > 20)
-                           );
-    const needsScroll = columnCount > 3 || hasLongContent;
+    // Calculate minimum width for each column (at least 80px, max 200px for auto-sizing)
+    const getColumnWidth = (colIndex) => {
+      const textLength = columnLengths[colIndex];
+      const baseWidth = Math.max(80, Math.min(200, textLength * 8 + 20));
+      return baseWidth;
+    };
     
-    // Check if this is a schedule-like table as in the image
-    const isScheduleTable = tableData.tableHeaders.some(header => 
-      header && (header.includes("Day") || header.includes("Morning") || header.includes("Afternoon")));
+    // Calculate total table width
+    const totalTableWidth = columnLengths.reduce((sum, _, index) => sum + getColumnWidth(index), 0);
+    const screenWidth = 350; // Approximate screen width for table container
+    
+    // Determine if table needs horizontal scrolling
+    const needsHorizontalScroll = totalTableWidth > screenWidth || columnCount > 3;
+    
+    // Check if this is a schedule-like table
+    const isScheduleTable = processedTableHeaders.some(header => 
+      header && (header.includes("Day") || header.includes("Morning") || header.includes("Afternoon") || 
+                 header.includes("Time") || header.includes("Schedule")));
     
     return (
       <View key={`table-${index}`} style={[
         styles.tableContainer,
-        isScheduleTable && styles.scheduleTableContainer
+        isScheduleTable && styles.scheduleTableContainer,
+        needsHorizontalScroll && { maxWidth: '100%' }
       ]}>
-        {needsScroll ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+        {needsHorizontalScroll ? (
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={true}
+            style={{ maxWidth: '100%' }}
+            contentContainerStyle={{ minWidth: totalTableWidth }}
+          >
             <TableContent 
-              tableData={tableData} 
+              tableHeaders={processedTableHeaders}
+              tableData={processedTableData}
               columnLengths={columnLengths} 
-              totalLength={totalLength}
+              getColumnWidth={getColumnWidth}
               isScheduleTable={isScheduleTable}
+              needsHorizontalScroll={needsHorizontalScroll}
             />
           </ScrollView>
         ) : (
           <TableContent 
-            tableData={tableData} 
+            tableHeaders={processedTableHeaders}
+            tableData={processedTableData}
             columnLengths={columnLengths} 
-            totalLength={totalLength}
+            getColumnWidth={getColumnWidth}
             isScheduleTable={isScheduleTable}
+            needsHorizontalScroll={needsHorizontalScroll}
           />
         )}
       </View>
@@ -909,15 +1068,23 @@ const BotScreen2 = ({ navigation, route }) => {
   };
 
   // Create a separate component for table content
-  const TableContent = React.memo(({ tableData, columnLengths, totalLength, isScheduleTable }) => {
+  const TableContent = React.memo(({ 
+    tableHeaders, 
+    tableData, 
+    columnLengths, 
+    getColumnWidth, 
+    isScheduleTable, 
+    needsHorizontalScroll 
+  }) => {
     return (
-      <View style={isScheduleTable ? styles.scheduleTableWrapper : styles.regularTableWrapper}>
+      <View style={[
+        isScheduleTable ? styles.scheduleTableWrapper : styles.regularTableWrapper,
+        needsHorizontalScroll && { minWidth: columnLengths.reduce((sum, _, index) => sum + getColumnWidth(index), 0) }
+      ]}>
         {/* Table header row */}
         <View style={[styles.tableHeaderRow, isScheduleTable && styles.scheduleTableHeaderRow]}>
-          {tableData.tableHeaders.map((header, headerIndex) => {
-            // Calculate width based on content length proportion
-            const widthPercentage = columnLengths[headerIndex] / totalLength;
-            const minWidth = Math.max(100, 50 + (columnLengths[headerIndex] * 10));
+          {tableHeaders.map((header, headerIndex) => {
+            const columnWidth = getColumnWidth(headerIndex);
             
             return (
               <View 
@@ -925,19 +1092,24 @@ const BotScreen2 = ({ navigation, route }) => {
                 style={[
                   styles.tableHeaderCell,
                   {
-                    flex: widthPercentage * 3, // Make the width proportional to text length
-                    minWidth: minWidth,
+                    width: needsHorizontalScroll ? columnWidth : undefined,
+                    flex: needsHorizontalScroll ? 0 : 1,
+                    minWidth: needsHorizontalScroll ? columnWidth : 80,
                   },
                   headerIndex === 0 ? styles.tableFirstColumn : null,
-                  headerIndex === tableData.tableHeaders.length - 1 ? styles.tableLastColumn : null,
+                  headerIndex === tableHeaders.length - 1 ? styles.tableLastColumn : null,
                   isScheduleTable && styles.scheduleTableHeaderCell
                 ]}
               >
-                <Text style={[
-                  styles.tableHeaderText,
-                  { color: '#333333' }, // Use theme color instead of hardcoded color
-                  isScheduleTable && styles.scheduleTableHeaderText
-                ]}>
+                <Text 
+                  style={[
+                    styles.tableHeaderText,
+                    { color: '#333333' },
+                    isScheduleTable && styles.scheduleTableHeaderText
+                  ]}
+                  numberOfLines={2}
+                  ellipsizeMode="tail"
+                >
                   {header || ''}
                 </Text>
               </View>
@@ -946,9 +1118,10 @@ const BotScreen2 = ({ navigation, route }) => {
         </View>
         
         {/* Table data rows */}
-        {tableData.tableData.map((row, rowIndex) => {
+        {tableData.map((row, rowIndex) => {
           // Check if the row contains day information
-          const isDayRow = row.some(cell => cell && cell.toString().includes && cell.toString().includes("Day"));
+          const isDayRow = row.some(cell => cell && cell.toString().includes && 
+            (cell.toString().includes("Day") || cell.toString().includes("day")));
           
           return (
             <View 
@@ -958,13 +1131,11 @@ const BotScreen2 = ({ navigation, route }) => {
                 rowIndex % 2 === 0 ? styles.tableEvenRow : styles.tableOddRow,
                 isScheduleTable && styles.scheduleTableRow,
                 isDayRow && styles.dayRow,
-                rowIndex === tableData.tableData.length - 1 && styles.tableLastRow
+                rowIndex === tableData.length - 1 && styles.tableLastRow
               ]}
             >
               {row.map((cell, cellIndex) => {
-                // Use the same width calculation as for headers
-                const widthPercentage = columnLengths[cellIndex] / totalLength;
-                const minWidth = Math.max(100, 50 + (columnLengths[cellIndex] * 10));
+                const columnWidth = getColumnWidth(cellIndex);
                 
                 return (
                   <View 
@@ -972,8 +1143,9 @@ const BotScreen2 = ({ navigation, route }) => {
                     style={[
                       styles.tableCell,
                       {
-                        flex: widthPercentage * 3, // Make the width proportional to text length
-                        minWidth: minWidth,
+                        width: needsHorizontalScroll ? columnWidth : undefined,
+                        flex: needsHorizontalScroll ? 0 : 1,
+                        minWidth: needsHorizontalScroll ? columnWidth : 80,
                       },
                       cellIndex === 0 ? styles.tableFirstColumn : null,
                       cellIndex === row.length - 1 ? styles.tableLastColumn : null,
@@ -981,12 +1153,16 @@ const BotScreen2 = ({ navigation, route }) => {
                       isDayRow && styles.dayCellStyle
                     ]}
                   >
-                    <Text style={[
-                      styles.tableCellText,
-                      { color: '#333' }, // Use theme color instead of hardcoded color
-                      isScheduleTable && styles.scheduleTableCellText,
-                      isDayRow && styles.dayText
-                    ]}>
+                    <Text 
+                      style={[
+                        styles.tableCellText,
+                        { color: '#333333' },
+                        isScheduleTable && styles.scheduleTableCellText,
+                        isDayRow && styles.dayText
+                      ]}
+                      numberOfLines={3}
+                      ellipsizeMode="tail"
+                    >
                       {cell || ''}
                     </Text>
                   </View>
@@ -2984,17 +3160,21 @@ marginBottom:-10,
     overflow: 'hidden',
     width: '100%',
     alignSelf: 'flex-start',
+    backgroundColor: '#fff',
+    maxWidth: '100%',
   },
   tableHeaderRow: {
     flexDirection: 'row',
     backgroundColor: '#F5F5F5',
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
+    minHeight: 44,
   },
   tableRow: {
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
+    minHeight: 40,
   },
   tableEvenRow: {
     backgroundColor: '#FFFFFF',
@@ -3003,20 +3183,20 @@ marginBottom:-10,
     backgroundColor: '#F9F9F9',
   },
   tableHeaderCell: {
-    flex: 1,
     padding: 8,
     justifyContent: 'center',
     alignItems: 'center',
     borderRightWidth: 1,
     borderRightColor: '#E0E0E0',
+    minHeight: 44,
   },
   tableCell: {
-    flex: 1,
     padding: 8,
     justifyContent: 'center',
     alignItems: 'center',
     borderRightWidth: 1,
     borderRightColor: '#E0E0E0',
+    minHeight: 40,
   },
   tableFirstColumn: {
     borderLeftWidth: 0,
@@ -3029,11 +3209,15 @@ marginBottom:-10,
     fontSize: 14,
     fontFamily: 'monospace',
     color: '#333333',
+    textAlign: 'center',
+    flexWrap: 'wrap',
   },
   tableCellText: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: 'monospace',
     color: '#333333',
+    textAlign: 'center',
+    flexWrap: 'wrap',
   },
   list_item_bullet: {
     marginRight: 5,
@@ -3172,6 +3356,7 @@ marginBottom:-10,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#ccc',
+    minWidth: '100%',
   },
   scheduleTableWrapper: {
     backgroundColor: '#fff',
@@ -3179,6 +3364,7 @@ marginBottom:-10,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#ddd',
+    minWidth: '100%',
   },
   scheduleTableHeaderCell: {
     backgroundColor: '#f1f2f6',

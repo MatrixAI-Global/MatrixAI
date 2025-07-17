@@ -34,10 +34,7 @@ const FeatureCardWithDetailsPro = () => {
             <MaterialCommunityIcons name="text-recognition" size={30} color="#FF6600" style={styles.featureIcon} />
             <Text style={[styles.featureText, {color: colors.text}]}>High-Accuracy Speech-to-Text</Text>
           </View>
-          <View style={styles.featureItem}>
-            <MaterialCommunityIcons name="microphone" size={30} color="#FF6600" style={styles.featureIcon} />
-            <Text style={[styles.featureText, {color: colors.text}]}>Live Speech-to-Text</Text>
-          </View>
+    
           <View style={styles.featureItem}>
             <MaterialIcons name="translate" size={30} color="#FF6600" style={styles.featureIcon} />
                   <Text style={[styles.featureText, {color: colors.text}]}>Multilingual Text Translation</Text>
@@ -46,17 +43,10 @@ const FeatureCardWithDetailsPro = () => {
             <MaterialCommunityIcons name="robot" size={30} color="#FF6600" style={styles.featureIcon} />
             <Text style={[styles.featureText, {color: colors.text}]}>AI Chatbot</Text>
           </View>
-          <View style={styles.featureItem}>
-            <MaterialCommunityIcons name="file-powerpoint" size={30} color="#FF6600" style={styles.featureIcon} />
-            <Text style={[styles.featureText, {color: colors.text}]}>One-Click PPT Generation</Text>
-          </View>
+       
           <View style={styles.featureItem}>
             <MaterialCommunityIcons name="image" size={30} color="#FF6600" style={styles.featureIcon} />
             <Text style={[styles.featureText, {color: colors.text}]}>AI Chatbot with Picture Understanding</Text>
-          </View>
-          <View style={styles.featureItem}>
-            <MaterialCommunityIcons name="video" size={30} color="#FF6600" style={styles.featureIcon} />
-            <Text style={[styles.featureText, {color: colors.text}] }>Voice and Video Calls with AI</Text>
           </View>
             </View>
        

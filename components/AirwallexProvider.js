@@ -22,9 +22,17 @@ const AirwallexProvider = ({ children }) => {
 
   // Function to initialize Airwallex auth only when explicitly called
   const initializeAirwallex = async () => {
-    // If already initialized or initializing, don't start again
+    // If already initialized, return success
     if (initialized) return { success: true, error: null };
-    if (initializing) return { success: false, error: "Initialization in progress" };
+    
+    // If already initializing, wait a bit and try again
+    if (initializing) {
+      console.log('Already initializing, waiting...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Check again after waiting
+      if (initialized) return { success: true, error: null };
+      if (initializing) return { success: false, error: "Initialization in progress" };
+    }
     
     setInitializing(true);
     setError(null);
@@ -39,6 +47,7 @@ const AirwallexProvider = ({ children }) => {
       if (token) {
         setInitialized(true);
         setError(null);
+        setRetryCount(0); // Reset retry count on success
         return { success: true, error: null };
       } else {
         throw new Error('Authentication failed - no token received');
@@ -52,14 +61,16 @@ const AirwallexProvider = ({ children }) => {
       if (retryCount < MAX_RETRIES) {
         console.log(`Retry attempt ${retryCount + 1} of ${MAX_RETRIES}`);
         setRetryCount(prev => prev + 1);
+        setInitializing(false); // Reset initializing state before retry
         // Try again in 2 seconds
         setTimeout(() => initializeAirwallex(), 2000);
+        return { success: false, error: `Retrying... (${retryCount + 1}/${MAX_RETRIES})` };
       }
       
       return { success: false, error: errorMessage };
     } finally {
-      // Only set initializing to false if we're done retrying or succeeded
-      if (retryCount >= MAX_RETRIES || initialized) {
+      // Always set initializing to false when done (success or final failure)
+      if (initialized || retryCount >= MAX_RETRIES) {
         setInitializing(false);
       }
     }

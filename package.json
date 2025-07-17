@@ -10,6 +10,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@bam.tech/react-native-image-resizer": "^3.0.11",
     "@react-native-async-storage/async-storage": "^2.1.2",
     "@react-native-camera-roll/camera-roll": "^7.10.0",
     "@react-native-clipboard/clipboard": "^1.11.1",
@@ -47,6 +48,7 @@
     "react-native-gesture-handler": "^2.24.0",
     "react-native-get-random-values": "^1.11.0",
     "react-native-image-picker": "^8.2.0",
+    "react-native-image-resizer": "^1.4.5",
     "react-native-linear-gradient": "^2.8.3",
     "react-native-markdown-display": "^7.0.2",
     "react-native-math-view": "^3.9.5",
@@ -77,6 +79,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@react-native-community/cli": "^19.1.0",
     "@react-native/babel-preset": "0.78.1",
     "@react-native/eslint-config": "0.78.1",
     "@react-native/metro-config": "0.78.1",

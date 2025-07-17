@@ -19,6 +19,7 @@ const BUYSubscription = ({ navigation, route }) => {
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date());
   const [paymentMethodId, setPaymentMethodId] = useState(null);
+  const [forceRefresh, setForceRefresh] = useState(0);
 
   useEffect(() => {
     // Set end date based on plan
@@ -89,25 +90,59 @@ const BUYSubscription = ({ navigation, route }) => {
   const fetchCoupons = async () => {
     try {
       setLoading(true);
+      console.log('=== FETCHING COUPONS ===');
+      console.log('User ID:', uid);
+      console.log('API URL: https://matrix-server.vercel.app/getCoupon');
+      
+      const requestBody = { uid: uid };
+      console.log('Request body:', JSON.stringify(requestBody));
+      
       const response = await fetch('https://matrix-server.vercel.app/getCoupon', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ uid: uid }),
+        body: JSON.stringify(requestBody),
       });
 
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+      
       const result = await response.json();
-      if (result.success) {
+      console.log('=== COUPON FETCH RESULT ===');
+      console.log('Full result:', JSON.stringify(result, null, 2));
+      
+      if (result.success && result.data) {
+        console.log('✅ Coupons found:', result.data.length);
+        console.log('Coupon data:', result.data);
         setSuggestedCoupons(result.data);
+        
+        // Force a re-render by updating state
+        setForceRefresh(prev => prev + 1);
+        setTimeout(() => {
+          console.log('Current suggestedCoupons state:', suggestedCoupons);
+        }, 100);
       } else {
-        Alert.alert('Error', 'Failed to fetch coupons');
+        console.log('❌ No coupons found or fetch failed');
+        console.log('Result success:', result.success);
+        console.log('Result message:', result.message);
+        setSuggestedCoupons([]); // Ensure empty array instead of undefined
+        
+        // Only show alert if there's an actual error, not just no coupons
+        if (!result.success && result.message) {
+          Alert.alert('Info', result.message);
+        }
       }
     } catch (error) {
-      console.error('Error fetching coupons:', error);
-      Alert.alert('Error', 'Something went wrong');
+      console.error('=== COUPON FETCH ERROR ===');
+      console.error('Error details:', error);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+      setSuggestedCoupons([]); // Ensure empty array on error
+      Alert.alert('Error', 'Something went wrong while fetching coupons');
     } finally {
       setLoading(false);
+      console.log('=== COUPON FETCH COMPLETE ===');
     }
   };
 
@@ -170,26 +205,6 @@ const BUYSubscription = ({ navigation, route }) => {
     });
   };
 
-  const renderSuggestedCoupon = ({ item }) => (
-    <View style={styles.couponItem}>
-      <View style={styles.couponInfo}>
-        <Text style={styles.couponName}>{item.coupon_name}</Text>
-        <Text style={styles.couponDescription}>{item.description}</Text>
-      </View>
-      <TouchableOpacity 
-        style={[
-          styles.applyButton, 
-          appliedCoupon && appliedCoupon.coupon_name === item.coupon_name ? styles.appliedButton : {}
-        ]}
-        onPress={() => appliedCoupon && appliedCoupon.coupon_name === item.coupon_name ? removeCoupon() : applyCoupon(item)}
-      >
-        <Text style={styles.applyButtonText}>
-          {appliedCoupon && appliedCoupon.coupon_name === item.coupon_name ? 'Applied' : 'Apply'}
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-
   const formatDate = (date) => {
     return date.toLocaleDateString('en-US', {
       year: 'numeric', 
@@ -241,20 +256,49 @@ const BUYSubscription = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.suggestedCouponsTitle}>Suggested Coupons</Text>
-        
-        {loading ? (
-          <ActivityIndicator size="large" color="#fff" />
-        ) : suggestedCoupons.length > 0 ? (
-          <FlatList
-            data={suggestedCoupons}
-            renderItem={renderSuggestedCoupon}
-            keyExtractor={item => item.id}
-            style={styles.couponsList}
-          />
-        ) : (
-          <Text style={styles.noCouponsText}>No coupons available</Text>
-        )}
+        <View style={styles.suggestedCouponsSection}>
+          <Text style={styles.suggestedCouponsTitle}>Suggested Coupons</Text>
+          
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#fff" />
+              <Text style={styles.loadingText}>Loading coupons...</Text>
+            </View>
+          ) : (
+            <View style={styles.couponsContainer}>
+              {suggestedCoupons && suggestedCoupons.length > 0 ? (
+                <View style={styles.couponsWrapper}>
+                  <Text style={styles.couponsCountText}>
+                    {suggestedCoupons.length} coupon{suggestedCoupons.length > 1 ? 's' : ''} available
+                  </Text>
+                  {suggestedCoupons.map((item, index) => (
+                    <View key={item.id ? item.id.toString() : index.toString()} style={styles.couponItem}>
+                      <View style={styles.couponInfo}>
+                        <Text style={styles.couponName}>{item.coupon_name}</Text>
+                        <Text style={styles.couponDescription}>{item.description}</Text>
+                      </View>
+                      <TouchableOpacity 
+                        style={[
+                          styles.applyButton, 
+                          appliedCoupon && appliedCoupon.coupon_name === item.coupon_name ? styles.appliedButton : {}
+                        ]}
+                        onPress={() => appliedCoupon && appliedCoupon.coupon_name === item.coupon_name ? removeCoupon() : applyCoupon(item)}
+                      >
+                        <Text style={styles.applyButtonText}>
+                          {appliedCoupon && appliedCoupon.coupon_name === item.coupon_name ? 'Applied' : 'Apply'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.noCouponsContainer}>
+                  <Text style={styles.noCouponsText}>No coupons available at the moment</Text>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
       </View>
 
       {/* Price Summary */}
@@ -433,7 +477,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: 10,
   },
-  couponsList: {
+  couponsListContainer: {
     maxHeight: 150,
   },
   couponItem: {
@@ -470,6 +514,10 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 12,
+  },
+  noCouponsContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
   },
   noCouponsText: {
     color: '#fff',
@@ -537,6 +585,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginTop: 20,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+  },
+  loadingText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 10,
+  },
+  couponsContainer: {
+    flex: 1,
+  },
+  couponsCountText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  couponsWrapper: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    padding: 10,
+  },
+  suggestedCouponsSection: {
+    marginBottom: 15,
   },
 });
 

@@ -26,7 +26,7 @@ import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import Header from '../components/Header';
 import ThemedView, { ThemedText, ThemedCard } from '../components/ThemedView';
 import FloatingButton from '../components/FloatingButton';
-import FeatureCardWithDetails2 from '../components/FeatureCardWithDetails';
+import FeatureCardWithDetails2 from '../components/FeatureCardWithDetails copy';
 import FeatureCardWithDetailsPro from '../components/FeatureCardWithDetailsPro';
 import FeatureCardWithDetailsAddon from '../components/FeatureCardWithDetailsAddon';
 import { useCoinsSubscription } from '../hooks/useCoinsSubscription';
@@ -147,28 +147,28 @@ const HomeScreen = () => {
       colors: ['#FF6D00', '#F57C00'],
       screen: 'SpeechToTextScreen'
     },
-    {
-      id: 'background',
-      title: t('humaniseText'),
-      description: t('humanLikeTransformations'),
-      icon: <MaterialCommunityIcons name="human-greeting" size={26} color="#FFFFFF" />,
-      colors: ['#D500F9', '#9C27B0'],
-      screen: 'HumaniseText'
-    },
-    {
-      id: 'detect',
-      title: t('detectAI'),
-      description: t('identifyAIGeneratedContent'),
-      icon: <MaterialCommunityIcons name="magnify-scan" size={26} color="#FFFFFF" />,
-      colors: ['#43A047', '#2E7D32'],
-      screen: 'DetectAIScreen'
-    },
+    // {
+    //   id: 'background',
+    //   title: t('humaniseText'),
+    //   description: t('humanLikeTransformations'),
+    //   icon: <MaterialCommunityIcons name="human-greeting" size={26} color="#FFFFFF" />,
+    //   colors: ['#D500F9', '#9C27B0'],
+    //   screen: 'HumaniseText'
+    // },
+    // {
+    //   id: 'detect',
+    //   title: t('detectAI'),
+    //   description: t('identifyAIGeneratedContent'),
+    //   icon: <MaterialCommunityIcons name="magnify-scan" size={26} color="#FFFFFF" />,
+    //   colors: ['#43A047', '#2E7D32'],
+    //   screen: 'DetectAIScreen'
+    // },
     {
       id: 'content',
       title: t('contentWriter'),
       description: t('aiPoweredWritingAssistant'),
       icon: <MaterialCommunityIcons name="text-box-outline" size={26} color="#FFFFFF" />,
-      colors: ['#FF6D00', '#F57C00'],
+      colors: ['#D500F9', '#9C27B0'],
       screen: 'ContentWriterScreen'
     },
   ];
@@ -392,13 +392,13 @@ const HomeScreen = () => {
           </View>
           
           {!isUserPro ? (
-            <FeatureCardWithDetails2/>
-          ) : (
-            <>
-              <FeatureCardWithDetailsPro/>
-              {(coinCount < 200) && <FeatureCardWithDetailsAddon/>}
-            </>
-          )}
+                    <FeatureCardWithDetails2 />
+                ) : (
+                    <>
+                        <FeatureCardWithDetailsPro />
+                        {(coinCount < 200) && <FeatureCardWithDetailsAddon />}
+                    </>
+                )}
           <ThemedView style={styles.endTextContainer}>
             <ThemedText style={styles.crossBee}>MatrixAI❤️</ThemedText>
             <ThemedText style={styles.AppYard3}>{t('worldsBestAITools')}</ThemedText>

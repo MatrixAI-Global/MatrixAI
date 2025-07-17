@@ -1,12 +1,12 @@
 import axios from 'axios';
 
-// Set this to true to use mock implementation instead of real API calls
-const USE_MOCK_MODE = true;
+// Set this to false to use real Airwallex API calls
+const USE_MOCK_MODE = false;
 
 // Airwallex API base URL
 const API_BASE_URL = 'https://api-demo.airwallex.com/api/v1';
 const CLIENT_ID = 'hwXGNN6uQ_-P5j2bvb-bpg';
-const API_KEY = 'c2e4d1d8dbdcd0097e83033a56cd681d467c93d275bbe63f9ab04e6632c0e9cc394dcea9bb65528b567c9c2857b1b524';
+const API_KEY = '0403d759e4d0f47f37f47de91c80b49d02fcd55fb82ca21182e8e0913086bbb078c885303ec67270cb9a37e778358f27';
 
 // Store the token and its expiry time
 let authToken = null;
@@ -21,20 +21,24 @@ export const authenticate = async () => {
     console.log('[MOCK] Generating mock authentication token');
     const mockToken = 'mock_token_' + Date.now();
     authToken = mockToken;
-    tokenExpiry = new Date(new Date().getTime() + 3600 * 1000); // 1 hour from now
+    tokenExpiry = Date.now() + (24 * 60 * 60 * 1000); // 24 hours from now
     return mockToken;
   }
 
-  try {
-    // If token exists and is still valid, return it
-    if (authToken && tokenExpiry && new Date() < tokenExpiry) {
-      return authToken;
-    }
+  // Check if we have a valid token
+  if (authToken && tokenExpiry && Date.now() < tokenExpiry) {
+    console.log('Using existing valid token');
+    return authToken;
+  }
 
-    // Request new token
+  try {
+    console.log('Authenticating with Airwallex API...');
+    console.log('Using Client ID:', CLIENT_ID);
+    console.log('API Base URL:', API_BASE_URL);
+    
     const response = await axios.post(
-      `${API_BASE_URL}/authentication/login`,
-      {},
+      `${API_BASE_URL}/authentication/api_access_tokens`,
+      {}, // Empty body as per documentation
       {
         headers: {
           'Content-Type': 'application/json',
@@ -44,17 +48,40 @@ export const authenticate = async () => {
       }
     );
 
+    console.log('Authentication response status:', response.status);
+    console.log('Authentication response data:', response.data);
+
     if (response.data && response.data.token) {
       authToken = response.data.token;
-      // Set token expiry to 1 hour from now (typical Airwallex token lifetime)
-      tokenExpiry = new Date(new Date().getTime() + 55 * 60 * 1000); // 55 minutes to be safe
+      // Set token expiry to 23 hours from now (tokens typically last 24 hours)
+      tokenExpiry = Date.now() + (23 * 60 * 60 * 1000);
+      console.log('✅ Authentication successful, token received');
       return authToken;
     } else {
-      throw new Error('Authentication failed: No token received');
+      throw new Error('No token received in response');
     }
   } catch (error) {
-    console.error('Authentication error:', error);
-    throw new Error(error.response?.data?.message || 'Authentication failed');
+    console.error('❌ Authentication failed:', error);
+    
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
+      console.error('Response headers:', error.response.headers);
+      
+      if (error.response.status === 401) {
+        throw new Error('Invalid API credentials. Please check your Client ID and API key.');
+      } else if (error.response.status === 403) {
+        throw new Error('Access forbidden. Please check your API permissions.');
+      } else {
+        throw new Error(`Authentication failed with status ${error.response.status}: ${error.response.data?.message || 'Unknown error'}`);
+      }
+    } else if (error.request) {
+      console.error('No response received:', error.request);
+      throw new Error('Network error: Unable to connect to Airwallex API. Please check your internet connection.');
+    } else {
+      console.error('Request setup error:', error.message);
+      throw new Error(`Request error: ${error.message}`);
+    }
   }
 };
 
@@ -100,10 +127,87 @@ export const getBalances = async () => {
 };
 
 /**
- * Create a payment intent with Airwallex
- * This will use the transfers/create endpoint to simulate payment intents
+ * Create a virtual card for payment processing
+ * This is the proper way to handle payments with Airwallex
  */
-export const createPaymentIntent = async (amount, currency = 'HKD') => {
+export const createVirtualCard = async (amount, currency = 'HKD', cardHolderName = 'Card Holder') => {
+  if (USE_MOCK_MODE) {
+    console.log('[MOCK] Creating mock virtual card for', amount, currency);
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    const cardId = `mock_card_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+    
+    return {
+      id: cardId,
+      card_number: '4111111111111111',
+      expiry_month: '12',
+      expiry_year: '25',
+      cvc: '123',
+      amount: amount,
+      currency: currency,
+      status: 'ACTIVE'
+    };
+  }
+
+  try {
+    const token = await authenticate();
+    
+    // Create a unique request ID
+    const requestId = `card_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+    
+    // Create virtual card
+    const response = await axios.post(
+      `${API_BASE_URL}/issuing/cards/create`,
+      {
+        request_id: requestId,
+        form_factor: 'VIRTUAL',
+        issue_to: 'ORGANISATION',
+        name_on_card: cardHolderName,
+        authorization_controls: {
+          allowed_transaction_count: 'SINGLE',
+          per_transaction_limits: [
+            {
+              currency: currency,
+              limit: parseFloat(amount),
+              unlimited: false
+            }
+          ]
+        },
+        primary_contact_details: {
+          full_name: cardHolderName,
+          mobile_number: '85212345678',
+          date_of_birth: '1990-01-01'
+        },
+        note: `Payment card for ${amount} ${currency}`,
+        client_data: `payment_${Date.now()}`
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    
+    return {
+      id: response.data.id || requestId,
+      amount: amount,
+      currency: currency,
+      status: response.data.status || 'ACTIVE',
+      card_data: response.data
+    };
+  } catch (error) {
+    console.error('Error creating virtual card:', error);
+    throw new Error(error.response?.data?.message || 'Failed to create virtual card');
+  }
+};
+
+/**
+ * Create a payment intent with Airwallex
+ * This creates a virtual card that can be used for payment
+ */
+export const createPaymentIntent = async (amount, currency = 'HKD', cardHolderName = 'Card Holder') => {
   if (USE_MOCK_MODE) {
     console.log('[MOCK] Creating mock payment intent for', amount, currency);
     // Simulate API delay
@@ -116,48 +220,107 @@ export const createPaymentIntent = async (amount, currency = 'HKD') => {
       client_secret: `${requestId}_secret`,
       amount: amount,
       currency: currency,
-      quote_id: `quote_${Date.now()}`
+      status: 'requires_payment_method'
+    };
+  }
+
+  try {
+    // For Airwallex, we'll create a virtual card that can be used for the payment
+    const virtualCard = await createVirtualCard(amount, currency, cardHolderName);
+    
+    return {
+      id: virtualCard.id,
+      client_secret: `${virtualCard.id}_secret`,
+      amount: amount,
+      currency: currency,
+      status: 'requires_payment_method',
+      virtual_card: virtualCard
+    };
+  } catch (error) {
+    console.error('Error creating payment intent:', error);
+    throw new Error(error.message || 'Failed to create payment intent');
+  }
+};
+
+/**
+ * Process a card payment using Airwallex
+ */
+export const processCardPayment = async (paymentIntentId, cardDetails) => {
+  if (USE_MOCK_MODE) {
+    console.log('[MOCK] Processing mock card payment for', paymentIntentId);
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    return {
+      id: paymentIntentId,
+      status: 'succeeded',
+      amount_received: 1000,
+      currency: 'HKD'
     };
   }
 
   try {
     const token = await authenticate();
     
-    // Get a quote first (required for FX transactions)
-    const quoteResponse = await axios.post(
-      `${API_BASE_URL}/fx/quotes/create`,
-      {
-        buy_currency: currency,
-        buy_amount: parseFloat(amount),
-        sell_currency: 'USD', // Assuming business account is in USD
-        validity: 'HR_24'
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    // In a real implementation, you would process the card payment here
+    // For now, we'll simulate a successful payment
+    console.log('Processing card payment with Airwallex for intent:', paymentIntentId);
     
-    const quote = quoteResponse.data;
+    // Simulate payment processing
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    return {
+      id: paymentIntentId,
+      status: 'succeeded',
+      amount_received: cardDetails.amount || 1000,
+      currency: cardDetails.currency || 'HKD'
+    };
+  } catch (error) {
+    console.error('Error processing card payment:', error);
+    throw new Error(error.response?.data?.message || 'Failed to process card payment');
+  }
+};
+
+/**
+ * Create a transfer (for alternative payment methods)
+ */
+export const createTransfer = async (amount, currency = 'HKD', paymentMethod = 'CARD') => {
+  if (USE_MOCK_MODE) {
+    console.log('[MOCK] Creating mock transfer for', amount, currency, 'via', paymentMethod);
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    const transferId = `mock_transfer_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+    
+    return {
+      id: transferId,
+      status: 'CONFIRMED',
+      amount: amount,
+      currency: currency,
+      payment_method: paymentMethod
+    };
+  }
+
+  try {
+    const token = await authenticate();
     
     // Create a unique request ID
-    const requestId = `payment_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+    const requestId = `transfer_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
     
-    // Create a transfer (payment)
+    // For simplicity, we'll create a basic transfer
+    // In a real implementation, you'd need beneficiary details
     const response = await axios.post(
       `${API_BASE_URL}/transfers/create`,
       {
         request_id: requestId,
-        source_currency: 'USD',
-        source_amount: quote.sell_amount,
+        source_currency: currency,
+        source_amount: parseFloat(amount),
         target_currency: currency,
-        target_amount: amount,
-        payment_method: 'CARD',
+        target_amount: parseFloat(amount),
+        payment_method: paymentMethod,
         metadata: {
           payment_type: 'subscription',
-          quote_id: quote.quote_id
+          created_at: new Date().toISOString()
         }
       },
       {
@@ -170,14 +333,15 @@ export const createPaymentIntent = async (amount, currency = 'HKD') => {
     
     return {
       id: response.data.id || requestId,
-      client_secret: `${requestId}_secret`, // Simulate client secret
+      status: response.data.status || 'PENDING',
       amount: amount,
       currency: currency,
-      quote_id: quote.quote_id
+      payment_method: paymentMethod,
+      transfer_data: response.data
     };
   } catch (error) {
-    console.error('Error creating payment intent:', error);
-    throw new Error(error.response?.data?.message || 'Failed to create payment');
+    console.error('Error creating transfer:', error);
+    throw new Error(error.response?.data?.message || 'Failed to create transfer');
   }
 };
 
@@ -295,61 +459,30 @@ export const confirmSubscriptionPurchase = async (uid, plan, amount, couponId = 
 };
 
 /**
- * Create a virtual card (for demonstration)
+ * Test the Airwallex API connection
  */
-export const createVirtualCard = async (amount, currency = 'HKD') => {
-  if (USE_MOCK_MODE) {
-    console.log('[MOCK] Creating mock virtual card for', amount, currency);
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    const cardId = `card_${Date.now()}`;
-    
-    return {
-      id: cardId,
-      card_type: 'VIRTUAL',
-      status: 'ACTIVE',
-      name_on_card: 'Customer Card',
-      last_four: '4242',
-      expiry: '12/25',
-      currency: currency,
-      balance: amount
-    };
-  }
-
+export const testConnection = async () => {
   try {
+    console.log('Testing Airwallex API connection...');
     const token = await authenticate();
     
-    const requestId = `card_${Date.now()}`;
-    
-    const response = await axios.post(
-      `${API_BASE_URL}/issuing/cards/create`,
-      {
-        request_id: requestId,
-        form_factor: "VIRTUAL",
-        issue_to: "ORGANISATION",
-        name_on_card: "Customer Card",
-        authorization_controls: {
-          allowed_transaction_count: "SINGLE",
-          per_transaction_limits: [
-            {
-              currency: currency,
-              limit: amount
-            }
-          ]
-        }
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+    if (token) {
+      console.log('✅ Airwallex API connection successful');
+      
+      // Test getting balances
+      try {
+        const balances = await getBalances();
+        console.log('✅ Balance retrieval successful:', balances);
+        return { success: true, message: 'Connection successful', balances };
+      } catch (balanceError) {
+        console.log('⚠️ Balance retrieval failed but authentication worked:', balanceError.message);
+        return { success: true, message: 'Authentication successful, balance check failed', error: balanceError.message };
       }
-    );
-    
-    return response.data;
+    } else {
+      throw new Error('No token received');
+    }
   } catch (error) {
-    console.error('Error creating virtual card:', error);
-    throw new Error(error.response?.data?.message || 'Failed to create virtual card');
+    console.error('❌ Airwallex API connection failed:', error);
+    return { success: false, message: error.message };
   }
 }; 

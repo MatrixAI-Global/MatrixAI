@@ -20,13 +20,13 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Ionicons';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import { authenticate, createPaymentIntent, confirmSubscriptionPurchase } from '../../utils/airwallexApi';
+import { authenticate, createPaymentIntent, confirmSubscriptionPurchase, processCardPayment, createTransfer, testConnection } from '../../utils/airwallexApi';
 import { useAirwallex } from '../../components/AirwallexProvider';
 
 const { width } = Dimensions.get('window');
 
 // Check if we're in mock mode - import this from airwallexApi
-const USE_MOCK_MODE = true; // Should match the value in airwallexApi.js
+const USE_MOCK_MODE = false; // Should match the value in airwallexApi.js
 
 const AirwallexPaymentScreen = ({ navigation, route }) => {
   const { 
@@ -359,13 +359,12 @@ const AirwallexPaymentScreen = ({ navigation, route }) => {
         await authenticate();
       } catch (authError) {
         console.error('Authentication error:', authError);
-        // If authentication fails, we can still continue with mock mode
-        console.log('Continuing with mock payment flow');
+        throw new Error('Failed to authenticate with payment provider');
       }
 
-      // Create a payment intent
+      // Create a payment intent with card holder name
       console.log('Creating payment intent with Airwallex');
-      const paymentIntent = await createPaymentIntent(numericPrice).catch(error => {
+      const paymentIntent = await createPaymentIntent(numericPrice, 'HKD', cardHolderName).catch(error => {
         console.error('Error creating payment intent:', error);
         if (error.message && error.message.includes('Network Error')) {
           throw new Error('Network connection issue. Please check your internet connection and try again.');
@@ -377,22 +376,35 @@ const AirwallexPaymentScreen = ({ navigation, route }) => {
         throw new Error('Payment service unavailable');
       }
       
-      // In a real implementation, we would call Airwallex SDK to handle the card payment
-      // For demonstration, we'll simulate the payment confirmation
       console.log('Payment intent created:', paymentIntent.id);
-      console.log('Simulating card payment confirmation...');
-
-      // Simulate payment processing delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Assume payment success
+      // Process the card payment
+      console.log('Processing card payment...');
+      const cardDetails = {
+        number: cardNumber.replace(/\s/g, ''), // Remove spaces
+        expiry: cardExpiry,
+        cvc: cardCVC,
+        name: cardHolderName,
+        amount: numericPrice,
+        currency: 'HKD'
+      };
+      
+      const paymentResult = await processCardPayment(paymentIntent.id, cardDetails).catch(error => {
+        console.error('Error processing card payment:', error);
+        throw new Error('Failed to process card payment. Please try again.');
+      });
+      
+      if (!paymentResult || paymentResult.status !== 'succeeded') {
+        throw new Error('Payment was not successful');
+      }
+      
       console.log('Card payment succeeded, confirming subscription purchase');
       
       // Prepare safe values for API call
       const safeUid = uid || 'unknown';
       const safePlan = plan || 'unknown';
       const safeCouponId = appliedCoupon && appliedCoupon.id ? appliedCoupon.id : "";
-      const safePaymentId = paymentIntent.id || 'unknown';
+      const safePaymentId = paymentResult.id || 'unknown';
       
       console.log('Confirming subscription with:', { 
         uid: safeUid, 
@@ -459,33 +471,40 @@ const AirwallexPaymentScreen = ({ navigation, route }) => {
         await authenticate();
       } catch (authError) {
         console.error('Authentication error:', authError);
-        // If authentication fails, we can still continue with mock mode
-        console.log('Continuing with mock payment flow');
+        throw new Error('Failed to authenticate with payment provider');
       }
 
-      // Create payment intent
-      const paymentIntent = await createPaymentIntent(numericPrice).catch(error => {
-        console.error(`Error creating ${methodName} payment intent:`, error);
+      // Create transfer for alternative payment methods
+      console.log(`Creating ${methodName} transfer with Airwallex`);
+      const transfer = await createTransfer(numericPrice, 'HKD', methodId.toUpperCase()).catch(error => {
+        console.error(`Error creating ${methodName} transfer:`, error);
         if (error.message && error.message.includes('Network Error')) {
           throw new Error('Network connection issue. Please check your internet connection and try again.');
         }
         throw new Error(`Failed to initialize ${methodName} payment. Please try again.`);
       });
       
-      if (!paymentIntent) {
+      if (!transfer) {
         throw new Error(`Failed to initialize ${methodName} payment`);
       }
       
-      console.log(`Processing ${methodName} payment with intent:`, paymentIntent.id);
+      console.log(`${methodName} transfer created:`, transfer.id);
       
-      // Simulate payment processing time 
+      // Simulate payment processing time for alternative methods
       await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Check if transfer was successful
+      if (transfer.status !== 'CONFIRMED' && transfer.status !== 'PENDING') {
+        throw new Error(`${methodName} payment failed`);
+      }
+      
+      console.log(`${methodName} payment processed successfully`);
       
       // Process subscription confirmation
       const safeUid = uid || 'unknown';
       const safePlan = plan || 'unknown';
       const safeCouponId = appliedCoupon && appliedCoupon.id ? appliedCoupon.id : "";
-      const safePaymentId = paymentIntent.id || 'unknown';
+      const safePaymentId = transfer.id || 'unknown';
       
       const result = await confirmSubscriptionPurchase(
         safeUid,
@@ -528,13 +547,6 @@ const AirwallexPaymentScreen = ({ navigation, route }) => {
     }
 
     console.log('Processing payment with method:', selectedPaymentMethod);
-    
-    // In mock mode, we can always proceed
-    if (USE_MOCK_MODE) {
-      console.log('Proceeding with payment in mock mode');
-      processPaymentWithSelectedMethod();
-      return;
-    }
     
     // Ensure the system is ready
     if (!initialized) {
@@ -722,26 +734,16 @@ const AirwallexPaymentScreen = ({ navigation, route }) => {
           console.log('Initializing Airwallex payment system...');
           const result = await initializeAirwallex();
           
-          if (!result.success && !USE_MOCK_MODE) {
+          if (!result.success) {
             console.error('Failed to initialize Airwallex:', result.error || 'Unknown error');
             setAirwallexError(result.error || 'Failed to initialize payment system');
           } else {
-            // Even if initialization failed, we can proceed in mock mode
-            console.log('Airwallex initialized successfully or using mock mode');
-            
-            // In mock mode, we can just proceed even if initialization failed
-            if (USE_MOCK_MODE && !result.success) {
-              console.log('Using mock mode despite initialization failure');
-            }
+            console.log('Airwallex initialized successfully');
           }
         }
       } catch (err) {
         console.error('Error initializing Airwallex:', err);
-        if (!USE_MOCK_MODE) {
-          setAirwallexError('Failed to initialize payment system. Please try again.');
-        } else {
-          console.log('Using mock mode despite error:', err);
-        }
+        setAirwallexError('Failed to initialize payment system. Please try again.');
       } finally {
         setInitializingAirwallex(false);
       }
@@ -762,8 +764,8 @@ const AirwallexPaymentScreen = ({ navigation, route }) => {
     );
   }
 
-  // Show error if Airwallex initialization failed - but only if we're not in mock mode
-  if ((airwallexError || error) && !USE_MOCK_MODE) {
+  // Show error if Airwallex initialization failed
+  if (airwallexError || error) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
         <Icon name="alert-circle" size={50} color="#e74c3c" />
@@ -792,13 +794,61 @@ const AirwallexPaymentScreen = ({ navigation, route }) => {
             paddingHorizontal: 20, 
             borderRadius: 8 
           }}
-          onPress={() => initPaymentSystem()}
+          onPress={() => {
+            setAirwallexError(null);
+            const initPaymentSystem = async () => {
+              setInitializingAirwallex(true);
+              try {
+                const result = await initializeAirwallex();
+                if (!result.success) {
+                  setAirwallexError(result.error || 'Failed to initialize payment system');
+                }
+              } catch (err) {
+                setAirwallexError('Failed to initialize payment system. Please try again.');
+              } finally {
+                setInitializingAirwallex(false);
+              }
+            };
+            initPaymentSystem();
+          }}
         >
           <Text style={{ color: '#2274F0', fontWeight: 'bold' }}>Retry</Text>
         </TouchableOpacity>
       </View>
     );
   }
+
+  // Function to test Airwallex connection
+  const testAirwallexConnection = async () => {
+    try {
+      console.log('Testing Airwallex connection...');
+      setProcessing(true);
+      
+      const result = await testConnection();
+      
+      if (result.success) {
+        Alert.alert(
+          'Connection Test Successful ✅', 
+          `${result.message}\n\n${USE_MOCK_MODE ? '🔧 Currently in DEMO MODE' : '🔴 Live API Mode'}\n\nBalances: ${result.balances ? JSON.stringify(result.balances, null, 2) : 'N/A'}`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert(
+          'Connection Test Failed ❌', 
+          `${result.message}\n\n${USE_MOCK_MODE ? '🔧 Currently in DEMO MODE' : '🔴 Live API Mode'}`,
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      Alert.alert(
+        'Connection Test Error ⚠️', 
+        `Error: ${error.message}\n\n${USE_MOCK_MODE ? '🔧 Currently in DEMO MODE' : '🔴 Live API Mode'}`,
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setProcessing(false);
+    }
+  };
 
   return (
     <LinearGradient
@@ -818,7 +868,12 @@ const AirwallexPaymentScreen = ({ navigation, route }) => {
             <Icon name="arrow-back" size={24} color="#FFF" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Payment Method</Text>
-        
+          <TouchableOpacity
+            style={styles.testButton}
+            onPress={testAirwallexConnection}
+          >
+            <Icon name="checkmark-circle" size={24} color="#FFF" />
+          </TouchableOpacity>
         </View>
 
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollViewContent}>
@@ -855,7 +910,7 @@ const AirwallexPaymentScreen = ({ navigation, route }) => {
           </View>
 
           {/* Airwallex Badge */}
-          {/* <View style={styles.airwallexBadge}>
+          <View style={styles.airwallexBadge}>
             <Text style={styles.poweredByText}>Powered by</Text>
             <Text style={styles.airwallexText}>AIRWALLEX</Text>
             {USE_MOCK_MODE && (
@@ -864,7 +919,7 @@ const AirwallexPaymentScreen = ({ navigation, route }) => {
               </View>
             )}
             <Text style={styles.securePaymentText}>Secure Global Payments</Text>
-          </View> */}
+          </View>
 
           {/* Payment Methods Section */}
           <View style={styles.section}>
@@ -954,6 +1009,14 @@ const styles = StyleSheet.create({
     color: '#FFF',
     textAlign: 'center',
     alignSelf: 'center',
+  },
+  testButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollView: {
     flex: 1,

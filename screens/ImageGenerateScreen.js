@@ -63,6 +63,11 @@ const ImageGenerateScreen = () => {
   const imagesPerPage = 10;
   const [downloadingImageId, setDownloadingImageId] = useState(null);
   
+  // Add state for full-screen image modal
+  const [fullScreenModalVisible, setFullScreenModalVisible] = useState(false);
+  const [fullScreenImageUrl, setFullScreenImageUrl] = useState('');
+  const [fullScreenImageId, setFullScreenImageId] = useState('');
+  
   // Run animations on mount
   useEffect(() => {
     // Start animations when component mounts
@@ -389,13 +394,30 @@ const ImageGenerateScreen = () => {
     }
   };
 
+  const handleImagePress = (imageUrl, imageId) => {
+    setFullScreenImageUrl(imageUrl);
+    setFullScreenImageId(imageId);
+    setFullScreenModalVisible(true);
+  };
+
+  const closeFullScreenModal = () => {
+    setFullScreenModalVisible(false);
+    setFullScreenImageUrl('');
+    setFullScreenImageId('');
+  };
+
   const renderHistoryItem = ({ item }) => (
     <View style={[styles.historyItem, {backgroundColor: colors.border}]}>
-      <Image 
-        source={{ uri: item.image_url }} 
-        style={styles.historyImage}
-        resizeMode="cover"
-      />
+      <TouchableOpacity 
+        onPress={() => handleImagePress(item.image_url, item.image_id)}
+        style={styles.historyImageContainer}
+      >
+        <Image 
+          source={{ uri: item.image_url }} 
+          style={styles.historyImage}
+          resizeMode="cover"
+        />
+      </TouchableOpacity>
       <View style={[styles.historyItemContent, {backgroundColor: colors.border}]}>
         <Text style={[styles.historyDate, {color: colors.text}]}>
           {new Date(item.created_at).toLocaleDateString()}
@@ -639,6 +661,61 @@ const ImageGenerateScreen = () => {
                 onPress={navigateToSubscription}
               >
                 <Text style={styles.rechargeButtonText}>Recharge Now</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Full Screen Image Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={fullScreenModalVisible}
+        onRequestClose={closeFullScreenModal}
+      >
+        <View style={styles.fullScreenModalOverlay}>
+          <View style={styles.fullScreenModalContainer}>
+            {/* Header with close button */}
+            <View style={styles.fullScreenHeader}>
+              <TouchableOpacity 
+                style={styles.fullScreenCloseButton}
+                onPress={closeFullScreenModal}
+              >
+                <MaterialIcons name="close" size={28} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            
+            {/* Full screen image */}
+            <View style={styles.fullScreenImageContainer}>
+              <Image 
+                source={{ uri: fullScreenImageUrl }} 
+                style={styles.fullScreenImage}
+                resizeMode="contain"
+              />
+            </View>
+            
+            {/* Action buttons */}
+            <View style={styles.fullScreenActions}>
+              <TouchableOpacity 
+                style={styles.fullScreenActionButton}
+                onPress={() => handleDownloadImage(fullScreenImageUrl, fullScreenImageId)}
+                disabled={downloadingImageId === fullScreenImageId}
+              >
+                {downloadingImageId === fullScreenImageId ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <MaterialIcons name="file-download" size={24} color="#fff" />
+                )}
+                <Text style={styles.fullScreenActionText}>Download</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.fullScreenActionButton}
+                onPress={() => handleShareImage(fullScreenImageUrl)}
+              >
+                <MaterialIcons name="ios-share" size={24} color="#fff" />
+                <Text style={styles.fullScreenActionText}>Share</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1015,6 +1092,68 @@ const styles = StyleSheet.create({
   rechargeButtonText: {
     color: '#fff',
     fontWeight: '500',
+  },
+  // Full Screen Modal Styles
+  fullScreenModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullScreenModalContainer: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  fullScreenHeader: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 1000,
+  },
+  fullScreenCloseButton: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 20,
+    padding: 8,
+  },
+  fullScreenImageContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  fullScreenImage: {
+    width: '100%',
+    height: '100%',
+  },
+  fullScreenActions: {
+    position: 'absolute',
+    bottom: 50,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+  },
+  fullScreenActionButton: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 25,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginHorizontal: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    minWidth: 100,
+  },
+  fullScreenActionText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 8,
+  },
+  historyImageContainer: {
+    borderRadius: 8,
   },
 });
 

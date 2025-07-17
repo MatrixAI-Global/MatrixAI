@@ -87,6 +87,7 @@ PODS:
     - React-RCTText (= 0.78.1)
     - React-RCTVibration (= 0.78.1)
   - React-callinvoker (0.78.1)
+  - React-Codegen (0.1.0)
   - React-Core (0.78.1):
     - glog
     - hermes-engine
@@ -1408,6 +1409,28 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
+  - react-native-image-resizer (3.0.11):
+    - DoubleConversion
+    - glog
+    - hermes-engine
+    - RCT-Folly (= 2024.11.18.00)
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Codegen
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - Yoga
   - react-native-netinfo (11.4.1):
     - React-Core
   - react-native-pdf (6.7.7):
@@ -2448,6 +2471,7 @@ DEPENDENCIES:
   - react-native-get-random-values (from `../node_modules/react-native-get-random-values`)
   - react-native-html-to-pdf (from `../node_modules/react-native-html-to-pdf`)
   - react-native-image-picker (from `../node_modules/react-native-image-picker`)
+  - "react-native-image-resizer (from `../node_modules/@bam.tech/react-native-image-resizer`)"
   - "react-native-netinfo (from `../node_modules/@react-native-community/netinfo`)"
   - react-native-pdf (from `../node_modules/react-native-pdf`)
   - react-native-restart (from `../node_modules/react-native-restart`)
@@ -2516,6 +2540,7 @@ SPEC REPOS:
     - GTMAppAuth
     - GTMSessionFetcher
     - lottie-ios
+    - React-Codegen
     - SocketRocket
     - Stripe
     - StripeApplePay
@@ -2622,6 +2647,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-html-to-pdf"
   react-native-image-picker:
     :path: "../node_modules/react-native-image-picker"
+  react-native-image-resizer:
+    :path: "../node_modules/@bam.tech/react-native-image-resizer"
   react-native-netinfo:
     :path: "../node_modules/@react-native-community/netinfo"
   react-native-pdf:
@@ -2763,6 +2790,7 @@ SPEC CHECKSUMS:
   RCTTypeSafety: 2f0bc11f9584fde4c7e6d8b26577c97681051c00
   React: e6035d3a639f6668a18429aaf2fdc0c12b1e7a81
   React-callinvoker: 3740fb1716428dabd205486c818ce6a5999e7f11
+  React-Codegen: 4b8b4817cea7a54b83851d4c1f91f79aa73de30a
   React-Core: d12b31b149ff71e5054dec137d651a9955569321
   React-CoreModules: e392c711449f260d9ba7556a264ef5cfacdab3f9
   React-cxxreact: dcb3c48b13b298a270edefb24d2a9211809ff147
@@ -2795,6 +2823,7 @@ SPEC CHECKSUMS:
   react-native-get-random-values: d16467cf726c618e9c7a8c3c39c31faa2244bbba
   react-native-html-to-pdf: 7a49e6c58ac5221bcc093027b195f4b214f27a9d
   react-native-image-picker: df2b20cdfa981f7288f4019774d9baa26a4772c1
+  react-native-image-resizer: 9e24efe3828c08a8d5553393f33695a086406340
   react-native-netinfo: cec9c4e86083cb5b6aba0e0711f563e2fbbff187
   react-native-pdf: e7980ebe741b1797f27ce451eab9dd9ca31484eb
   react-native-restart: 0bc732f4461709022a742bb29bcccf6bbc5b4863

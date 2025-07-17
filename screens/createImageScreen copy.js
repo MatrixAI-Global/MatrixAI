@@ -12,6 +12,10 @@ import {
   Easing,
   Linking,
   ScrollView,
+  Platform,
+  ToastAndroid,
+  PermissionsAndroid,
+  Alert,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
@@ -23,6 +27,11 @@ import * as Animatable from 'react-native-animatable';
 import LottieView from "lottie-react-native";
 import { useAuthUser } from '../hooks/useAuthUser';
 import { useFocusEffect } from '@react-navigation/native';
+import RNFS from 'react-native-fs';
+import Share from 'react-native-share';
+import Toast from 'react-native-toast-message';
+import { PERMISSIONS, request, RESULTS } from 'react-native-permissions';
+import { CameraRoll } from '@react-native-camera-roll/camera-roll';
 const { width, height } = Dimensions.get("window");
 
 const CreateImagesScreen2 = ({ route, navigation }) => {
@@ -34,6 +43,7 @@ const CreateImagesScreen2 = ({ route, navigation }) => {
   const colors = getThemeColors();
   const [selectedImage, setSelectedImage] = useState(null);
   const [gridImages, setGridImages] = useState([]);
+  const [downloadingImageId, setDownloadingImageId] = useState(null);
 
   // Animated values
   const shimmerValue = useRef(new Animated.Value(0)).current;
@@ -232,6 +242,204 @@ const CreateImagesScreen2 = ({ route, navigation }) => {
   // Determine loading text with animated dots
   const loadingText = `Creating${'.'.repeat(loadingDots.__getValue())}`;
 
+  const handleDownloadImage = async (imageUrl, imageId = null) => {
+    try {
+      // Set downloading state
+      setDownloadingImageId(imageId || imageUrl);
+      
+      // Request storage permission (for Android)
+      if (Platform.OS === 'android') {
+        const permission = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+          {
+            title: 'Storage Permission',
+            message: 'Matrix AI needs access to your storage to save images.',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          },
+        );
+        
+        if (permission !== PermissionsAndroid.RESULTS.GRANTED) {
+          Toast.show({
+            type: 'error',
+            text1: 'Permission Denied',
+            text2: 'Cannot save image without storage permission',
+            position: 'bottom',
+          });
+          setDownloadingImageId(null);
+          return;
+        }
+      } else if (Platform.OS === 'ios') {
+        // For iOS, request photo library permission
+        const permission = await request(PERMISSIONS.IOS.PHOTO_LIBRARY);
+        if (permission !== RESULTS.GRANTED) {
+          Toast.show({
+            type: 'error',
+            text1: 'Permission Denied',
+            text2: 'Cannot save image without photo library permission',
+            position: 'bottom',
+          });
+          setDownloadingImageId(null);
+          return;
+        }
+      }
+      
+      // Create appropriate filename
+      const filename = imageUrl.substring(imageUrl.lastIndexOf('/') + 1);
+      const extension = filename.split('.').pop() || 'jpg';
+      const newFilename = `matrix_ai_image_${Date.now()}.${extension}`;
+      
+      // Determine where to save the file based on platform
+      const targetPath = Platform.OS === 'ios' 
+        ? `${RNFS.DocumentDirectoryPath}/${newFilename}`
+        : `${RNFS.PicturesDirectoryPath}/${newFilename}`;
+      
+      // Download the file
+      const download = RNFS.downloadFile({
+        fromUrl: imageUrl,
+        toFile: targetPath,
+        background: true,
+        discretionary: true,
+      });
+      
+      // Wait for the download to complete
+      const result = await download.promise;
+      
+      if (result.statusCode === 200) {
+        // For Android: Make the file visible in gallery
+        if (Platform.OS === 'android') {
+          // Use ToastAndroid for native toast on Android
+          ToastAndroid.show('Image saved to gallery', ToastAndroid.SHORT);
+          
+          // Use the MediaScanner to refresh the gallery
+          await RNFS.scanFile(targetPath);
+        } else if (Platform.OS === 'ios') {
+          // For iOS: Save to Camera Roll
+          await CameraRoll.save(`file://${targetPath}`, {
+            type: 'photo',
+            album: 'MatrixAI'
+          });
+          
+          // Show toast notification
+          Toast.show({
+            type: 'success',
+            text1: 'Download Complete',
+            text2: 'Image has been saved to your Photos',
+            position: 'bottom',
+          });
+        }
+      } else {
+        throw new Error('Download failed with status code: ' + result.statusCode);
+      }
+    } catch (error) {
+      console.error('Error downloading image:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Download Failed',
+        text2: 'Could not save the image. Please try again.',
+        position: 'bottom',
+      });
+    } finally {
+      setDownloadingImageId(null);
+    }
+  };
+  
+  const handleShareImage = async (imageUrl) => {
+    try {
+      // Create a temporary path to save the image for sharing
+      const filename = imageUrl.substring(imageUrl.lastIndexOf('/') + 1);
+      const extension = filename.split('.').pop() || 'jpg';
+      const tempFilename = `matrix_ai_image_${Date.now()}.${extension}`;
+      const tempFilePath = `${RNFS.TemporaryDirectoryPath}/${tempFilename}`;
+      
+      // Download the file to temporary location
+      const download = RNFS.downloadFile({
+        fromUrl: imageUrl,
+        toFile: tempFilePath,
+      });
+      
+      // Wait for download to complete
+      const result = await download.promise;
+      
+      if (result.statusCode === 200) {
+        // Share the image
+        const shareOptions = {
+          title: 'Share Image',
+          url: `file://${tempFilePath}`,
+          type: `image/${extension}`,
+          failOnCancel: false,
+        };
+        
+        await Share.open(shareOptions);
+        
+        // Clean up the temporary file
+        try {
+          await RNFS.unlink(tempFilePath);
+        } catch (cleanupError) {
+          console.error('Error cleaning up temp file:', cleanupError);
+        }
+      } else {
+        throw new Error('Download failed with status code: ' + result.statusCode);
+      }
+    } catch (error) {
+      console.error('Error sharing image:', error);
+      if (error.message !== 'User did not share') {
+        Alert.alert('Error', 'Failed to share the image. Please try again.');
+      }
+    }
+  };
+
+  const renderGridImages = () => (
+    <View style={styles.gridContainer}>
+      {gridImages.map((url, index) => (
+        <TouchableOpacity
+          key={index}
+          style={[
+            styles.imageBox,
+            selectedImage === url && styles.selectedBox,
+          ]}
+          onPress={() => handleSelectImage(url)}
+        >
+          <Animated.View
+            style={{
+              opacity: imageOpacity,
+              transform: [{ scale: imageScale }],
+            }}
+          >
+            <Image source={{ uri: url }} style={styles.image} />
+            {selectedImage === url && (
+              <View style={styles.selectedOverlay}>
+                <MaterialIcons name="check" size={20} color="#fff" />
+              </View>
+            )}
+          </Animated.View>
+          
+          {/* Add download and share buttons for each image */}
+          <View style={styles.imageActions}>
+            <TouchableOpacity 
+              style={styles.imageActionButton}
+              onPress={() => handleDownloadImage(url, `grid-${index}`)}
+              disabled={downloadingImageId === `grid-${index}`}
+            >
+              {downloadingImageId === `grid-${index}` ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <MaterialIcons name="file-download" size={16} color="#fff" />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.imageActionButton, {backgroundColor: '#28a745'}]}
+              onPress={() => handleShareImage(url)}
+            >
+              <MaterialIcons name="ios-share" size={16} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+
   const renderSkeletonGrid = () => (
     <View style={styles.gridContainer}>
       {Array.from({ length: imageCount }).map((_, index) => (
@@ -250,146 +458,142 @@ const CreateImagesScreen2 = ({ route, navigation }) => {
   );
 
   return (
-    <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
-      <StatusBar barStyle="light-content" />
-      
-      <Animatable.View 
-        animation="fadeIn" 
-        duration={600} 
-        style={styles.header}
-      >
-        <TouchableOpacity 
-          style={[styles.backButton, {backgroundColor: colors.primary}]} 
-          onPress={() => navigation.goBack()}
-        >
-          <MaterialIcons name="arrow-back" size={24} color="#fff" />
-        </TouchableOpacity>
+    <>
+      <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
+        <StatusBar barStyle="light-content" />
         
-        <Text style={[styles.heading, {color: colors.text}]}>
-          {loading ? "AI Image Generation" : "AI Generated Images"}
-        </Text>
-      </Animatable.View>
-
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
         <Animatable.View 
           animation="fadeIn" 
-          delay={300}
-          style={styles.promptContainer}
+          duration={600} 
+          style={styles.header}
         >
-          <Text style={styles.promptLabel}>PROMPT</Text>
-          <LinearGradient
-            colors={[colors.card, colors.card + '80']}
-            style={styles.promptBox}
+          <TouchableOpacity 
+            style={[styles.backButton, {backgroundColor: colors.primary}]} 
+            onPress={() => navigation.goBack()}
           >
-            <Text style={[styles.promptText, {color: '#E66902'}]}>{message}</Text>
-          </LinearGradient>
+            <MaterialIcons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          
+          <Text style={[styles.heading, {color: colors.text}]}>
+            {loading ? "AI Image Generation" : "AI Generated Images"}
+          </Text>
         </Animatable.View>
 
-        {/* Always render the images, even during loading */}
-        <Animated.View 
-          style={[
-            styles.gridContainer, 
-            { opacity: imageOpacity, display: gridImages.length > 0 ? 'flex' : 'none' }
-          ]}
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
         >
-          {gridImages.map((imageUrl, index) => (
-            imageUrl && (
-              <TouchableOpacity
-                key={index}
-                style={[
-                  styles.imageBox,
-                  selectedImage === imageUrl && styles.selectedBox,
-                ]}
-                onPress={() => imageUrl && handleSelectImage(imageUrl)}
-                disabled={loading}
-                activeOpacity={0.7}
-              >
-                <Image
-                  source={{ uri: imageUrl }}
-                  style={styles.image}
-                  resizeMode="cover"
-                />
-                {selectedImage === imageUrl && (
-                  <View style={styles.selectedOverlay}>
-                    <MaterialIcons name="check-circle" size={28} color="#fff" />
-                  </View>
-                )}
-              </TouchableOpacity>
-            )
-          ))}
-        </Animated.View>
-
-        {loading && (
-          <>
-            <Animatable.View 
-              animation="fadeIn" 
-              delay={400}
-              style={styles.loadingContainer}
-            >
-              <View style={styles.loadingIndicator}>
-                <Animated.View style={[styles.pulseCircle, { transform: [{ scale: pulseAnim }] }]}>
-                  <LottieView
-                    source={require('../assets/image2.json')}
-                    autoPlay
-                    loop
-                    style={{width: '100%', height: 100, backgroundColor: 'transparent'}}
-                  />
-                </Animated.View>
-              </View>
-              <Text style={[styles.loadingText, {color: colors.text}]}>{loadingText}</Text>
-              <Text style={[styles.subtext, {color: colors.text}]}>
-                Please don't leave this screen while images are being generated
-              </Text>
-            </Animatable.View>
-            
-            {renderSkeletonGrid()}
-          </>
-        )}
-
-        {error && !loading && (
-          <View style={styles.errorContainer}>
-            <MaterialIcons name="error-outline" size={48} color="#E66902" />
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity 
-              style={styles.tryAgainButton} 
-              onPress={handleTryAgain}
-            >
-              <MaterialIcons name="refresh" size={20} color="#000" />
-              <Text style={styles.tryAgainText}>Try Again</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {!loading && !error && (
           <Animatable.View 
-            animation="fadeInUp" 
-            duration={600}
-            style={styles.buttonsContainer}
+            animation="fadeIn" 
+            delay={300}
+            style={styles.promptContainer}
           >
-            <TouchableOpacity 
-              style={styles.tryAgainButton} 
-              onPress={handleTryAgain}
+            <Text style={styles.promptLabel}>PROMPT</Text>
+            <LinearGradient
+              colors={[colors.card, colors.card + '80']}
+              style={styles.promptBox}
             >
-              <MaterialIcons name="refresh" size={20} color="#000" />
-              <Text style={styles.tryAgainText}>Try Again</Text>
-            </TouchableOpacity>
-            
-            {selectedImage && (
-              <TouchableOpacity
-                style={[styles.downloadButton]}
-                onPress={() => Linking.openURL(selectedImage)}
-              >
-                <MaterialIcons name="file-download" size={20} color="#fff" />
-                <Text style={styles.downloadText}>Download</Text>
-              </TouchableOpacity>
-            )}
+              <Text style={[styles.promptText, {color: '#E66902'}]}>{message}</Text>
+            </LinearGradient>
           </Animatable.View>
-        )}
-      </ScrollView>
-    </SafeAreaView>
+
+          {/* Always render the images, even during loading */}
+          <Animated.View 
+            style={[
+              styles.gridContainer, 
+              { opacity: imageOpacity, display: gridImages.length > 0 ? 'flex' : 'none' }
+            ]}
+          >
+            {renderGridImages()}
+          </Animated.View>
+
+          {loading && (
+            <>
+              <Animatable.View 
+                animation="fadeIn" 
+                delay={400}
+                style={styles.loadingContainer}
+              >
+                <View style={styles.loadingIndicator}>
+                  <Animated.View style={[styles.pulseCircle, { transform: [{ scale: pulseAnim }] }]}>
+                    <LottieView
+                      source={require('../assets/image2.json')}
+                      autoPlay
+                      loop
+                      style={{width: '100%', height: 100, backgroundColor: 'transparent'}}
+                    />
+                  </Animated.View>
+                </View>
+                <Text style={[styles.loadingText, {color: colors.text}]}>{loadingText}</Text>
+                <Text style={[styles.subtext, {color: colors.text}]}>
+                  Please don't leave this screen while images are being generated
+                </Text>
+              </Animatable.View>
+              
+              {renderSkeletonGrid()}
+            </>
+          )}
+
+          {error && !loading && (
+            <View style={styles.errorContainer}>
+              <MaterialIcons name="error-outline" size={48} color="#E66902" />
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity 
+                style={styles.tryAgainButton} 
+                onPress={handleTryAgain}
+              >
+                <MaterialIcons name="refresh" size={20} color="#000" />
+                <Text style={styles.tryAgainText}>Try Again</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {!loading && !error && (
+            <Animatable.View 
+              animation="fadeInUp" 
+              duration={600}
+              style={styles.buttonsContainer}
+            >
+              <TouchableOpacity 
+                style={styles.tryAgainButton} 
+                onPress={handleTryAgain}
+              >
+                <MaterialIcons name="refresh" size={20} color="#000" />
+                <Text style={styles.tryAgainText}>Try Again</Text>
+              </TouchableOpacity>
+              
+              {selectedImage && (
+                <>
+                  <TouchableOpacity
+                    style={styles.downloadButton}
+                    onPress={() => handleDownloadImage(selectedImage, 'selected-image')}
+                    disabled={downloadingImageId === 'selected-image'}
+                  >
+                    {downloadingImageId === 'selected-image' ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <MaterialIcons name="file-download" size={20} color="#fff" />
+                    )}
+                    <Text style={styles.downloadText}>
+                      {downloadingImageId === 'selected-image' ? 'Saving...' : 'Download'}
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={[styles.downloadButton, {backgroundColor: '#28a745'}]}
+                    onPress={() => handleShareImage(selectedImage)}
+                  >
+                    <MaterialIcons name="ios-share" size={20} color="#fff" />
+                    <Text style={styles.downloadText}>Share</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </Animatable.View>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+      <Toast />
+    </>
   );
 };
 
@@ -582,6 +786,22 @@ const styles = StyleSheet.create({
     color: '#E66902',
     textAlign: 'center',
     marginVertical: 16,
+  },
+  imageActions: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    flexDirection: 'row',
+  },
+  imageActionButton: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 6,
+    borderRadius: 15,
+    marginLeft: 4,
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 
